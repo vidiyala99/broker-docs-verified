@@ -244,7 +244,7 @@ build_tables (compose.py:302) is extended, not duplicated; template_report stays
 Critical gaps: 0.
 
 ### Implementation Tasks
-- [ ] **T1 (P1, human: ~4h / CC: ~25min)**: eval: proposal-aware adapter, 2 to 3 multi-quote fixtures with cell ground truth, scorer coverage for new fields, 0 hard fails and accuracy gate 0.85. Files: backend/eval_hook.py, tests/eval/. Verify: offline eval tests, then a live run.
+- [x] **T1 (P1, human: ~4h / CC: ~25min)**: eval: proposal-aware adapter, 2 to 3 multi-quote fixtures with cell ground truth, scorer coverage for new fields, 0 hard fails and accuracy gate 0.85. Files: backend/eval_hook.py, tests/eval/. Verify: offline eval tests, then a live run.
 - [x] **T2 (P1, ~4h / ~25min)**: outline in schemas.py (kinds, caps, locked, unique ids, one table per fact section), shared plan helper at runner.py:319 and :646, template snapshot into run.parameters. Verify: backend tests plus Compare Quotes regression (test_compose.py, test_runner.py, test_api_flow.py unchanged).
 - [x] **T3 (P1, ~4h / ~20min)**: compose: block-to-fact_sections binding, drop unowned facts, per-block fact scoping for prose, cover and TOC, merge_edits survives them. Files: backend/pipeline/compose.py, backend/edits.py.
 - [x] **T4 (P1, ~3h / ~15min)**: deterministic renderer for no-AI mode, preserved across retry and regenerate. File: backend/pipeline/compose.py.

@@ -28,6 +28,28 @@ One call is one Compare Quotes run (at most 8 documents, D3). Field names
 are the keys of ``quote_generator.FIELDS``, a subset of the backend's canonical
 FactField keys (carrier_name, address, policy_term, total_premium, retention,
 quote_expiration, ...), so no key mapping is needed between backend and eval.
+
+Proposal Builder (slice 2, T1). The same callable runs one proposal when called
+with keywords::
+
+    run_eval_batch(paths, workflow="proposal-builder",
+                   parameters={"broker_name", "brokerage_name",
+                               "additional_context", "no_ai_prose"},
+                   template="standard")  # template slug; the hook adds
+                                         # template_id and outline (spec 2)
+    -> the dict above plus
+       "proposal": {
+           "workflow": str, "run_status": str, "warnings": [str],
+           "cells": [{"block_id", "row", "column", "document": path | None,
+                      "value", "state", "conflicts": [str],
+                      "citations": [{"document": path, "page": int}]}],
+           "prose": [{"section_id", "block_id", "text",
+                      "citations": [{"document": path, "page": int}]}],
+       }
+
+Called without ``workflow`` it is exactly the Compare Quotes run above. When
+the backend has no ``proposal-builder`` workflow the call raises
+NotImplementedError (the live test skips with its message).
 """
 
 from __future__ import annotations
@@ -129,3 +151,44 @@ def run_suite(adapter: Callable[[list[str]], dict], fixture_dir: Path, truths: d
     else:
         required = tuple(g.GATED_BUCKETS) if runs is None else ("clean", "multi_column")
     return metrics, g.evaluate_gates(metrics, require_buckets=required)
+
+
+# ---------------------------------------------------------------------------
+# Proposal Builder runs (slice 2, T1)
+# ---------------------------------------------------------------------------
+
+PROPOSALS_ENV = "BROKERDOCS_EVAL_PROPOSALS"
+
+
+def selected_proposals(known: list[str], env: dict | None = None) -> list[str]:
+    """Proposal ids from ``BROKERDOCS_EVAL_PROPOSALS`` (comma-separated), else all.
+    Unknown names raise ValueError."""
+    raw = (os.environ if env is None else env).get(PROPOSALS_ENV, "")
+    names = [n.strip() for n in raw.split(",") if n.strip()]
+    if not names:
+        return list(known)
+    unknown = [n for n in names if n not in known]
+    if unknown:
+        raise ValueError(f"{PROPOSALS_ENV}: unknown proposal(s) {unknown}; known: {known}")
+    return list(dict.fromkeys(names))
+
+
+def run_proposal_suite(adapter: Callable[..., dict], proposal_dir: Path, proposals: dict,
+                       doc_truths: dict, ids: list[str] | None = None):
+    """Call ``adapter`` once per proposal fixture (workflow selected by the
+    fixture), score cells and prose, apply the proposal gate.
+
+    Returns ``(metrics, gate_report)``. NotImplementedError from the adapter
+    (workflow not in the backend yet) propagates to the caller."""
+    import eval_gates as g
+
+    ids = ids if ids is not None else selected_proposals(sorted(proposals))
+    scores = []
+    for pid in ids:
+        p = proposals[pid]
+        paths = {fid: str(Path(proposal_dir) / doc_truths[fid]["file"]) for fid in p["documents"]}
+        out = adapter([paths[f] for f in p["documents"]], workflow=p["workflow"],
+                      parameters=dict(p["parameters"]), template=p.get("template"))
+        scores.append(g.score_proposal(p, doc_truths, out, paths))
+    metrics = g.aggregate_proposals(scores)
+    return metrics, g.evaluate_proposal_gates(metrics)

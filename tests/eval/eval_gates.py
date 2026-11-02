@@ -37,7 +37,13 @@ Gates (R6, initial bars, tuned after the first live run):
     zero hard fails in that bucket (gated; required when the full suite runs)
   * field accuracy on the scanned bucket: reported, not gated
   * max input tokens per run <= 600,000 (D3 budget, gated when reported)
+  * unlisted fields == 0: fail-closed fixtures (``"fail_closed": true``, the
+    proposal fixtures) report any output field their truth does not list
 Everything else is reported, not gated.
+
+Proposal Builder (slice 2, T1): ``score_proposal`` and
+``evaluate_proposal_gates`` at the end of this module score table cells and
+prose of a proposal run (see the section comment there).
 """
 
 from __future__ import annotations
@@ -317,6 +323,8 @@ class DocScore:
     parse_ok: bool | None = None
     ocr_pages_ok: bool | None = None
     outcomes: list[FieldOutcome] = field(default_factory=list)
+    # Fail-closed fixtures only: fields in the output that the truth does not list.
+    unlisted: list[dict] = field(default_factory=list)
 
 
 MISS_REASONS = ("missing", "wrong_value", "rejected", "scan_read")
@@ -374,11 +382,20 @@ def score_document(truth: Mapping, result: DocResult) -> DocScore:
 
     predicted = _dedupe(result.facts)
     truth_facts: Mapping = truth.get("facts", {}) or {}
-    # Only the eval's scored fields count. A predicted field the truth does not
-    # list (subjectivities, key_exclusions, ... exist in the backend and in the
-    # PDFs but have no truth here) is ignored: not a hard fail, absent violation
-    # or hallucination.
+    # Only the eval's scored fields count. For slice 1 fixtures a predicted field
+    # the truth does not list (subjectivities, key_exclusions, ... exist in the
+    # backend and in the PDFs but have no truth here) is ignored: not a hard
+    # fail, absent violation or hallucination. Fail-closed fixtures (the
+    # proposal fixtures, ``"fail_closed": true``) report every such field as
+    # ``unlisted`` unless the truth names it in ``unscored_fields``; the
+    # ``unlisted_fields`` gate then fails.
     fields = list(truth_facts)
+    if truth.get("fail_closed"):
+        known = set(truth_facts) | set(truth.get("unscored_fields") or {})
+        for fname in sorted({f.field for f in result.facts} - known):
+            p = predicted[fname]
+            score.unlisted.append({"fixture_id": score.fixture_id, "field": fname,
+                                   "predicted": p.value, "state": p.state, "where": "fact"})
 
     for fname in fields:
         t = truth_facts.get(fname)
@@ -490,6 +507,8 @@ class SuiteMetrics:
     misses: list[dict] = field(default_factory=list)
     # Set (to the group names that ran) when only a subset of the live runs executed.
     subset_groups: list[str] | None = None
+    # Fail-closed fixtures: output fields the truth does not list (gated at 0).
+    unlisted_fields: list[dict] = field(default_factory=list)
 
 
 def _bucket(name: str, scores: list[DocScore]) -> BucketMetrics:
@@ -536,6 +555,7 @@ def aggregate(scores: list[DocScore], run_input_tokens: Iterable[int] = ()) -> S
              "predicted": o.predicted, "state": o.state, "reason": o.miss_reason}
             for sc in scores for o in sc.outcomes if o.miss_reason
         ],
+        unlisted_fields=[u for sc in scores for u in sc.unlisted],
     )
 
 
@@ -570,6 +590,8 @@ def evaluate_gates(m: SuiteMetrics, *, require_buckets: Iterable[str] = ("clean"
     res: list[GateResult] = [
         GateResult("hard_fails (verified value not matching source)", m.hard_fails,
                    f"== {HARD_FAIL_MAX}", True, m.hard_fails <= HARD_FAIL_MAX),
+        GateResult("unlisted_fields (fail-closed fixtures)", len(m.unlisted_fields), "== 0", True,
+                   not m.unlisted_fields, "output field missing from a fail-closed truth"),
     ]
     for bucket, bar in GATED_BUCKETS.items():
         b = m.buckets.get(bucket)
@@ -642,6 +664,9 @@ def format_report(m: SuiteMetrics, g: GateReport) -> str:
     for d in m.misses:
         lines.append(f"MISS {d['fixture_id']}.{d['field']}: {d['reason']} "
                      f"(predicted {d['predicted']!r}, truth {d['truth']!r}, state {d['state']})")
+    for d in m.unlisted_fields:
+        lines.append(f"UNLISTED {d['fixture_id']}.{d['field']}: not in the truth "
+                     f"(predicted {d['predicted']!r}, state {d['state']})")
     if m.subset_groups:
         lines.append(f"subset run: only {', '.join(m.subset_groups)} executed; "
                      "gates for buckets that did not run are not evaluated")
@@ -670,3 +695,405 @@ def oracle_result(truth: Mapping, *, digital_state: str = "verified") -> DocResu
         facts.append(PredictedFact(fname, t["value"], t["page"], t["quote"], state))
     return DocResult(truth["fixture_id"], facts, option_count=exp.get("option_count", 1),
                      ocr_pages=list(exp.get("ocr_pages", [])))
+
+
+# ---------------------------------------------------------------------------
+# Proposal Builder (slice 2, task T1): table cells and prose
+# ---------------------------------------------------------------------------
+#
+# One proposal fixture is one proposal run over two or three quote PDFs. The
+# adapter returns the slice 1 per-document facts plus a ``proposal`` block:
+#
+#     {"run_status": str, "cells": [ProposalCell...], "prose": [ProseSegment...]}
+#
+# Gate (spec section 6, approved):
+#   * hard fails == 0, where a hard fail is
+#       - uncited_value: a cell shows a value with no citation;
+#       - cited_wrong_page: a citation of a shown value points at a page where
+#         the truth does not have that value, or into another document;
+#       - wrong_value / value_for_absent_field: a shown value that differs from
+#         the truth, or a value in a row that is null in the truth (as R6);
+#       - prose_number_not_in_facts: prose states a money, percent, date or
+#         limit-like number that no shown cell or cited fact holds;
+#   * table-cell accuracy >= 0.85 over cells present in the truth;
+#   * unlisted fields == 0 (fail-closed): a row or fact field the truth neither
+#     scores nor lists in ``unscored_fields``, or a cell whose column maps to no
+#     fixture document. Unscored rows still get the uncited and wrong-document
+#     checks.
+
+PROPOSAL_CELL_ACCURACY_MIN = 0.85
+PROPOSAL_HARD_FAIL_KINDS = ("uncited_value", "value_for_absent_field", "wrong_value",
+                            "cited_wrong_page", "prose_number_not_in_facts")
+
+
+@dataclass
+class ProposalCell:
+    row: str  # fact field key
+    document: str | None  # path of the column's document, as given to the adapter
+    value: str | None
+    state: str | None = None
+    citations: list[dict] = field(default_factory=list)  # [{"document": path, "page": int}]
+    block_id: str | None = None
+    column: str | None = None
+    conflicts: list[str | None] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.value, str) and not self.value.strip():
+            self.value = None
+
+    @property
+    def displayed(self) -> bool:
+        """A value shown as sourced. A cell with no state but a value counts as shown."""
+        return self.value is not None and (self.state is None or self.state in DISPLAYED)
+
+    @classmethod
+    def from_dict(cls, d: Mapping) -> "ProposalCell":
+        return cls(row=d["row"], document=d.get("document"), value=d.get("value"),
+                   state=d.get("state"), citations=list(d.get("citations") or []),
+                   block_id=d.get("block_id"), column=d.get("column"),
+                   conflicts=list(d.get("conflicts") or []))
+
+
+@dataclass
+class ProseSegment:
+    text: str
+    section_id: str | None = None
+    block_id: str | None = None
+    citations: list[dict] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: Mapping) -> "ProseSegment":
+        return cls(text=d.get("text") or "", section_id=d.get("section_id"),
+                   block_id=d.get("block_id"), citations=list(d.get("citations") or []))
+
+
+_PROSE_NUMBER = re.compile(
+    r"(?:(?P<cur>\$)\s?)?(?<![\w.,])(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?![\d,]*\d)"
+    r"(?:\s?(?P<pct>%|percent\b|per\s?cent\b))?"
+    r"(?:\s?(?P<mult>million\b|thousand\b|billion\b|mm\b|[mk]\b))?")
+
+
+def _numbers(text: str | None, *, checked_only: bool) -> set[str]:
+    """Number tokens in ``text``: ``@dYYYYMMDD`` dates and ``@n<value>[%]`` numbers.
+
+    ``checked_only`` keeps the ones the backend validator checks in prose (R1):
+    money, percents, dates, scaled or comma-grouped numbers, and plain numbers
+    of 1,000 or more that are not a bare year. Section numbers, counts and
+    small integers are not checked."""
+    if not text:
+        return set()
+    s = _sub_dates(str(text).lower().replace(" ", " "))
+    out = set(re.findall(r"@d\d{8}", s))
+    s = re.sub(r"@d\d{8}", " ", s)
+    for mo in _PROSE_NUMBER.finditer(s):
+        raw = mo.group("num")
+        try:
+            val = Decimal(raw.replace(",", ""))
+        except InvalidOperation:  # pragma: no cover - the regex guarantees digits
+            continue
+        cur, pct, mult = mo.group("cur"), mo.group("pct"), mo.group("mult")
+        if mult:
+            val *= _SCALE[mult]
+        if checked_only:
+            is_year = (not cur and not pct and not mult and "," not in raw and "." not in raw
+                       and len(raw) == 4 and 1900 <= val <= 2100)
+            if not (cur or pct or mult or "," in raw or (val >= 1000 and not is_year)):
+                continue
+        text_val = format(val.normalize(), "f")
+        if "." in text_val:
+            text_val = text_val.rstrip("0").rstrip(".")
+        out.add(f"@n{text_val}{'%' if pct else ''}")
+    return out
+
+
+def checked_numbers(text: str | None) -> set[str]:
+    return _numbers(text, checked_only=True)
+
+
+def all_numbers(text: str | None) -> set[str]:
+    return _numbers(text, checked_only=False)
+
+
+def _norm_path(p: str | None) -> str | None:
+    import os
+
+    return None if p is None else os.path.normcase(os.path.normpath(str(p)))
+
+
+@dataclass
+class ProposalScore:
+    proposal_id: str
+    documents: int = 0
+    run_status: str | None = None
+    input_tokens: int = 0
+    cells_present: int = 0
+    cells_correct: int = 0
+    cells_displayed: int = 0
+    absent_cells: int = 0
+    prose_segments: int = 0
+    prose_numbers_checked: int = 0
+    documents_failed: list[str] = field(default_factory=list)
+    hard_fails: list[dict] = field(default_factory=list)
+    unlisted: list[dict] = field(default_factory=list)
+    misses: list[dict] = field(default_factory=list)
+    decoy_hits: dict[str, int] = field(default_factory=dict)
+    fact_scores: list[DocScore] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+def score_proposal(proposal: Mapping, doc_truths: Mapping[str, Mapping], output: Mapping,
+                   paths: Mapping[str, str]) -> ProposalScore:
+    """Score one proposal run.
+
+    ``proposal`` is a ``*.proposal.json`` truth, ``doc_truths`` maps fixture id
+    to its document truth, ``output`` is the adapter's return value and
+    ``paths`` maps fixture id to the path passed to the adapter."""
+    pid = proposal["proposal_id"]
+    fids = list(proposal["documents"])
+    fid_for = {_norm_path(paths[f]): f for f in fids}
+    unscored = set(proposal.get("unscored_fields") or {})
+    block = output.get("proposal") or {}
+    sc = ProposalScore(pid, documents=len(fids), run_status=block.get("run_status"),
+                       input_tokens=int(output.get("input_tokens") or 0),
+                       warnings=list(block.get("warnings") or []))
+    docs = output.get("documents") or {}
+
+    # Per-document facts (slice 1 scoring, fail-closed): reported, and their
+    # unlisted fields count toward the gate.
+    cited_fact_values: list[str] = []
+    for fid in fids:
+        raw = docs.get(paths[fid])
+        if raw is None:
+            raw = next((v for k, v in docs.items() if _norm_path(k) == _norm_path(paths[fid])), None)
+        raw = raw or {"status": "failed", "failure_reason": "missing_from_adapter_output"}
+        result = DocResult.from_dict({**raw, "fixture_id": fid})
+        if result.status != "ok":
+            sc.documents_failed.append(fid)
+        sc.fact_scores.append(score_document(doc_truths[fid], result))
+        sc.unlisted.extend(sc.fact_scores[-1].unlisted)
+        cited_fact_values += [f.value for f in result.facts if f.displayed]
+
+    cells = [ProposalCell.from_dict(c) for c in block.get("cells") or []]
+    by: dict[tuple[str, str], list[ProposalCell]] = {}
+    for cell in cells:
+        fid = fid_for.get(_norm_path(cell.document))
+        if fid is None:
+            sc.unlisted.append({"fixture_id": pid, "field": cell.row, "predicted": cell.value,
+                                "state": cell.state, "where": "cell",
+                                "reason": f"column {cell.column!r} maps to no fixture document"})
+            if cell.displayed and not cell.citations:
+                sc.hard_fails.append({"fixture_id": pid, "field": cell.row, "kind": "uncited_value",
+                                      "predicted": cell.value, "truth": None, "pages": []})
+            continue
+        by.setdefault((fid, cell.row), []).append(cell)
+        tfacts = doc_truths[fid].get("facts") or {}
+        if cell.row not in tfacts and cell.row not in unscored:
+            sc.unlisted.append({"fixture_id": fid, "field": cell.row, "predicted": cell.value,
+                                "state": cell.state, "where": "cell"})
+        if not cell.displayed:
+            continue
+        sc.cells_displayed += 1
+        cite_fids = [fid_for.get(_norm_path(c.get("document"))) for c in cell.citations]
+        t = tfacts.get(cell.row) if cell.row in tfacts else None
+        kind = detail = None
+        if not cell.citations:
+            kind, detail = "uncited_value", "value shown with no citation"
+        elif cell.row in tfacts and t is None:
+            kind, detail = "value_for_absent_field", "value shown for a field absent from the source"
+        elif t is not None and not values_match(cell.value, t["value"], t.get("accepted_values", [])):
+            kind, detail = "wrong_value", "shown value differs from the source"
+            for d in doc_truths[fid].get("decoys") or []:
+                if d["field"] == cell.row and values_match(cell.value, d["value"]):
+                    k = d.get("kind", "decoy")
+                    sc.decoy_hits[k] = sc.decoy_hits.get(k, 0) + 1
+                    detail += f" (matches {k} decoy)"
+                    break
+        elif any(cf != fid for cf in cite_fids):
+            kind, detail = "cited_wrong_page", "citation points into another document"
+        elif t is not None and any(c.get("page") not in (t.get("pages") or [t.get("page")])
+                                   for c in cell.citations):
+            kind, detail = "cited_wrong_page", "citation points at a page without the value"
+        if kind:
+            sc.hard_fails.append({"fixture_id": fid, "field": cell.row, "kind": kind, "detail": detail,
+                                  "predicted": cell.value, "truth": t["value"] if t else None,
+                                  "pages": [c.get("page") for c in cell.citations]})
+
+    # Table-cell accuracy over cells present in the truth.
+    for fid in fids:
+        for fname, t in (doc_truths[fid].get("facts") or {}).items():
+            if t is None:
+                sc.absent_cells += 1
+                continue
+            sc.cells_present += 1
+            found = by.get((fid, fname), [])
+            ok = any(c.displayed and values_match(c.value, t["value"], t.get("accepted_values", []))
+                     for c in found)
+            if ok:
+                sc.cells_correct += 1
+                continue
+            shown = [c for c in found if c.displayed]
+            reason = ("missing_row" if not found else "wrong_value" if shown else "not_shown")
+            pick = shown[0] if shown else (found[0] if found else None)
+            sc.misses.append({"fixture_id": fid, "field": fname, "reason": reason, "truth": t["value"],
+                              "predicted": pick.value if pick else None,
+                              "state": pick.state if pick else None})
+
+    # Prose numbers must come from the facts (shown cells, conflicts, cited facts).
+    allowed: set[str] = set()
+    for v in cited_fact_values + [c.value for c in cells if c.displayed] + \
+            [v for c in cells for v in c.conflicts]:
+        allowed |= all_numbers(v)
+    for seg in (ProseSegment.from_dict(s) for s in block.get("prose") or []):
+        sc.prose_segments += 1
+        nums = checked_numbers(seg.text)
+        sc.prose_numbers_checked += len(nums)
+        for tok in sorted(nums - allowed):
+            sc.hard_fails.append({"fixture_id": pid, "field": seg.block_id or seg.section_id,
+                                  "kind": "prose_number_not_in_facts",
+                                  "detail": f"{tok} not in any fact: {seg.text[:120]!r}",
+                                  "predicted": tok, "truth": None, "pages": []})
+    return sc
+
+
+@dataclass
+class ProposalMetrics:
+    proposals: list[dict]
+    cells_present: int
+    cells_correct: int
+    cell_accuracy: float | None
+    cells_displayed: int
+    hard_fails: list[dict]
+    unlisted_fields: list[dict]
+    misses: list[dict]
+    decoy_hits: dict[str, int]
+    prose_segments: int
+    prose_numbers_checked: int
+    fact_accuracy: float | None
+    fact_hard_fails: int
+    documents_failed: list[str]
+    max_run_input_tokens: int | None
+    warnings: list[str] = field(default_factory=list)
+
+
+def aggregate_proposals(scores: list[ProposalScore]) -> ProposalMetrics:
+    present = sum(s.cells_present for s in scores)
+    correct = sum(s.cells_correct for s in scores)
+    fscores = [f for s in scores for f in s.fact_scores]
+    decoys: dict[str, int] = {}
+    for s in scores:
+        for k, v in s.decoy_hits.items():
+            decoys[k] = decoys.get(k, 0) + v
+    return ProposalMetrics(
+        proposals=[{"proposal_id": s.proposal_id, "documents": s.documents, "run_status": s.run_status,
+                    "cells_present": s.cells_present, "cells_correct": s.cells_correct,
+                    "cell_accuracy": _ratio(s.cells_correct, s.cells_present),
+                    "hard_fails": len(s.hard_fails), "input_tokens": s.input_tokens} for s in scores],
+        cells_present=present, cells_correct=correct, cell_accuracy=_ratio(correct, present),
+        cells_displayed=sum(s.cells_displayed for s in scores),
+        hard_fails=[h for s in scores for h in s.hard_fails],
+        unlisted_fields=[u for s in scores for u in s.unlisted],
+        misses=[m for s in scores for m in s.misses],
+        decoy_hits=decoys,
+        prose_segments=sum(s.prose_segments for s in scores),
+        prose_numbers_checked=sum(s.prose_numbers_checked for s in scores),
+        fact_accuracy=_ratio(sum(f.correct for f in fscores), sum(f.present for f in fscores)),
+        fact_hard_fails=sum(f.hard_fails for f in fscores),
+        documents_failed=[d for s in scores for d in s.documents_failed],
+        max_run_input_tokens=max((s.input_tokens for s in scores), default=None),
+        warnings=[f"{s.proposal_id}: {w}" for s in scores for w in s.warnings],
+    )
+
+
+def evaluate_proposal_gates(m: ProposalMetrics) -> GateReport:
+    """The approved proposal gate. No scored cells is a failure, not a pass."""
+    hard = len(m.hard_fails)
+    kinds = ", ".join(f"{k} {sum(1 for h in m.hard_fails if h['kind'] == k)}"
+                      for k in PROPOSAL_HARD_FAIL_KINDS if any(h["kind"] == k for h in m.hard_fails))
+    acc = m.cell_accuracy
+    res = [
+        GateResult("proposal_hard_fails (uncited, wrong page, wrong value, prose number)", hard,
+                   f"== {HARD_FAIL_MAX}", True, hard <= HARD_FAIL_MAX, kinds),
+        GateResult("cell_accuracy[proposal]", acc, f">= {PROPOSAL_CELL_ACCURACY_MIN:.2f}", True,
+                   acc is not None and acc >= PROPOSAL_CELL_ACCURACY_MIN,
+                   "no data" if acc is None else ""),
+        GateResult("unlisted_fields[proposal] (fail-closed)", len(m.unlisted_fields), "== 0", True,
+                   not m.unlisted_fields, "output field or column the truth does not list"),
+    ]
+    if m.max_run_input_tokens is not None:
+        res.append(GateResult("max_run_input_tokens", m.max_run_input_tokens,
+                              f"<= {RUN_INPUT_TOKEN_BUDGET}", True,
+                              m.max_run_input_tokens <= RUN_INPUT_TOKEN_BUDGET))
+    res += [
+        GateResult("fact_accuracy[proposal documents]", m.fact_accuracy, "reported", False, True),
+        GateResult("fact_hard_fails[proposal documents]", m.fact_hard_fails, "reported", False, True,
+                   "extraction level; the gate counts what the proposal shows"),
+        GateResult("prose_numbers_checked", m.prose_numbers_checked, "reported", False, True,
+                   f"{m.prose_segments} prose segments"),
+        GateResult("documents_failed", len(m.documents_failed), "reported", False, True,
+                   ", ".join(m.documents_failed)),
+    ]
+    return GateReport(res)
+
+
+def format_proposal_report(m: ProposalMetrics, g: GateReport) -> str:
+    lines = ["Proposal eval gates (slice 2, T1)", "-" * 72]
+    for r in g.results:
+        flag = ("PASS" if r.passed else "FAIL") if r.gated else "info"
+        note = f"  ({r.note})" if r.note else ""
+        lines.append(f"{flag:5} {r.name:60} {_fmt(r.value):>8}  {r.threshold}{note}")
+    lines.append("-" * 72)
+    lines.append("proposal                    docs  status      cells  correct  accuracy  hard  tokens")
+    for p in m.proposals:
+        lines.append(f"{p['proposal_id']:27} {p['documents']:4}  {str(p['run_status']):10} "
+                     f"{p['cells_present']:6} {p['cells_correct']:8} {_fmt(p['cell_accuracy']):>9} "
+                     f"{p['hard_fails']:5} {p['input_tokens']:7}")
+    for h in m.hard_fails:
+        lines.append(f"HARD FAIL {h['fixture_id']}.{h['field']}: {h['kind']}: {h.get('detail', '')} "
+                     f"(predicted {h['predicted']!r}, truth {h['truth']!r}, pages {h['pages']})")
+    for u in m.unlisted_fields:
+        lines.append(f"UNLISTED {u['fixture_id']}.{u['field']} ({u['where']}): "
+                     f"{u.get('reason', 'not in the truth')} (predicted {u['predicted']!r})")
+    for d in m.misses:
+        lines.append(f"MISS {d['fixture_id']}.{d['field']}: {d['reason']} "
+                     f"(predicted {d['predicted']!r}, truth {d['truth']!r}, state {d['state']})")
+    for w in m.warnings:
+        lines.append(f"WARNING {w}")
+    lines.append(f"overall: {'PASS' if g.passed else 'FAIL'}")
+    return "\n".join(lines)
+
+
+def proposal_report_dict(m: ProposalMetrics, g: GateReport) -> dict:
+    return {"passed": g.passed, "gates": [asdict(r) for r in g.results], "metrics": asdict(m)}
+
+
+def proposal_oracle_output(proposal: Mapping, doc_truths: Mapping[str, Mapping],
+                           paths: Mapping[str, str], *, input_tokens: int = 1000) -> dict:
+    """A perfect adapter output for one proposal: oracle facts per document, one
+    cell per truth field citing the truth page, and prose that restates a fact
+    value per document. Self-tests the scorer and documents the adapter shape."""
+    documents: dict[str, dict] = {}
+    cells: list[dict] = []
+    prose: list[dict] = [{"section_id": "cover", "block_id": "cover",
+                          "text": f"Insurance proposal prepared by {proposal['parameters']['broker_name']}",
+                          "citations": []}]
+    for i, fid in enumerate(proposal["documents"]):
+        truth, path = doc_truths[fid], paths[fid]
+        r = oracle_result(truth)
+        documents[path] = {"status": r.status, "failure_reason": r.failure_reason,
+                           "option_count": r.option_count, "ocr_pages": r.ocr_pages,
+                           "facts": [vars(f) for f in r.facts]}
+        column = chr(ord("A") + i)
+        for fname, t in (truth.get("facts") or {}).items():
+            cells.append({"block_id": "oracle-table", "row": fname, "column": column, "document": path,
+                          "value": t["value"] if t else None,
+                          "state": "verified" if t else "not_found",
+                          "citations": [{"document": path, "page": t["page"]}] if t else [],
+                          "conflicts": []})
+        total = (truth.get("facts") or {}).get("total_premium")
+        if total:
+            prose.append({"section_id": "premium", "block_id": "premium-prose",
+                          "text": f"{truth.get('carrier')} quotes a total payable of {total['value']}.",
+                          "citations": [{"document": path, "page": total["page"]}]})
+    return {"input_tokens": input_tokens, "documents": documents,
+            "proposal": {"workflow": proposal.get("workflow"), "run_status": "done",
+                         "cells": cells, "prose": prose, "warnings": []}}
