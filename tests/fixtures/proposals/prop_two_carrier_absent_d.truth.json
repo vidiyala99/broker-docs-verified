@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generator_version": 1,
+  "generator_version": 2,
   "seed": 20261102,
   "fixture_id": "prop_two_carrier_absent_d",
   "proposal_id": "prop_two_carrier_absent",
@@ -8,10 +8,10 @@
   "file": "prop_two_carrier_absent_d.pdf",
   "variant": "proposal_table",
   "gate_bucket": "proposal",
-  "description": "Quarrystone Surplus Insurance Company Cyber and Technology E&O quote for Orchard Ridge Software Inc. (table layout). Absent fields (must show no value): each_occurrence_limit, rate, retention.",
+  "description": "Quarrystone Surplus Insurance Company Cyber and Technology E&O quote for Orchard Ridge Software Inc. (table layout). Absent fields (must show no value): rate.",
   "carrier": "Quarrystone Surplus Insurance Company",
   "page_count": 3,
-  "size_bytes": 12055,
+  "size_bytes": 13321,
   "expect": {
     "parse": "ok",
     "failure_reason": null,
@@ -22,7 +22,9 @@
   "unscored_fields": {
     "key_endorsements": "free-text list, not scored",
     "key_exclusions": "free-text list, not scored",
-    "subjectivities": "free-text list, not scored"
+    "subjectivities": "free-text list, not scored",
+    "each_occurrence_limit": "ambiguous on a cyber and E&O quote (per-claim limits per coverage part), not scored",
+    "retention": "ambiguous on a cyber and E&O quote (retentions per coverage part), not scored"
   },
   "facts": {
     "named_insured": {
@@ -41,7 +43,7 @@
       "pages": [
         1
       ],
-      "quote": "Mailing Address: 77 Millbrook Street, Floor 3, Burlington, VT 05401",
+      "quote": "Address: 77 Millbrook Street, Floor 3, Burlington, VT 05401",
       "source": "text",
       "accepted_values": []
     },
@@ -87,7 +89,7 @@
       "pages": [
         1
       ],
-      "quote": "Policy Period: 01/01/2027 - 01/01/2028",
+      "quote": "Policy Term: 01/01/2027 - 01/01/2028",
       "source": "text",
       "accepted_values": []
     },
@@ -97,7 +99,7 @@
       "pages": [
         1
       ],
-      "quote": "Coverage Territory: Worldwide, provided the claim is brought in the United States",
+      "quote": "Territory: Worldwide, provided the claim is brought in the United States",
       "source": "text",
       "accepted_values": []
     },
@@ -127,7 +129,7 @@
       "pages": [
         2
       ],
-      "quote": "Total Payable: $26,181.44",
+      "quote": "Total Premium: $26,181.44",
       "source": "text",
       "accepted_values": []
     },
@@ -141,18 +143,16 @@
       "source": "text",
       "accepted_values": []
     },
-    "each_occurrence_limit": null,
     "aggregate_limit": {
       "value": "$2,000,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Maximum Policy Aggregate Limit: $2,000,000",
+      "quote": "Aggregate Limit: $2,000,000",
       "source": "text",
       "accepted_values": []
     },
-    "retention": null,
     "rate": null,
     "quote_expiration": {
       "value": "12/15/2026",
@@ -174,17 +174,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "retroactive_date": {
-      "value": "06/15/2020",
-      "page": 1,
-      "pages": [
-        1
-      ],
-      "quote": "Retroactive Date: 06/15/2020",
-      "source": "text",
-      "accepted_values": []
-    },
-    "tech_eo_limit": {
+    "cyber_aggregate_limit": {
       "value": "$1,000,000",
       "page": 2,
       "pages": [
@@ -194,27 +184,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "tech_eo_retention": {
-      "value": "$10,000",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "$10,000",
-      "source": "text",
-      "accepted_values": []
-    },
-    "cyber_liability_limit": {
-      "value": "$750,000",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "$750,000",
-      "source": "text",
-      "accepted_values": []
-    },
-    "cyber_liability_retention": {
+    "cyber_retention": {
       "value": "$12,500",
       "page": 2,
       "pages": [
@@ -224,7 +194,31 @@
       "source": "text",
       "accepted_values": []
     },
-    "cyber_crime_limit": {
+    "cyber_ransomware_sublimit": {
+      "value": "$250,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$250,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_business_interruption": {
+      "value": "$500,000, 12 hour waiting period",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$500,000, 12 hour waiting period",
+      "source": "text",
+      "accepted_values": [
+        "$500,000; 12 hour waiting period",
+        "$500,000 (12 hour waiting period)",
+        "$500,000, 12-hour waiting period"
+      ]
+    },
+    "cyber_social_engineering": {
       "value": "$100,000",
       "page": 2,
       "pages": [
@@ -234,15 +228,62 @@
       "source": "text",
       "accepted_values": []
     },
-    "cyber_crime_retention": {
-      "value": "$5,000",
+    "eo_each_claim_limit": {
+      "value": "$750,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "$5,000",
+      "quote": "$750,000",
       "source": "text",
       "accepted_values": []
+    },
+    "eo_aggregate_limit": {
+      "value": "$1,500,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,500,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_retention": {
+      "value": "$10,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$10,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_retroactive_date": {
+      "value": "06/15/2020",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "06/15/2020",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_defense_costs": {
+      "value": "Within the limits of liability",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Within the limits of liability",
+      "source": "text",
+      "accepted_values": [
+        "Within the limit",
+        "Within limits",
+        "Inside the limits",
+        "Inside limits",
+        "Within",
+        "Defense costs within the limits"
+      ]
     }
   },
   "decoys": [],

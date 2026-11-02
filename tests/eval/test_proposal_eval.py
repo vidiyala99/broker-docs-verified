@@ -110,12 +110,27 @@ def test_truth_lists_every_proposal_field(proposal_doc_truths):
 
 
 def test_cyber_and_eo_sub_coverage_facts_are_present(proposal_doc_truths):
+    always = [*pg.EO, "cyber_aggregate_limit", "cyber_retention", "cyber_business_interruption",
+              "minimum_earned_premium", "aggregate_limit"]
     for fid, t in proposal_doc_truths.items():
-        for f in ("tech_eo_limit", "tech_eo_retention", "cyber_liability_limit",
-                  "cyber_liability_retention", "retroactive_date", "minimum_earned_premium"):
+        for f in always:
             assert t["facts"][f] is not None, (fid, f)
-    with_crime = [f for f, t in proposal_doc_truths.items() if t["facts"]["cyber_crime_limit"]]
-    assert len(with_crime) == len(proposal_doc_truths) - 1
+    for f in ("cyber_ransomware_sublimit", "cyber_social_engineering"):
+        missing = [fid for fid, t in proposal_doc_truths.items() if t["facts"][f] is None]
+        assert missing == ["prop_two_carrier_absent_e"], f
+
+
+def test_every_printed_fact_uses_its_schema_label(proposal_doc_truths):
+    """The schema is the contract: a tagged line is the field's schema label and its value
+    (a table cell is the value alone, its label on the same baseline)."""
+    for fid, t in proposal_doc_truths.items():
+        for fname, fact in t["facts"].items():
+            if fact is None:
+                continue
+            if t["variant"] == "proposal_table" and fname in pg.COVERAGE_PARTS:
+                assert fact["quote"] == fact["value"], (fid, fname)
+            else:
+                assert fact["quote"] == f"{pg.SCHEMA_LABELS[fname]}: {fact['value']}", (fid, fname)
 
 
 def test_fact_values_sit_on_their_truth_pages_only(proposal_doc_truths, proposal_dir):
@@ -148,26 +163,34 @@ def test_values_are_distinct_within_a_document(proposal_doc_truths):
 def test_absent_fields_have_no_labeled_line(proposal_doc_truths, proposal_dir):
     t = proposal_doc_truths["prop_two_carrier_absent_e"]
     text = " ".join(p.get_text() for p in fitz.open(proposal_dir / t["file"]))
-    for f in ("am_best_rating", "cyber_crime_limit", "cyber_crime_retention"):
+    for f in ("am_best_rating", "cyber_ransomware_sublimit", "cyber_social_engineering"):
         assert t["facts"][f] is None
         assert pg.LABELS[f] not in text
-    for f in pg.POLICY_WIDE_NULL:
-        assert qg.LABELS[f] + ":" not in text
+    for fid, t in proposal_doc_truths.items():
+        text = " ".join(p.get_text() for p in fitz.open(proposal_dir / t["file"]))
+        for f in (*pg.POLICY_WIDE_NULL, "each_occurrence_limit", "retention"):
+            assert pg.LABELS[f] + ":" not in text and qg.LABELS[f] + ":" not in text, (fid, f)
 
 
 def test_amended_value_is_truth_and_declared_value_is_a_decoy(proposal_doc_truths, proposal_dir):
     t = proposal_doc_truths["prop_amended_f"]
-    fact = t["facts"]["cyber_crime_limit"]
+    fact = t["facts"]["cyber_social_engineering"]
     (decoy,) = t["decoys"]
-    assert decoy == {"field": "cyber_crime_limit", "value": "$250,000", "kind": "superseded", "pages": [2]}
-    assert fact["value"] == "$500,000" and fact["page"] == 4 == t["page_count"]
-    assert "Amendment of Cyber Crime Sublimit" in fitz.open(proposal_dir / t["file"])[3].get_text()
+    assert decoy == {"field": "cyber_social_engineering", "value": "$100,000", "kind": "superseded",
+                     "pages": [2]}
+    assert fact["value"] == "$250,000" and fact["page"] == 4 == t["page_count"]
+    assert fact["quote"] == "Social Engineering Sublimit: $250,000"
+    doc = fitz.open(proposal_dir / t["file"])
+    assert "Amendment of Social Engineering Sublimit" in doc[3].get_text()
+    # The trap: the superseded figure is printed under the same schema label.
+    assert "Social Engineering Sublimit: $100,000" in doc[1].get_text()
 
 
 def test_table_layout_reads_values_before_labels(proposal_dir):
     text = fitz.open(proposal_dir / "prop_three_carrier_c.pdf")[1].get_text()
     lines = [ln for ln in text.splitlines() if ln.strip()]
-    assert lines.index("$3,000,000") < lines.index("Technology Errors and Omissions Liability Limit")
+    assert lines.index("$1,500,000") < lines.index("E&O Each Claim Limit")
+    assert lines.index("Outside the limits of liability") < lines.index("Cyber Aggregate Limit")
 
 
 def test_no_em_dashes_and_no_real_carriers(proposal_doc_truths, proposal_dir, proposals):
@@ -181,8 +204,29 @@ def test_no_em_dashes_and_no_real_carriers(proposal_doc_truths, proposal_dir, pr
 
 
 def test_proposal_fields_extend_the_slice_1_fields():
-    assert set(qg.FIELDS) <= set(pg.FIELDS)
+    assert set(qg.FIELDS) <= set(pg.FIELDS) | set(pg.UNSCORED_FIELDS)
     assert not set(pg.PROPOSAL_ONLY_FIELDS) & set(qg.FIELDS)
+    assert not set(pg.FIELDS) & set(pg.UNSCORED_FIELDS)
+    assert set(pg.FIELDS) | set(pg.UNSCORED_FIELDS) == set(pg.SCHEMA_LABELS)
+
+
+def _db_fact_field_literals() -> dict[str, str]:
+    """key -> label of every FactField(...) literal in backend/db.py, read without importing it."""
+    import ast
+
+    out = {}
+    tree = ast.parse((REPO_ROOT / "backend" / "db.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "FactField":
+            kw = {k.arg: k.value.value for k in node.keywords if isinstance(k.value, ast.Constant)}
+            out[kw["key"]] = kw["label"]
+    return out
+
+
+def test_schema_labels_match_backend_db_source():
+    """Runs without backend deps: the mirrored labels are the FactField literals in db.py."""
+    literals = _db_fact_field_literals()
+    assert {k: literals.get(k) for k in pg.SCHEMA_LABELS} == pg.SCHEMA_LABELS
 
 
 def test_proposal_fields_match_the_backend_proposal_schema():
@@ -199,13 +243,16 @@ def test_proposal_fields_match_the_backend_proposal_schema():
     db.init_db(engine)
     with db.make_session_factory(engine)() as s:
         wf = s.scalar(select(models.Workflow).where(models.Workflow.slug == pg.WORKFLOW))
-        keys = {f["key"] for f in wf.fact_schema} if wf is not None else None
+        schema = [dict(f) for f in wf.fact_schema] if wf is not None else None
     engine.dispose()
-    if keys is None:
+    if schema is None:
         pytest.skip("proposal-builder workflow not seeded yet (lane A)")
+    keys = {f["key"] for f in schema}
     assert not set(pg.FIELDS) - keys, f"eval fields missing from the backend: {sorted(set(pg.FIELDS) - keys)}"
     extra = keys - set(pg.FIELDS) - set(pg.UNSCORED_FIELDS)
     assert not extra, f"backend fields the proposal truth does not list (fail-closed): {sorted(extra)}"
+    # Labels too: every printed fact line uses its schema label.
+    assert [(f["key"], f["label"]) for f in schema] == list(pg.SCHEMA_LABELS.items())
 
 
 # ---------------------------------------------------------------------------
@@ -229,24 +276,24 @@ def test_cited_wrong_page_is_a_hard_fail(proposals, proposal_doc_truths, paths):
     path = paths["prop_three_carrier_a"]
 
     def wrong_page(out):
-        _cell(out, path, "tech_eo_limit")["citations"] = [{"document": path, "page": 3}]
+        _cell(out, path, "eo_each_claim_limit")["citations"] = [{"document": path, "page": 3}]
 
     sc = _score(proposals, proposal_doc_truths, paths, "prop_three_carrier", wrong_page)
-    assert [(h["field"], h["kind"]) for h in sc.hard_fails] == [("tech_eo_limit", "cited_wrong_page")]
+    assert [(h["field"], h["kind"]) for h in sc.hard_fails] == [("eo_each_claim_limit", "cited_wrong_page")]
     assert sc.cells_correct == sc.cells_present  # the value is right; only its source is wrong
     m = g.aggregate_proposals([sc])
     rep = g.evaluate_proposal_gates(m)
     assert not rep.passed
     assert [r.name for r in rep.failures] == [
         "proposal_hard_fails (uncited, wrong page, wrong value, prose number)"]
-    assert "HARD FAIL prop_three_carrier_a.tech_eo_limit: cited_wrong_page" in g.format_proposal_report(m, rep)
+    assert "HARD FAIL prop_three_carrier_a.eo_each_claim_limit: cited_wrong_page" in g.format_proposal_report(m, rep)
 
 
 def test_one_wrong_page_among_several_citations_is_a_hard_fail(proposals, proposal_doc_truths, paths):
     path = paths["prop_amended_f"]
 
     def extra(out):
-        _cell(out, path, "cyber_crime_limit")["citations"].append({"document": path, "page": 2})
+        _cell(out, path, "cyber_social_engineering")["citations"].append({"document": path, "page": 2})
 
     sc = _score(proposals, proposal_doc_truths, paths, "prop_amended", extra)
     assert [h["kind"] for h in sc.hard_fails] == ["cited_wrong_page"]
@@ -302,28 +349,54 @@ def test_cell_with_no_state_but_a_value_counts_as_shown(proposals, proposal_doc_
 
 
 def test_value_in_a_null_row_is_a_hard_fail(proposals, proposal_doc_truths, paths):
-    """A sub-coverage retention shown in the policy-wide retention row."""
-    a = paths["prop_three_carrier_a"]
+    """A coverage the quote does not include, filled with another sublimit; and a rate
+    the quote does not state."""
+    e = paths["prop_two_carrier_absent_e"]
 
     def fill(out):
-        c = _cell(out, a, "retention")
-        c.update(value="$25,000", state="verified", citations=[{"document": a, "page": 2}])
+        c = _cell(out, e, "cyber_social_engineering")
+        c.update(value="$250,000", state="verified", citations=[{"document": e, "page": 2}])
+        c = _cell(out, e, "rate")
+        c.update(value="$7,500", state="verified", citations=[{"document": e, "page": 2}])
 
-    sc = _score(proposals, proposal_doc_truths, paths, "prop_three_carrier", fill)
-    assert [(h["field"], h["kind"]) for h in sc.hard_fails] == [("retention", "value_for_absent_field")]
+    sc = _score(proposals, proposal_doc_truths, paths, "prop_two_carrier_absent", fill)
+    assert sorted((h["field"], h["kind"]) for h in sc.hard_fails) == [
+        ("cyber_social_engineering", "value_for_absent_field"), ("rate", "value_for_absent_field")]
+
+
+def test_ambiguous_policy_wide_rows_are_unscored_but_checked(proposals, proposal_doc_truths, paths):
+    """each_occurrence_limit and retention are unscored on cyber and E&O quotes (their
+    descriptions fit a per-claim figure): a cited value there is not a hard fail, an
+    uncited one is."""
+    a = paths["prop_three_carrier_a"]
+
+    def fill(cite):
+        def mutate(out):
+            out["proposal"]["cells"] += [
+                {"row": "each_occurrence_limit", "document": a, "column": "A", "value": "$1,000,000",
+                 "state": "verified", "citations": [{"document": a, "page": 2}] if cite else []},
+                {"row": "retention", "document": a, "column": "A", "value": "$25,000",
+                 "state": "verified", "citations": [{"document": a, "page": 2}]},
+            ]
+        return mutate
+
+    sc = _score(proposals, proposal_doc_truths, paths, "prop_three_carrier", fill(True))
+    assert sc.hard_fails == [] and sc.unlisted == []
+    sc = _score(proposals, proposal_doc_truths, paths, "prop_three_carrier", fill(False))
+    assert [(h["field"], h["kind"]) for h in sc.hard_fails] == [("each_occurrence_limit", "uncited_value")]
 
 
 def test_superseded_value_is_a_hard_fail_with_a_decoy_hit(proposals, proposal_doc_truths, paths):
     f = paths["prop_amended_f"]
 
     def superseded(out):
-        c = _cell(out, f, "cyber_crime_limit")
-        c.update(value="$250,000", citations=[{"document": f, "page": 2}])
+        c = _cell(out, f, "cyber_social_engineering")
+        c.update(value="$100,000", citations=[{"document": f, "page": 2}])
 
     sc = _score(proposals, proposal_doc_truths, paths, "prop_amended", superseded)
     assert [h["kind"] for h in sc.hard_fails] == ["wrong_value"]
     assert sc.decoy_hits == {"superseded": 1}
-    assert sc.misses[0]["field"] == "cyber_crime_limit" and sc.misses[0]["reason"] == "wrong_value"
+    assert sc.misses[0]["field"] == "cyber_social_engineering" and sc.misses[0]["reason"] == "wrong_value"
 
 
 def test_prose_number_not_in_the_facts_is_a_hard_fail(proposals, proposal_doc_truths, paths):
@@ -352,12 +425,12 @@ def test_conflicting_values_may_be_stated_in_prose(proposals, proposal_doc_truth
     f = paths["prop_amended_f"]
 
     def conflict(out):
-        c = _cell(out, f, "cyber_crime_limit")
+        c = _cell(out, f, "cyber_social_engineering")
         c.update(value=None, state="not_found", citations=[{"document": f, "page": 2},
                                                           {"document": f, "page": 4}],
-                 conflicts=["$250,000", "$500,000"])
+                 conflicts=["$100,000", "$250,000"])
         out["proposal"]["prose"].append({"section_id": "s", "block_id": "b", "citations": [],
-                                         "text": "The quote states both $250,000 and $500,000."})
+                                         "text": "The quote states both $100,000 and $250,000."})
 
     sc = _score(proposals, proposal_doc_truths, paths, "prop_amended", conflict)
     assert sc.hard_fails == []

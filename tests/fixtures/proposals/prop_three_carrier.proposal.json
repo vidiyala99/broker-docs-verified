@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "generator_version": 1,
+  "generator_version": 2,
   "seed": 20261102,
   "proposal_id": "prop_three_carrier",
   "workflow": "proposal-builder",
   "gate_bucket": "proposal",
-  "description": "Three carriers quoting one Cyber and Technology E&O program; two single-column quotes and one whose insuring agreement schedule is a two-column table.",
+  "description": "Three carriers quoting one Cyber and Technology E&O program; two single-column quotes and one whose coverage part schedule is a two-column table.",
   "template": "standard",
   "parameters": {
     "broker_name": "Dana Whitfield",
     "brokerage_name": "Meridian Risk Partners LLC",
-    "additional_context": "The client asked for a side-by-side view of the cyber crime coverage.",
+    "additional_context": "The client asked for a side-by-side view of the social engineering cover.",
     "no_ai_prose": false
   },
   "documents": [
@@ -30,24 +30,27 @@
     "policy_form",
     "total_premium",
     "taxes_and_fees",
-    "each_occurrence_limit",
     "aggregate_limit",
-    "retention",
     "rate",
     "quote_expiration",
     "minimum_earned_premium",
-    "retroactive_date",
-    "tech_eo_limit",
-    "tech_eo_retention",
-    "cyber_liability_limit",
-    "cyber_liability_retention",
-    "cyber_crime_limit",
-    "cyber_crime_retention"
+    "cyber_aggregate_limit",
+    "cyber_retention",
+    "cyber_ransomware_sublimit",
+    "cyber_business_interruption",
+    "cyber_social_engineering",
+    "eo_each_claim_limit",
+    "eo_aggregate_limit",
+    "eo_retention",
+    "eo_retroactive_date",
+    "eo_defense_costs"
   ],
   "unscored_fields": {
     "key_endorsements": "free-text list, not scored",
     "key_exclusions": "free-text list, not scored",
-    "subjectivities": "free-text list, not scored"
+    "subjectivities": "free-text list, not scored",
+    "each_occurrence_limit": "ambiguous on a cyber and E&O quote (per-claim limits per coverage part), not scored",
+    "retention": "ambiguous on a cyber and E&O quote (retentions per coverage part), not scored"
   },
   "fail_closed": true
 }

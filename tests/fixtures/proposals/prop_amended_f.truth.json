@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generator_version": 1,
+  "generator_version": 2,
   "seed": 20261102,
   "fixture_id": "prop_amended_f",
   "proposal_id": "prop_amended",
@@ -8,10 +8,10 @@
   "file": "prop_amended_f.pdf",
   "variant": "proposal_clean",
   "gate_bucket": "proposal",
-  "description": "Kestrel Bay Assurance Company Cyber and Technology E&O quote for Pinecrest Analytics Corp. (clean layout). Absent fields (must show no value): each_occurrence_limit, rate, retention.",
+  "description": "Kestrel Bay Assurance Company Cyber and Technology E&O quote for Pinecrest Analytics Corp. (clean layout). Absent fields (must show no value): rate.",
   "carrier": "Kestrel Bay Assurance Company",
   "page_count": 4,
-  "size_bytes": 12410,
+  "size_bytes": 13618,
   "expect": {
     "parse": "ok",
     "failure_reason": null,
@@ -22,7 +22,9 @@
   "unscored_fields": {
     "key_endorsements": "free-text list, not scored",
     "key_exclusions": "free-text list, not scored",
-    "subjectivities": "free-text list, not scored"
+    "subjectivities": "free-text list, not scored",
+    "each_occurrence_limit": "ambiguous on a cyber and E&O quote (per-claim limits per coverage part), not scored",
+    "retention": "ambiguous on a cyber and E&O quote (retentions per coverage part), not scored"
   },
   "facts": {
     "named_insured": {
@@ -41,7 +43,7 @@
       "pages": [
         1
       ],
-      "quote": "Mailing Address: 4100 Wexford Lane, Building B, Boise, ID 83702",
+      "quote": "Address: 4100 Wexford Lane, Building B, Boise, ID 83702",
       "source": "text",
       "accepted_values": []
     },
@@ -84,7 +86,7 @@
       "pages": [
         1
       ],
-      "quote": "Policy Period: 2027-01-01 to 2028-01-01",
+      "quote": "Policy Term: 2027-01-01 to 2028-01-01",
       "source": "text",
       "accepted_values": []
     },
@@ -94,7 +96,7 @@
       "pages": [
         1
       ],
-      "quote": "Coverage Territory: Worldwide, provided the claim is brought in the United States",
+      "quote": "Territory: Worldwide, provided the claim is brought in the United States",
       "source": "text",
       "accepted_values": []
     },
@@ -124,7 +126,7 @@
       "pages": [
         2
       ],
-      "quote": "Total Payable: $18,225.00",
+      "quote": "Total Premium: $18,225.00",
       "source": "text",
       "accepted_values": []
     },
@@ -138,18 +140,16 @@
       "source": "text",
       "accepted_values": []
     },
-    "each_occurrence_limit": null,
     "aggregate_limit": {
-      "value": "$3,000,000",
+      "value": "$4,000,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Maximum Policy Aggregate Limit: $3,000,000",
+      "quote": "Aggregate Limit: $4,000,000",
       "source": "text",
       "accepted_values": []
     },
-    "retention": null,
     "rate": null,
     "quote_expiration": {
       "value": "2026-12-15",
@@ -171,86 +171,127 @@
       "source": "text",
       "accepted_values": []
     },
-    "retroactive_date": {
-      "value": "09/01/2018",
-      "page": 1,
-      "pages": [
-        1
-      ],
-      "quote": "Retroactive Date: 09/01/2018",
-      "source": "text",
-      "accepted_values": []
-    },
-    "tech_eo_limit": {
-      "value": "$3,000,000",
+    "cyber_aggregate_limit": {
+      "value": "$1,500,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Technology Errors and Omissions Liability Limit: $3,000,000",
+      "quote": "Cyber Aggregate Limit: $1,500,000",
       "source": "text",
       "accepted_values": []
     },
-    "tech_eo_retention": {
-      "value": "$40,000",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Technology Errors and Omissions Liability Retention: $40,000",
-      "source": "text",
-      "accepted_values": []
-    },
-    "cyber_liability_limit": {
-      "value": "$2,000,000",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Network Security and Privacy Liability Limit: $2,000,000",
-      "source": "text",
-      "accepted_values": []
-    },
-    "cyber_liability_retention": {
+    "cyber_retention": {
       "value": "$25,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Network Security and Privacy Liability Retention: $25,000",
+      "quote": "Cyber Retention: $25,000",
       "source": "text",
       "accepted_values": []
     },
-    "cyber_crime_limit": {
-      "value": "$500,000",
-      "page": 4,
-      "pages": [
-        4
-      ],
-      "quote": "Amended Cyber Crime Sublimit: $500,000 each claim",
-      "source": "text",
-      "accepted_values": []
-    },
-    "cyber_crime_retention": {
-      "value": "$15,000",
+    "cyber_ransomware_sublimit": {
+      "value": "$750,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Cyber Crime Retention: $15,000",
+      "quote": "Ransomware / Extortion Sublimit: $750,000",
       "source": "text",
       "accepted_values": []
+    },
+    "cyber_business_interruption": {
+      "value": "$500,000, 8 hour waiting period",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Business Interruption Sublimit: $500,000, 8 hour waiting period",
+      "source": "text",
+      "accepted_values": [
+        "$500,000; 8 hour waiting period",
+        "$500,000 (8 hour waiting period)",
+        "$500,000, 8-hour waiting period"
+      ]
+    },
+    "cyber_social_engineering": {
+      "value": "$250,000",
+      "page": 4,
+      "pages": [
+        4
+      ],
+      "quote": "Social Engineering Sublimit: $250,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_each_claim_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Each Claim Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_aggregate_limit": {
+      "value": "$3,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Aggregate Limit: $3,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_retention": {
+      "value": "$40,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Retention: $40,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_retroactive_date": {
+      "value": "09/01/2018",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Retroactive Date: 09/01/2018",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_defense_costs": {
+      "value": "Within the limits of liability",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Defense Costs: Within the limits of liability",
+      "source": "text",
+      "accepted_values": [
+        "Within the limit",
+        "Within limits",
+        "Inside the limits",
+        "Inside limits",
+        "Within",
+        "Defense costs within the limits"
+      ]
     }
   },
   "decoys": [
     {
-      "field": "cyber_crime_limit",
-      "value": "$250,000",
+      "field": "cyber_social_engineering",
+      "value": "$100,000",
       "kind": "superseded",
       "pages": [
         2
       ]
     }
   ],
-  "notes": "Effective value chosen as truth: a later endorsement amends the declarations."
+  "notes": "Effective value chosen as truth: a later endorsement replaces the scheduled sublimit."
 }

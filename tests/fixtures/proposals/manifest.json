@@ -1,5 +1,5 @@
 {
-  "generator_version": 1,
+  "generator_version": 2,
   "seed": 20261102,
   "pymupdf_version": "1.28.0",
   "fields": {
@@ -14,24 +14,27 @@
     "policy_form": "Policy form name and number",
     "total_premium": "Total premium payable, including taxes and fees (printed as Total Payable)",
     "taxes_and_fees": "Taxes and fees",
-    "each_occurrence_limit": "Each occurrence limit",
     "aggregate_limit": "General aggregate limit",
-    "retention": "Deductible or retention",
     "rate": "Rate basis",
     "quote_expiration": "Date the quote expires",
     "minimum_earned_premium": "Minimum earned premium, as an amount or percent",
-    "retroactive_date": "Retroactive date for claims-made coverage, or Full Prior Acts",
-    "tech_eo_limit": "Technology errors and omissions liability limit, each claim",
-    "tech_eo_retention": "Technology errors and omissions liability retention, each claim",
-    "cyber_liability_limit": "Network security and privacy liability limit, each claim",
-    "cyber_liability_retention": "Network security and privacy liability retention, each claim",
-    "cyber_crime_limit": "Cyber crime (funds transfer fraud, social engineering) sublimit",
-    "cyber_crime_retention": "Cyber crime retention"
+    "cyber_aggregate_limit": "Cyber liability policy aggregate limit",
+    "cyber_retention": "Cyber retention or deductible",
+    "cyber_ransomware_sublimit": "Cyber extortion or ransomware sublimit",
+    "cyber_business_interruption": "Cyber business interruption sublimit and waiting period",
+    "cyber_social_engineering": "Social engineering or funds transfer fraud sublimit",
+    "eo_each_claim_limit": "Errors and omissions each claim limit",
+    "eo_aggregate_limit": "Errors and omissions aggregate limit",
+    "eo_retention": "Errors and omissions retention or deductible",
+    "eo_retroactive_date": "Retroactive date for claims-made E&O coverage, or Full Prior Acts",
+    "eo_defense_costs": "Whether defense costs are inside or outside the E&O limit"
   },
   "unscored_fields": {
     "key_endorsements": "free-text list, not scored",
     "key_exclusions": "free-text list, not scored",
-    "subjectivities": "free-text list, not scored"
+    "subjectivities": "free-text list, not scored",
+    "each_occurrence_limit": "ambiguous on a cyber and E&O quote (per-claim limits per coverage part), not scored",
+    "retention": "ambiguous on a cyber and E&O quote (retentions per coverage part), not scored"
   },
   "proposals": [
     {
@@ -42,7 +45,7 @@
         "prop_three_carrier_b",
         "prop_three_carrier_c"
       ],
-      "description": "Three carriers quoting one Cyber and Technology E&O program; two single-column quotes and one whose insuring agreement schedule is a two-column table."
+      "description": "Three carriers quoting one Cyber and Technology E&O program; two single-column quotes and one whose coverage part schedule is a two-column table."
     },
     {
       "proposal_id": "prop_two_carrier_absent",
@@ -51,7 +54,7 @@
         "prop_two_carrier_absent_d",
         "prop_two_carrier_absent_e"
       ],
-      "description": "Two carriers, no-AI-prose mode. One quote states no cyber crime coverage and no AM Best rating (null cells that must show no value); the other is a two-column table."
+      "description": "Two carriers, no-AI-prose mode. One quote has no ransomware or social engineering cover and no AM Best rating (null cells that must show no value); the other is a two-column table."
     },
     {
       "proposal_id": "prop_amended",
@@ -60,7 +63,7 @@
         "prop_amended_f",
         "prop_amended_g"
       ],
-      "description": "Two carriers; one quote's declarations state a cyber crime sublimit that a later endorsement replaces (truth is the amended figure, the declared one is a decoy)."
+      "description": "Two carriers; one quote's coverage schedule states a social engineering sublimit that a later endorsement replaces (truth is the amended figure, the scheduled one is a decoy)."
     }
   ],
   "documents": [
@@ -71,9 +74,9 @@
       "truth": "prop_three_carrier_a.truth.json",
       "variant": "proposal_clean",
       "gate_bucket": "proposal",
-      "sha256": "6daee26c128f79ef70086a9b207c25ab6f7f5eb8d47c59674b5274043a796763",
+      "sha256": "2714f6490bc3edd0027da03ed8ff60ef578c8c42b96a2712b0228494675a260d",
       "deterministic_bytes": true,
-      "description": "Tidewater Cyber Insurance Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (clean layout). Absent fields (must show no value): each_occurrence_limit, rate, retention."
+      "description": "Tidewater Cyber Insurance Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (clean layout). Absent fields (must show no value): rate."
     },
     {
       "fixture_id": "prop_three_carrier_b",
@@ -82,9 +85,9 @@
       "truth": "prop_three_carrier_b.truth.json",
       "variant": "proposal_clean",
       "gate_bucket": "proposal",
-      "sha256": "69bbe7ea0f9b4d5809e11f5cb728f221061e82f485769105ba54773f0498d298",
+      "sha256": "fd95cee3af60237b386b58e14ffcf732c88954521c7b83e1a67de8e8af70afcd",
       "deterministic_bytes": true,
-      "description": "Lakemont Specialty Indemnity Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (clean layout). Absent fields (must show no value): each_occurrence_limit, rate, retention."
+      "description": "Lakemont Specialty Indemnity Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (clean layout). Absent fields (must show no value): rate."
     },
     {
       "fixture_id": "prop_three_carrier_c",
@@ -93,9 +96,9 @@
       "truth": "prop_three_carrier_c.truth.json",
       "variant": "proposal_table",
       "gate_bucket": "proposal",
-      "sha256": "c126ce7d6aa8aa5e0f7d3d3bc8ffa0635c1210cb3f28164126a7bb77a4e93df1",
+      "sha256": "64c8885dd560fdc44cd409bc9fc022264f39d5d9053d775d083276a37ce91f04",
       "deterministic_bytes": true,
-      "description": "Brassridge Technology Insurance Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (table layout). Absent fields (must show no value): each_occurrence_limit, rate, retention."
+      "description": "Brassridge Technology Insurance Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (table layout). Absent fields (must show no value): rate."
     },
     {
       "fixture_id": "prop_two_carrier_absent_d",
@@ -104,9 +107,9 @@
       "truth": "prop_two_carrier_absent_d.truth.json",
       "variant": "proposal_table",
       "gate_bucket": "proposal",
-      "sha256": "00baf94723a60549cceed5f2a9d7806d1929fdc72d2dc3bde9df2a6e073edca4",
+      "sha256": "a31910f2a148aba78ed7d932439090de628be58f00944bafdb1b71c168182c4b",
       "deterministic_bytes": true,
-      "description": "Quarrystone Surplus Insurance Company Cyber and Technology E&O quote for Orchard Ridge Software Inc. (table layout). Absent fields (must show no value): each_occurrence_limit, rate, retention."
+      "description": "Quarrystone Surplus Insurance Company Cyber and Technology E&O quote for Orchard Ridge Software Inc. (table layout). Absent fields (must show no value): rate."
     },
     {
       "fixture_id": "prop_two_carrier_absent_e",
@@ -115,9 +118,9 @@
       "truth": "prop_two_carrier_absent_e.truth.json",
       "variant": "proposal_clean",
       "gate_bucket": "proposal",
-      "sha256": "98dd9c7825532c8b2953f13f65852eb623c191e89fb01fec7296f92a3339f264",
+      "sha256": "43d7efef8ede83231b1a9c572d1a759f61d574e169ce4640a9720a1c9f8255de",
       "deterministic_bytes": true,
-      "description": "Silverfen Casualty Company Cyber and Technology E&O quote for Orchard Ridge Software Inc. (clean layout). Absent fields (must show no value): am_best_rating, cyber_crime_limit, cyber_crime_retention, each_occurrence_limit, rate, retention."
+      "description": "Silverfen Casualty Company Cyber and Technology E&O quote for Orchard Ridge Software Inc. (clean layout). Absent fields (must show no value): am_best_rating, cyber_ransomware_sublimit, cyber_social_engineering, rate."
     },
     {
       "fixture_id": "prop_amended_f",
@@ -126,9 +129,9 @@
       "truth": "prop_amended_f.truth.json",
       "variant": "proposal_clean",
       "gate_bucket": "proposal",
-      "sha256": "e27f8cb9dee15cc87e24798f3004725d8146aaf429368b8e1f6e5e0297afe6d1",
+      "sha256": "d922e79a877f5f12ec98fc9e487af546882478668a9df054dd87f1a6d7c02964",
       "deterministic_bytes": true,
-      "description": "Kestrel Bay Assurance Company Cyber and Technology E&O quote for Pinecrest Analytics Corp. (clean layout). Absent fields (must show no value): each_occurrence_limit, rate, retention."
+      "description": "Kestrel Bay Assurance Company Cyber and Technology E&O quote for Pinecrest Analytics Corp. (clean layout). Absent fields (must show no value): rate."
     },
     {
       "fixture_id": "prop_amended_g",
@@ -137,9 +140,9 @@
       "truth": "prop_amended_g.truth.json",
       "variant": "proposal_clean",
       "gate_bucket": "proposal",
-      "sha256": "9884a9fe55834640661c5dcf34a0432e16f0ee4fdbdc8888d97a525378db9e42",
+      "sha256": "78f54557aee74067fd14390e7c76e4f672178061b3a701a4348c7b37c64c8077",
       "deterministic_bytes": true,
-      "description": "Fernhollow Mutual Insurance Company Cyber and Technology E&O quote for Pinecrest Analytics Corp. (clean layout). Absent fields (must show no value): each_occurrence_limit, rate, retention."
+      "description": "Fernhollow Mutual Insurance Company Cyber and Technology E&O quote for Pinecrest Analytics Corp. (clean layout). Absent fields (must show no value): rate."
     }
   ]
 }

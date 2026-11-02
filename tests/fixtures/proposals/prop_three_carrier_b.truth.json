@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generator_version": 1,
+  "generator_version": 2,
   "seed": 20261102,
   "fixture_id": "prop_three_carrier_b",
   "proposal_id": "prop_three_carrier",
@@ -8,10 +8,10 @@
   "file": "prop_three_carrier_b.pdf",
   "variant": "proposal_clean",
   "gate_bucket": "proposal",
-  "description": "Lakemont Specialty Indemnity Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (clean layout). Absent fields (must show no value): each_occurrence_limit, rate, retention.",
+  "description": "Lakemont Specialty Indemnity Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (clean layout). Absent fields (must show no value): rate.",
   "carrier": "Lakemont Specialty Indemnity Company",
   "page_count": 3,
-  "size_bytes": 11056,
+  "size_bytes": 11888,
   "expect": {
     "parse": "ok",
     "failure_reason": null,
@@ -22,7 +22,9 @@
   "unscored_fields": {
     "key_endorsements": "free-text list, not scored",
     "key_exclusions": "free-text list, not scored",
-    "subjectivities": "free-text list, not scored"
+    "subjectivities": "free-text list, not scored",
+    "each_occurrence_limit": "ambiguous on a cyber and E&O quote (per-claim limits per coverage part), not scored",
+    "retention": "ambiguous on a cyber and E&O quote (retentions per coverage part), not scored"
   },
   "facts": {
     "named_insured": {
@@ -41,7 +43,7 @@
       "pages": [
         1
       ],
-      "quote": "Mailing Address: 2210 Brookfield Parkway, Suite 400, Madison, WI 53703",
+      "quote": "Address: 2210 Brookfield Parkway, Suite 400, Madison, WI 53703",
       "source": "text",
       "accepted_values": []
     },
@@ -83,7 +85,7 @@
       "pages": [
         1
       ],
-      "quote": "Policy Period: January 1, 2027 to January 1, 2028",
+      "quote": "Policy Term: January 1, 2027 to January 1, 2028",
       "source": "text",
       "accepted_values": []
     },
@@ -93,7 +95,7 @@
       "pages": [
         1
       ],
-      "quote": "Coverage Territory: Worldwide, provided the claim is brought in the United States",
+      "quote": "Territory: Worldwide, provided the claim is brought in the United States",
       "source": "text",
       "accepted_values": []
     },
@@ -123,7 +125,7 @@
       "pages": [
         2
       ],
-      "quote": "Total Payable: $22,025.00",
+      "quote": "Total Premium: $22,025.00",
       "source": "text",
       "accepted_values": []
     },
@@ -137,18 +139,16 @@
       "source": "text",
       "accepted_values": []
     },
-    "each_occurrence_limit": null,
     "aggregate_limit": {
       "value": "$5,000,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Maximum Policy Aggregate Limit: $5,000,000",
+      "quote": "Aggregate Limit: $5,000,000",
       "source": "text",
       "accepted_values": []
     },
-    "retention": null,
     "rate": null,
     "quote_expiration": {
       "value": "December 15, 2026",
@@ -170,75 +170,116 @@
       "source": "text",
       "accepted_values": []
     },
-    "retroactive_date": {
-      "value": "03/01/2019",
-      "page": 1,
-      "pages": [
-        1
-      ],
-      "quote": "Retroactive Date: 03/01/2019",
-      "source": "text",
-      "accepted_values": []
-    },
-    "tech_eo_limit": {
-      "value": "$5,000,000",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Technology Errors and Omissions Liability Limit: $5,000,000",
-      "source": "text",
-      "accepted_values": []
-    },
-    "tech_eo_retention": {
-      "value": "$50,000",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Technology Errors and Omissions Liability Retention: $50,000",
-      "source": "text",
-      "accepted_values": []
-    },
-    "cyber_liability_limit": {
+    "cyber_aggregate_limit": {
       "value": "$3,000,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Network Security and Privacy Liability Limit: $3,000,000",
+      "quote": "Cyber Aggregate Limit: $3,000,000",
       "source": "text",
       "accepted_values": []
     },
-    "cyber_liability_retention": {
+    "cyber_retention": {
       "value": "$35,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Network Security and Privacy Liability Retention: $35,000",
+      "quote": "Cyber Retention: $35,000",
       "source": "text",
       "accepted_values": []
     },
-    "cyber_crime_limit": {
+    "cyber_ransomware_sublimit": {
+      "value": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Ransomware / Extortion Sublimit: $1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_business_interruption": {
+      "value": "$1,500,000, 12 hour waiting period",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Business Interruption Sublimit: $1,500,000, 12 hour waiting period",
+      "source": "text",
+      "accepted_values": [
+        "$1,500,000; 12 hour waiting period",
+        "$1,500,000 (12 hour waiting period)",
+        "$1,500,000, 12-hour waiting period"
+      ]
+    },
+    "cyber_social_engineering": {
       "value": "$500,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Cyber Crime Sublimit: $500,000",
+      "quote": "Social Engineering Sublimit: $500,000",
       "source": "text",
       "accepted_values": []
     },
-    "cyber_crime_retention": {
-      "value": "$20,000",
+    "eo_each_claim_limit": {
+      "value": "$2,000,000",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Cyber Crime Retention: $20,000",
+      "quote": "E&O Each Claim Limit: $2,000,000",
       "source": "text",
       "accepted_values": []
+    },
+    "eo_aggregate_limit": {
+      "value": "$4,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Aggregate Limit: $4,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_retention": {
+      "value": "$50,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Retention: $50,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_retroactive_date": {
+      "value": "03/01/2019",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Retroactive Date: 03/01/2019",
+      "source": "text",
+      "accepted_values": []
+    },
+    "eo_defense_costs": {
+      "value": "Within the limits of liability",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "E&O Defense Costs: Within the limits of liability",
+      "source": "text",
+      "accepted_values": [
+        "Within the limit",
+        "Within limits",
+        "Inside the limits",
+        "Inside limits",
+        "Within",
+        "Defense costs within the limits"
+      ]
     }
   },
   "decoys": [],

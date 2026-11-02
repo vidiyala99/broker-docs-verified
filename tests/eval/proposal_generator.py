@@ -11,11 +11,14 @@ Rendering reuses ``quote_generator`` (same PyMuPDF calls, fixed metadata,
 The files live in their own folder with their own manifest so the slice 1
 catalogue (and its byte hashes) is untouched.
 
-Fields: the slice 1 eval fields plus the per-coverage facts the cyber and E&O
-sub-tables need (``PROPOSAL_ONLY_FIELDS``). These keys are the eval's half of
-the contract with the ``proposal-builder`` fact schema (lane A); the scorer is
-fail-closed for proposal fixtures, so a backend field missing from this list
-is reported and fails the gate until the truth lists it.
+Fields: the schema is the contract. The fact schema of the seeded
+``proposal-builder`` workflow (``backend/db.py``: the Compare Quotes fields
+plus the cyber and E&O fields) is mirrored in ``SCHEMA_LABELS``, and every
+fact a document prints uses the schema label of its field. Every schema key is
+either scored (``FIELDS``) or listed as unscored (``UNSCORED_FIELDS``); the
+scorer is fail-closed for proposal fixtures. ``test_proposal_eval`` checks the
+keys and labels against the seeded workflow (and against the ``FactField``
+literals in ``backend/db.py`` when the backend is not importable).
 
 Usage::
 
@@ -40,60 +43,106 @@ import fitz  # PyMuPDF
 import quote_generator as qg
 from quote_generator import MARGIN, Cursor, Fixture, PageSpec, Run
 
-GENERATOR_VERSION = 1
+GENERATOR_VERSION = 2
 DEFAULT_SEED = 20261102
 TRUTH_SCHEMA_VERSION = 1
 GATE_BUCKET = "proposal"
 WORKFLOW = "proposal-builder"
 FIXED_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "proposals"
 
-# Per-coverage facts for the cyber and technology E&O sub-tables. Proposed
-# backend FactField keys for the proposal-builder fact schema (spec section 2.1).
-PROPOSAL_ONLY_FIELDS: dict[str, str] = {
-    "minimum_earned_premium": "Minimum earned premium, as an amount or percent",
-    "retroactive_date": "Retroactive date for claims-made coverage, or Full Prior Acts",
-    "tech_eo_limit": "Technology errors and omissions liability limit, each claim",
-    "tech_eo_retention": "Technology errors and omissions liability retention, each claim",
-    "cyber_liability_limit": "Network security and privacy liability limit, each claim",
-    "cyber_liability_retention": "Network security and privacy liability retention, each claim",
-    "cyber_crime_limit": "Cyber crime (funds transfer fraud, social engineering) sublimit",
-    "cyber_crime_retention": "Cyber crime retention",
+# Key -> label of every FactField in the seeded proposal-builder fact_schema,
+# in schema order. Must equal backend/db.py (checked by test_proposal_eval).
+SCHEMA_LABELS: dict[str, str] = {
+    "carrier_name": "Carrier",
+    "named_insured": "Named Insured",
+    "address": "Address",
+    "admitted_status": "Admitted Status",
+    "am_best_rating": "AM Best Rating",
+    "policy_term": "Policy Term",
+    "territory": "Territory",
+    "producer": "Producer",
+    "policy_form": "Policy Form",
+    "rate": "Rate",
+    "total_premium": "Total Premium",
+    "taxes_and_fees": "Taxes and Fees",
+    "minimum_earned_premium": "Minimum Earned Premium",
+    "each_occurrence_limit": "Each Occurrence Limit",
+    "aggregate_limit": "Aggregate Limit",
+    "retention": "Deductible / Retention",
+    "key_endorsements": "Key Endorsements",
+    "key_exclusions": "Key Exclusions",
+    "subjectivities": "Subjectivities",
+    "quote_expiration": "Quote Valid Until",
+    "cyber_aggregate_limit": "Cyber Aggregate Limit",
+    "cyber_retention": "Cyber Retention",
+    "cyber_ransomware_sublimit": "Ransomware / Extortion Sublimit",
+    "cyber_business_interruption": "Business Interruption Sublimit",
+    "cyber_social_engineering": "Social Engineering Sublimit",
+    "eo_each_claim_limit": "E&O Each Claim Limit",
+    "eo_aggregate_limit": "E&O Aggregate Limit",
+    "eo_retention": "E&O Retention",
+    "eo_retroactive_date": "E&O Retroactive Date",
+    "eo_defense_costs": "E&O Defense Costs",
 }
-FIELDS: dict[str, str] = {**qg.FIELDS, **PROPOSAL_ONLY_FIELDS}
 
-# Backend fact fields that exist in the Compare Quotes schema but have no cell
-# truth here (free-text lists). Listed so the fail-closed scorer knows them;
-# their cells are still checked for an uncited value and a citation into the
-# wrong document.
+# Schema fields with no cell truth. Listed so the fail-closed scorer knows
+# them; their cells still get the uncited-value and wrong-document checks.
 UNSCORED_FIELDS: dict[str, str] = {
     "key_endorsements": "free-text list, not scored",
     "key_exclusions": "free-text list, not scored",
     "subjectivities": "free-text list, not scored",
+    # The schema descriptions ("Per-occurrence or per-claim limit", "Deductible
+    # or self-insured retention") do not tell a model to leave these empty on a
+    # cyber and E&O quote, which states per-claim limits and retentions per
+    # coverage part. Neither a value nor no value is wrong, so they are unscored.
+    "each_occurrence_limit": "ambiguous on a cyber and E&O quote (per-claim limits per coverage part), not scored",
+    "retention": "ambiguous on a cyber and E&O quote (retentions per coverage part), not scored",
 }
 
-# Fields a cyber or E&O quote does not state as one policy-wide figure. Truth is
-# null: a value shown in these rows would put a sub-coverage figure (for
-# example a retention of one insuring agreement) in a policy-wide row.
-POLICY_WIDE_NULL = ("each_occurrence_limit", "retention", "rate")
-
-LABELS: dict[str, str] = {
-    **qg.LABELS,
-    "aggregate_limit": "Maximum Policy Aggregate Limit",
-    "minimum_earned_premium": "Minimum Earned Premium",
-    "retroactive_date": "Retroactive Date",
-    "tech_eo_limit": "Technology Errors and Omissions Liability Limit",
-    "tech_eo_retention": "Technology Errors and Omissions Liability Retention",
-    "cyber_liability_limit": "Network Security and Privacy Liability Limit",
-    "cyber_liability_retention": "Network Security and Privacy Liability Retention",
-    "cyber_crime_limit": "Cyber Crime Sublimit",
-    "cyber_crime_retention": "Cyber Crime Retention",
+# Per-coverage facts of the cyber and E&O sub-tables, plus the minimum earned
+# premium (a Compare Quotes field the slice 1 eval does not score).
+PROPOSAL_ONLY_FIELDS: dict[str, str] = {
+    "minimum_earned_premium": "Minimum earned premium, as an amount or percent",
+    "cyber_aggregate_limit": "Cyber liability policy aggregate limit",
+    "cyber_retention": "Cyber retention or deductible",
+    "cyber_ransomware_sublimit": "Cyber extortion or ransomware sublimit",
+    "cyber_business_interruption": "Cyber business interruption sublimit and waiting period",
+    "cyber_social_engineering": "Social engineering or funds transfer fraud sublimit",
+    "eo_each_claim_limit": "Errors and omissions each claim limit",
+    "eo_aggregate_limit": "Errors and omissions aggregate limit",
+    "eo_retention": "Errors and omissions retention or deductible",
+    "eo_retroactive_date": "Retroactive date for claims-made E&O coverage, or Full Prior Acts",
+    "eo_defense_costs": "Whether defense costs are inside or outside the E&O limit",
 }
+FIELDS: dict[str, str] = {
+    **{k: v for k, v in qg.FIELDS.items() if k not in UNSCORED_FIELDS},
+    **PROPOSAL_ONLY_FIELDS,
+}
+
+# Scored fields a cyber and E&O quote does not state. Truth is null: the
+# quotes print no rate and the "Rate" description ("Rate as stated") gives a
+# model nothing to fill it with.
+POLICY_WIDE_NULL = ("rate",)
+
+# Printed labels: the schema label of every field, plus the untagged premium line.
+LABELS: dict[str, str] = {**SCHEMA_LABELS, "premium": "Annual Premium"}
 
 DECL = ["named_insured", "address", "producer", "carrier_name", "admitted_status",
-        "am_best_rating", "policy_term", "policy_form", "territory", "retroactive_date"]
+        "am_best_rating", "policy_term", "policy_form", "territory"]
 PREMIUM = ["premium", "taxes_and_fees", "total_premium", "minimum_earned_premium"]
-AGREEMENTS = ["tech_eo_limit", "tech_eo_retention", "cyber_liability_limit",
-              "cyber_liability_retention", "cyber_crime_limit", "cyber_crime_retention"]
+CYBER = ["cyber_aggregate_limit", "cyber_retention", "cyber_ransomware_sublimit",
+         "cyber_business_interruption", "cyber_social_engineering"]
+EO = ["eo_each_claim_limit", "eo_aggregate_limit", "eo_retention", "eo_retroactive_date",
+      "eo_defense_costs"]
+COVERAGE_PARTS = CYBER + EO
+
+OUTSIDE = "Outside the limits of liability"
+WITHIN = "Within the limits of liability"
+DEFENSE_ALIASES = {
+    OUTSIDE: ["Outside the limit", "Outside limits", "Outside", "Defense costs outside the limits"],
+    WITHIN: ["Within the limit", "Within limits", "Inside the limits", "Inside limits", "Within",
+             "Defense costs within the limits"],
+}
 
 FORMS = [
     "TEC 100 07 24 Technology Errors and Omissions and Cyber Liability Policy (Claims-Made)",
@@ -110,8 +159,8 @@ FILLER = [
     "submitted by the producer and is subject to the terms of the policy as issued.",
     "Coverage is written on a claims-made and reported basis. Claims must be first made "
     "against the insured and reported to the carrier during the policy period.",
-    "Defense costs are within and reduce the limits of liability. Each retention applies "
-    "to damages and claim expenses for each claim under the insuring agreement shown.",
+    "All sublimits are part of, and not in addition to, the aggregate limit of the coverage "
+    "part shown. Each retention applies to each claim under the coverage part shown.",
     "Subjectivities must be received within thirty days of binding. Failure to satisfy them "
     "may result in cancellation of the policy for underwriting reasons.",
 ]
@@ -123,8 +172,8 @@ class CarrierSpec:
     name: str
     admitted: bool
     layout: str  # clean | table
-    retro: str
-    limits: dict[str, str]
+    policy_aggregate: str
+    coverage: dict[str, str]  # COVERAGE_PARTS field -> printed value
     absent: tuple[str, ...] = ()
     rating: str = "A (Excellent), XII"
     meprem: str = "25%"
@@ -142,6 +191,11 @@ class ProposalSpec:
     additional_context: str = ""
 
 
+def _cov(cyber_agg, cyber_ret, ransom, bi, se, eo_each, eo_agg, eo_ret, retro, defense) -> dict:
+    vals = [cyber_agg, cyber_ret, ransom, bi, se, eo_each, eo_agg, eo_ret, retro, defense]
+    return {f: v for f, v in zip(COVERAGE_PARTS, vals) if v is not None}
+
+
 INSUREDS = [
     ("Halcyon Data Systems LLC", "2210 Brookfield Parkway, Suite 400, Madison, WI 53703"),
     ("Orchard Ridge Software Inc.", "77 Millbrook Street, Floor 3, Burlington, VT 05401"),
@@ -154,67 +208,57 @@ PROPOSALS: tuple[ProposalSpec, ...] = (
     ProposalSpec(
         "prop_three_carrier", "standard", INSUREDS[0],
         "Three carriers quoting one Cyber and Technology E&O program; two single-column "
-        "quotes and one whose insuring agreement schedule is a two-column table.",
+        "quotes and one whose coverage part schedule is a two-column table.",
         (
-            CarrierSpec("a", "Tidewater Cyber Insurance Company", False, "clean", "Full Prior Acts",
-                        {"aggregate_limit": "$3,000,000", "tech_eo_limit": "$2,000,000",
-                         "tech_eo_retention": "$25,000", "cyber_liability_limit": "$1,000,000",
-                         "cyber_liability_retention": "$15,000", "cyber_crime_limit": "$250,000",
-                         "cyber_crime_retention": "$10,000"}),
-            CarrierSpec("b", "Lakemont Specialty Indemnity Company", True, "clean", "03/01/2019",
-                        {"aggregate_limit": "$5,000,000", "tech_eo_limit": "$5,000,000",
-                         "tech_eo_retention": "$50,000", "cyber_liability_limit": "$3,000,000",
-                         "cyber_liability_retention": "$35,000", "cyber_crime_limit": "$500,000",
-                         "cyber_crime_retention": "$20,000"},
+            CarrierSpec("a", "Tidewater Cyber Insurance Company", False, "clean", "$3,000,000",
+                        _cov("$1,500,000", "$15,000", "$500,000", "$750,000, 8 hour waiting period",
+                             "$250,000", "$1,000,000", "$2,000,000", "$25,000", "Full Prior Acts",
+                             OUTSIDE)),
+            CarrierSpec("b", "Lakemont Specialty Indemnity Company", True, "clean", "$5,000,000",
+                        _cov("$3,000,000", "$35,000", "$1,000,000", "$1,500,000, 12 hour waiting period",
+                             "$500,000", "$2,000,000", "$4,000,000", "$50,000", "03/01/2019", WITHIN),
                         rating="A+ (Superior), XIV", meprem="35%"),
-            CarrierSpec("c", "Brassridge Technology Insurance Company", True, "table",
-                        "January 1, 2021",
-                        {"aggregate_limit": "$4,000,000", "tech_eo_limit": "$3,000,000",
-                         "tech_eo_retention": "$30,000", "cyber_liability_limit": "$2,000,000",
-                         "cyber_liability_retention": "$20,000", "cyber_crime_limit": "$150,000",
-                         "cyber_crime_retention": "$7,500"},
+            CarrierSpec("c", "Brassridge Technology Insurance Company", True, "table", "$4,000,000",
+                        _cov("$2,000,000", "$20,000", "$750,000", "$1,000,000, 10 hour waiting period",
+                             "$150,000", "$1,500,000", "$3,000,000", "$30,000", "January 1, 2021",
+                             OUTSIDE),
                         rating="A- (Excellent), IX", meprem="$2,500"),
         ),
-        additional_context="The client asked for a side-by-side view of the cyber crime coverage.",
+        additional_context="The client asked for a side-by-side view of the social engineering cover.",
     ),
     ProposalSpec(
         "prop_two_carrier_absent", "premier", INSUREDS[1],
-        "Two carriers, no-AI-prose mode. One quote states no cyber crime coverage and no AM "
-        "Best rating (null cells that must show no value); the other is a two-column table.",
+        "Two carriers, no-AI-prose mode. One quote has no ransomware or social engineering "
+        "cover and no AM Best rating (null cells that must show no value); the other is a "
+        "two-column table.",
         (
-            CarrierSpec("d", "Quarrystone Surplus Insurance Company", False, "table", "06/15/2020",
-                        {"aggregate_limit": "$2,000,000", "tech_eo_limit": "$1,000,000",
-                         "tech_eo_retention": "$10,000", "cyber_liability_limit": "$750,000",
-                         "cyber_liability_retention": "$12,500", "cyber_crime_limit": "$100,000",
-                         "cyber_crime_retention": "$5,000"},
+            CarrierSpec("d", "Quarrystone Surplus Insurance Company", False, "table", "$2,000,000",
+                        _cov("$1,000,000", "$12,500", "$250,000", "$500,000, 12 hour waiting period",
+                             "$100,000", "$750,000", "$1,500,000", "$10,000", "06/15/2020", WITHIN),
                         rating="A (Excellent), X", meprem="$1,500"),
-            CarrierSpec("e", "Silverfen Casualty Company", True, "clean", "Full Prior Acts",
-                        {"aggregate_limit": "$1,000,000", "tech_eo_limit": "$1,000,000",
-                         "tech_eo_retention": "$15,000", "cyber_liability_limit": "$500,000",
-                         "cyber_liability_retention": "$7,500"},
-                        absent=("am_best_rating", "cyber_crime_limit", "cyber_crime_retention"),
+            CarrierSpec("e", "Silverfen Casualty Company", True, "clean", "$2,000,000",
+                        _cov("$500,000", "$7,500", None, "$250,000, 24 hour waiting period", None,
+                             "$1,000,000", "$1,500,000", "$15,000", "Full Prior Acts", OUTSIDE),
+                        absent=("am_best_rating", "cyber_ransomware_sublimit",
+                                "cyber_social_engineering"),
                         meprem="30%"),
         ),
         no_ai_prose=True,
     ),
     ProposalSpec(
         "prop_amended", "standard", INSUREDS[2],
-        "Two carriers; one quote's declarations state a cyber crime sublimit that a later "
-        "endorsement replaces (truth is the amended figure, the declared one is a decoy).",
+        "Two carriers; one quote's coverage schedule states a social engineering sublimit that "
+        "a later endorsement replaces (truth is the amended figure, the scheduled one is a decoy).",
         (
-            CarrierSpec("f", "Kestrel Bay Assurance Company", True, "clean", "09/01/2018",
-                        {"aggregate_limit": "$3,000,000", "tech_eo_limit": "$3,000,000",
-                         "tech_eo_retention": "$40,000", "cyber_liability_limit": "$2,000,000",
-                         "cyber_liability_retention": "$25,000", "cyber_crime_limit": "$500,000",
-                         "cyber_crime_retention": "$15,000"},
+            CarrierSpec("f", "Kestrel Bay Assurance Company", True, "clean", "$4,000,000",
+                        _cov("$1,500,000", "$25,000", "$750,000", "$500,000, 8 hour waiting period",
+                             "$250,000", "$2,000,000", "$3,000,000", "$40,000", "09/01/2018", WITHIN),
                         rating="A (Excellent), XI", meprem="25%",
-                        amended={"field": "cyber_crime_limit", "declared": "$250,000",
-                                 "amended": "$500,000", "endorsement_no": 2}),
-            CarrierSpec("g", "Fernhollow Mutual Insurance Company", False, "clean", "11/01/2022",
-                        {"aggregate_limit": "$2,000,000", "tech_eo_limit": "$2,000,000",
-                         "tech_eo_retention": "$20,000", "cyber_liability_limit": "$1,500,000",
-                         "cyber_liability_retention": "$17,500", "cyber_crime_limit": "$200,000",
-                         "cyber_crime_retention": "$12,000"},
+                        amended={"field": "cyber_social_engineering", "declared": "$100,000",
+                                 "amended": "$250,000", "endorsement_no": 2}),
+            CarrierSpec("g", "Fernhollow Mutual Insurance Company", False, "clean", "$3,000,000",
+                        _cov("$1,000,000", "$17,500", "$500,000", "$250,000, 12 hour waiting period",
+                             "$200,000", "$1,500,000", "$2,000,000", "$20,000", "11/01/2022", OUTSIDE),
                         rating="A- (Excellent), VIII", meprem="40%"),
         ),
         additional_context="Keep the executive summary short and plain.",
@@ -251,14 +295,27 @@ def build_profile(rng: random.Random, spec: CarrierSpec, idx: int,
         "total_premium": qg._money(total, True),
         "quote_expiration": qg.VALID_UNTIL_FORMATS[idx % len(qg.VALID_UNTIL_FORMATS)],
         "minimum_earned_premium": spec.meprem,
-        "retroactive_date": spec.retro,
-        **spec.limits,
+        "aggregate_limit": spec.policy_aggregate,
+        **spec.coverage,
     }
-    for f in POLICY_WIDE_NULL:
+    for f in (*POLICY_WIDE_NULL, "each_occurrence_limit", "retention", *spec.absent):
         profile[f] = None
-    for f in spec.absent:
-        profile[f] = None
+    if spec.amended:
+        profile[spec.amended["field"]] = spec.amended["amended"]
     return profile
+
+
+def accepted_values(profile: dict) -> dict[str, list[str]]:
+    acc = qg._accepted(profile)
+    bi = profile.get("cyber_business_interruption")
+    if bi:
+        amount, wait = bi.split(", ", 1)
+        hours = wait.split(" ", 1)[0]
+        acc["cyber_business_interruption"] = [f"{amount}; {wait}", f"{amount} ({wait})",
+                                              f"{amount}, {hours}-hour waiting period"]
+    if profile.get("eo_defense_costs"):
+        acc["eo_defense_costs"] = DEFENSE_ALIASES[profile["eo_defense_costs"]]
+    return acc
 
 
 def _fact(c: Cursor, profile: dict, f: str) -> None:
@@ -275,30 +332,34 @@ def _header(c: Cursor, carrier: str, page_no: int, n_pages: int) -> None:
     c.y += 10
 
 
-def _agreements_clean(c: Cursor, profile: dict, amended: dict | None) -> None:
-    c.line("Insuring Agreements", size=12, bold=True)
-    c.y += 4
-    for f in AGREEMENTS:
-        if amended and f == amended["field"]:
-            # Declared figure, later replaced by an endorsement: printed, not tagged.
-            c.line(f"{LABELS[f]} (per Declarations): {amended['declared']}")
-            continue
-        _fact(c, profile, f)
+def _parts_clean(c: Cursor, profile: dict, amended: dict | None) -> None:
+    for title, fields in (("Cyber Liability Coverage Part", CYBER),
+                          ("Errors and Omissions Coverage Part", EO)):
+        c.line(title, size=12, bold=True)
+        c.y += 4
+        for f in fields:
+            if amended and f == amended["field"]:
+                # Scheduled figure, later replaced by an endorsement: printed with the
+                # schema label (the trap), not tagged.
+                c.line(f"{LABELS[f]}: {amended['declared']}")
+                continue
+            _fact(c, profile, f)
+        c.y += 8
 
 
-def _agreements_table(c: Cursor, profile: dict) -> list[Run]:
+def _parts_table(c: Cursor, profile: dict) -> list[Run]:
     """Two-column schedule: labels left, values right on shared baselines, value
     column first in content-stream order (extraction order differs from reading order)."""
-    c.line("SCHEDULE OF INSURING AGREEMENTS", size=11, bold=True)
+    c.line("SCHEDULE OF COVERAGE PARTS", size=11, bold=True)
     c.y += 6
     label_runs, value_runs = [], []
     y = c.y
-    for f in AGREEMENTS:
+    for f in COVERAGE_PARTS:
         v = profile.get(f)
         if v is None:
             continue
         label_runs.append(Run(MARGIN, y, LABELS[f]))
-        value_runs.append(Run(420.0, y, v, field=f, value=v))
+        value_runs.append(Run(330.0, y, v, field=f, value=v))
         y += 16
     c.y = y + 8
     return value_runs + label_runs
@@ -323,16 +384,16 @@ def carrier_pages(profile: dict, spec: CarrierSpec) -> list[PageSpec]:
     for f in PREMIUM:
         _fact(p2, profile, f)
     p2.y += 10
-    p2.line("Limits of Liability", size=12, bold=True)
+    p2.line("Maximum Policy Aggregate, all coverage parts combined", size=12, bold=True)
     p2.y += 4
     _fact(p2, profile, "aggregate_limit")
     p2.y += 8
     extra: list[Run] = []
     if spec.layout == "table":
-        extra = _agreements_table(p2, profile)
+        extra = _parts_table(p2, profile)
     else:
-        _agreements_clean(p2, profile, spec.amended)
-    p2.y += 10
+        _parts_clean(p2, profile, spec.amended)
+    p2.y += 4
     p2.para(FILLER[2])
     p2_runs = p2.runs[:]
     if extra:
@@ -355,17 +416,18 @@ def carrier_pages(profile: dict, spec: CarrierSpec) -> list[PageSpec]:
 
     if spec.amended:
         a = spec.amended
+        label = LABELS[a["field"]]
         p4 = Cursor()
         _header(p4, spec.name, 4, n)
-        p4.line(f"Endorsement No. {a['endorsement_no']}: Amendment of {LABELS[a['field']]}",
-                size=12, bold=True)
+        p4.line(f"Endorsement No. {a['endorsement_no']}: Amendment of {label}", size=12, bold=True)
         p4.y += 4
-        p4.line("This endorsement modifies insurance provided under the policy form shown in "
-                "the Declarations.", size=9)
-        p4.line(f"The {LABELS[a['field']]} shown in the Declarations is deleted and replaced "
-                "with the following:", size=9)
-        p4.line(f"Amended {LABELS[a['field']]}: {a['amended']} each claim",
-                field_name=a["field"], value=a["amended"])
+        p4.line("This endorsement modifies insurance provided under the policy form shown in", size=9)
+        p4.line("the Declarations.", size=9)
+        p4.line(f"The {label} shown in the Cyber Liability Coverage Part schedule is deleted",
+                size=9)
+        p4.line("and replaced with the following:", size=9)
+        p4.y += 4
+        p4.line(f"{label}: {a['amended']}", field_name=a["field"], value=a["amended"])
         pages.append(PageSpec(runs=p4.runs))
     return pages
 
@@ -392,13 +454,14 @@ def build_doc_fixtures(seed: int = DEFAULT_SEED) -> list[DocFixture]:
         for c_idx, spec in enumerate(p.carriers):
             idx = p_idx * 3 + c_idx
             prof = build_profile(random.Random(seed * 37 + idx), spec, idx, p.insured)
-            acc = qg._accepted(prof)
+            acc = accepted_values(prof)
             decoys = []
             notes = ""
             if spec.amended:
                 decoys.append({"field": spec.amended["field"], "value": spec.amended["declared"],
                                "kind": "superseded"})
-                notes = "Effective value chosen as truth: a later endorsement amends the declarations."
+                notes = ("Effective value chosen as truth: a later endorsement replaces the "
+                         "scheduled sublimit.")
             absent = sorted(set(POLICY_WIDE_NULL) | set(spec.absent))
             fx = Fixture(
                 doc_fixture_id(p.proposal_id, spec.letter), f"proposal_{spec.layout}", GATE_BUCKET,
