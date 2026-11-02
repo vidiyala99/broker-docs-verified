@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "conflicting_endorsement",
+  "file": "conflicting_endorsement.pdf",
+  "variant": "conflicting_endorsement",
+  "gate_bucket": "report_only",
+  "description": "Declarations state one deductible; a later endorsement replaces it. Truth is the amended (effective) deductible; the declared figure is a decoy.",
+  "carrier": "Stonegate Assurance Company",
+  "page_count": 3,
+  "size_bytes": 10757,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Cedar Hollow Hospitality LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Cedar Hollow Hospitality LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "mailing_address": {
+      "value": "305 Orchard Lane, Asheville, NC 28801",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 305 Orchard Lane, Asheville, NC 28801",
+      "source": "text",
+      "accepted_values": []
+    },
+    "carrier": {
+      "value": "Stonegate Assurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Carrier: Stonegate Assurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Admitted",
+      "source": "text",
+      "accepted_values": []
+    },
+    "am_best_rating": {
+      "value": "A+ (Superior), XIV",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AM Best Rating: A+ (Superior), XIV",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_period": {
+      "value": "January 1, 2027 to January 1, 2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: January 1, 2027 to January 1, 2028",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "State of Ohio only",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage Territory: State of Ohio only",
+      "source": "text",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Meridian Risk Partners LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "source": "text",
+      "accepted_values": []
+    },
+    "premium": {
+      "value": "$14,375",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Annual Premium: $14,375",
+      "source": "text",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$150.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Taxes and Fees: $150.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "total_cost": {
+      "value": "$14,525.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $14,525.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "aggregate_limit": {
+      "value": "$4,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "General Aggregate Limit: $4,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "deductible": {
+      "value": "$10,000",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Amended Deductible: $10,000 per occurrence",
+      "source": "text",
+      "accepted_values": []
+    },
+    "rate": {
+      "value": "$6.733 per $1,000 of gross sales",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Rate: $6.733 per $1,000 of gross sales",
+      "source": "text",
+      "accepted_values": []
+    },
+    "quote_valid_until": {
+      "value": "December 15, 2026",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Quote Valid Until: December 15, 2026",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "decoys": [
+    {
+      "field": "deductible",
+      "value": "$5,000",
+      "kind": "superseded",
+      "pages": [
+        2
+      ]
+    }
+  ],
+  "injection": null,
+  "password": null,
+  "notes": "Effective value chosen as truth: an endorsement amends the declarations."
+}

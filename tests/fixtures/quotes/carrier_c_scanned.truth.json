@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "carrier_c_scanned",
+  "file": "carrier_c_scanned.pdf",
+  "variant": "scanned",
+  "gate_bucket": "scanned",
+  "description": "Image-only (scan-like, noisy JPEG) pages of the Northbeam Indemnity Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): am_best_rating.",
+  "carrier": "Northbeam Indemnity Company",
+  "page_count": 3,
+  "size_bytes": 413906,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [
+      1,
+      2,
+      3
+    ],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Cedar Hollow Hospitality LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Cedar Hollow Hospitality LLC",
+      "source": "image",
+      "accepted_values": []
+    },
+    "mailing_address": {
+      "value": "305 Orchard Lane, Asheville, NC 28801",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 305 Orchard Lane, Asheville, NC 28801",
+      "source": "image",
+      "accepted_values": []
+    },
+    "carrier": {
+      "value": "Northbeam Indemnity Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Carrier: Northbeam Indemnity Company",
+      "source": "image",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Admitted",
+      "source": "image",
+      "accepted_values": []
+    },
+    "am_best_rating": null,
+    "policy_period": {
+      "value": "2027-01-01 to 2028-01-01",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: 2027-01-01 to 2028-01-01",
+      "source": "image",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "Worldwide, provided suit is brought in the United States",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage Territory: Worldwide, provided suit is brought in the United States",
+      "source": "image",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Meridian Risk Partners LLC",
+      "source": "image",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)",
+      "source": "image",
+      "accepted_values": []
+    },
+    "premium": {
+      "value": "$18,775.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Annual Premium: $18,775.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$250.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Taxes and Fees: $250.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "total_cost": {
+      "value": "$19,025.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $19,025.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": {
+      "value": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $1,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "aggregate_limit": {
+      "value": "$3,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "General Aggregate Limit: $3,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "deductible": {
+      "value": "$1,500",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Deductible: $1,500",
+      "source": "image",
+      "accepted_values": []
+    },
+    "rate": {
+      "value": "$6.808 per $1,000 of gross sales",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Rate: $6.808 per $1,000 of gross sales",
+      "source": "image",
+      "accepted_values": []
+    },
+    "quote_valid_until": {
+      "value": "2026-12-15",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Quote Valid Until: 2026-12-15",
+      "source": "image",
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": ""
+}

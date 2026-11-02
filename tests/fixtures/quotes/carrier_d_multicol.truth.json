@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "carrier_d_multicol",
+  "file": "carrier_d_multicol.pdf",
+  "variant": "multi_column",
+  "gate_bucket": "multi_column",
+  "description": "Two-column layout of the same Copperfield Surplus Lines Insurance Company quote; premium table values precede labels in extraction order. Absent fields (must return null): deductible, rate.",
+  "carrier": "Copperfield Surplus Lines Insurance Company",
+  "page_count": 3,
+  "size_bytes": 13416,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Cedar Hollow Hospitality LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Cedar Hollow Hospitality LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "mailing_address": {
+      "value": "305 Orchard Lane, Asheville, NC 28801",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "305 Orchard Lane, Asheville, NC 28801",
+      "source": "text",
+      "accepted_values": []
+    },
+    "carrier": {
+      "value": "Copperfield Surplus Lines Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Copperfield Surplus Lines Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Non-Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Non-Admitted",
+      "source": "text",
+      "accepted_values": [
+        "Non-Admitted (Surplus Lines)",
+        "Surplus Lines",
+        "Nonadmitted"
+      ]
+    },
+    "am_best_rating": {
+      "value": "A (Excellent), X",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "A (Excellent), X",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_period": {
+      "value": "01/01/2027 - 01/01/2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "01/01/2027 - 01/01/2028",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "United States of America, its territories and possessions, Puerto Rico and Canada",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "United States of America, its territories and possessions, Puerto Rico and Canada",
+      "source": "text",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Meridian Risk Partners LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "source": "text",
+      "accepted_values": []
+    },
+    "premium": {
+      "value": "$8,775",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$8,775",
+      "source": "text",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$525.59",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$525.59",
+      "source": "text",
+      "accepted_values": []
+    },
+    "total_cost": {
+      "value": "$9,300.59",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$9,300.59",
+      "source": "text",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": {
+      "value": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "aggregate_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "deductible": null,
+    "rate": null,
+    "quote_valid_until": {
+      "value": "12/15/2026",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Valid until 12/15/2026",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": ""
+}
