@@ -134,6 +134,21 @@ Stale section tag "May be out of date": `--color-stale-bg/fg`, glyph plus text.
 - `prefers-reduced-motion`: scale and movement off, opacity fades kept,
   spinner slows to 1.5s.
 
+## Left panel (patterns, 2026-11-02)
+See `frontend/LEFT-PANEL-BRIEF.md`. No new tokens.
+- Shares: the sections area shrinks to its content (`flex: 0 1 auto`); chat with a report
+  takes the rest (`flex: 1 1 0`, floor 240px); chat without a report, or folded, docks at the
+  bottom as a 44px handle. No fixed-height inner scroll box.
+- Upload folds to one summary line ("4 documents, all read") only when the run is Done;
+  the user's toggle wins until the run status changes. A folded section's summary replaces
+  its count badge.
+- Document rows: one line (letter, filename, page count, 16px status glyph with its own
+  silhouette, never a colour-only dot); a second line only for news (progress, failure,
+  option note). Past 6 rows, quiet rows after the 5th fold into "+N more" at their position;
+  rows with news never fold.
+- Disclosure motion: caret rotation (`--dur-base`), body fades in 150ms on pointer opens only;
+  keyboard opens are instant.
+
 ## Open item: collapsed-outline warning mark (recommendation, not decided)
 Recommend: when the outline is collapsed and any value is scan-read,
 couldn't verify, or failed, the collapse handle shows the triangle glyph from
