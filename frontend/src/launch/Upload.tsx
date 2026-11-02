@@ -1,7 +1,8 @@
-import { useRef, useState, type DragEvent } from "react";
-import { CheckCircle, FilePdf, Trash, UploadSimple, WarningCircle } from "@phosphor-icons/react";
+import { useId, useRef, useState, type DragEvent } from "react";
+import { FilePdf, Trash, UploadSimple, WarningCircle } from "@phosphor-icons/react";
 import { api, ApiError, uploadFile } from "../api/client";
 import type { DocumentInfo, Limits } from "../api/types";
+import { MoreRow, useFold } from "../ui/Fold";
 
 export interface FileRow {
   key: string;
@@ -119,55 +120,65 @@ export function useUploads(limits: Limits | null) {
   return { rows, add, remove, clear };
 }
 
+/**
+ * Compact rows, same shape as the run panel's document rows: letter, filename, page count, status
+ * glyph, Remove. A second line only for news (upload progress, a warning, a rejection). Past six
+ * rows the quiet ones fold into "+N more"; uploading and rejected rows never fold.
+ */
 export function FileRows({ rows, onRemove }: { rows: FileRow[]; onRemove: (key: string) => void }) {
+  const listId = useId();
+  const fold = useFold(rows, (r) => r.status !== "ready" || Boolean(r.doc?.warning));
   if (!rows.length) return null;
+  const letters = new Map<string, string>();
+  rows.filter((r) => r.status === "ready").forEach((r, i) => letters.set(r.key, String.fromCharCode(65 + i)));
   return (
-    <ul className="file-rows" aria-label="Files for this run">
-      {rows.map((r, i) => {
-        const letter = r.status === "ready" ? String.fromCharCode(65 + rows.filter((x, j) => j < i && x.status === "ready").length) : null;
+    <ul className="file-rows file-rows--compact" id={listId} aria-label="Files for this run">
+      {fold.entries.map((e) => {
+        if (e.more) return <MoreRow key="more" hidden={fold.hidden} expanded={fold.expanded} onToggle={fold.toggle} noun="files" controls={listId} />;
+        const r = e.item;
+        const letter = letters.get(r.key) ?? null;
+        const pages = r.status === "ready" ? r.doc?.page_count : null;
         return (
           <li key={r.key} className={`file-row file-row--${r.status}`}>
-            <FilePdf size={20} aria-hidden className="file-row__icon" />
-            <div className="file-row__main">
-              <span className="file-row__name" title={r.name}>
-                {letter && <span className="sr-only">Document {letter}: </span>}
-                {r.name}
-              </span>
-              {r.status === "uploading" && (
-                <span className="file-row__meta">
-                  <span className="progress" role="progressbar" aria-label={`Uploading ${r.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(r.progress * 100)}>
-                    <span className="progress__bar" style={{ transform: `scaleX(${r.progress})` }} />
-                  </span>
-                </span>
-              )}
-              {r.status === "ready" && r.doc && (
-                <span className="file-row__meta">
-                  {r.doc.warning ? (
-                    <span className="file-row__warn">
-                      <WarningCircle size={14} aria-hidden /> {r.doc.warning}
-                    </span>
-                  ) : (
-                    <>
-                      <CheckCircle size={14} aria-hidden className="ok-glyph" />
-                      {r.doc.page_count} {r.doc.page_count === 1 ? "page" : "pages"}, {formatBytes(r.doc.size_bytes)}
-                    </>
-                  )}
-                </span>
-              )}
-              {r.status === "rejected" && (
-                <span className="file-row__error" role="alert">
-                  {r.message}
-                </span>
-              )}
-            </div>
-            {letter && (
+            {letter ? (
               <span className={`doc-letter hue-${((letter.charCodeAt(0) - 65) % 5) + 1}`} aria-hidden>
                 {letter}
               </span>
+            ) : (
+              <FilePdf size={20} aria-hidden className="file-row__icon" />
             )}
-            <button type="button" className="icon-btn" aria-label={`Remove ${r.name}`} onClick={() => onRemove(r.key)} disabled={r.status === "uploading"}>
+            <span className="file-row__name" title={r.name}>
+              {letter && <span className="sr-only">Document {letter}: </span>}
+              {r.name}
+            </span>
+            {pages != null && (
+              <span className="file-row__pages">
+                {pages} {pages === 1 ? "page" : "pages"}
+                <span className="sr-only">, {formatBytes(r.doc!.size_bytes)}</span>
+              </span>
+            )}
+            {/* Ready rows: the letter badge is the status; a warning carries its glyph on the news line. */}
+            {r.status === "rejected" && <WarningCircle size={16} weight="fill" aria-hidden className="danger-glyph file-row__glyph" />}
+            <button type="button" className="icon-btn file-row__remove" aria-label={`Remove ${r.name}`} onClick={() => onRemove(r.key)} disabled={r.status === "uploading"}>
               <Trash size={16} aria-hidden />
             </button>
+            {r.status === "uploading" && (
+              <span className="file-row__news">
+                <span className="progress" role="progressbar" aria-label={`Uploading ${r.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(r.progress * 100)}>
+                  <span className="progress__bar" style={{ transform: `scaleX(${r.progress})` }} />
+                </span>
+              </span>
+            )}
+            {r.status === "ready" && r.doc?.warning && (
+              <span className="file-row__news file-row__warn">
+                <WarningCircle size={14} weight="fill" aria-hidden /> {r.doc.warning}
+              </span>
+            )}
+            {r.status === "rejected" && (
+              <span className="file-row__news file-row__error" role="alert">
+                {r.message}
+              </span>
+            )}
           </li>
         );
       })}

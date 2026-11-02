@@ -25,8 +25,23 @@ export function useViewport(): Viewport {
  * The 300px left panel. Under 1280px it collapses to a 56px strip; expanding it lays the
  * panel over the report (Esc or the close button folds it back).
  */
-export function LeftPanel({ viewport, label, children }: { viewport: Viewport; label: string; children: ReactNode }) {
+export function LeftPanel({
+  viewport,
+  label,
+  onReveal,
+  children,
+}: {
+  viewport: Viewport;
+  label: string;
+  /** The strip's Uploads and Chat buttons open the overlay with that section expanded. */
+  onReveal?: (section: "uploads" | "chat") => void;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
+  const reveal = (section: "uploads" | "chat") => {
+    onReveal?.(section);
+    setOpen(true);
+  };
   const collapsed = viewport !== "wide";
 
   useEffect(() => {
@@ -55,10 +70,10 @@ export function LeftPanel({ viewport, label, children }: { viewport: Viewport; l
         <button type="button" className="icon-btn" aria-label={`Show ${label.toLowerCase()}`} aria-expanded={open} onClick={() => setOpen(true)}>
           <SidebarSimple size={20} aria-hidden />
         </button>
-        <button type="button" className="icon-btn" aria-label="Show uploads" onClick={() => setOpen(true)}>
+        <button type="button" className="icon-btn" aria-label="Show uploads" onClick={() => reveal("uploads")}>
           <UploadSimple size={20} aria-hidden />
         </button>
-        <button type="button" className="icon-btn" aria-label="Show chat" onClick={() => setOpen(true)}>
+        <button type="button" className="icon-btn" aria-label="Show chat" onClick={() => reveal("chat")}>
           <ChatCircleText size={20} aria-hidden />
         </button>
       </div>

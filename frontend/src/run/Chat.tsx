@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Check, Question, Sparkle } from "@phosphor-icons/react";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
+import { ArrowUp, CaretDown, Check, Question, Sparkle } from "@phosphor-icons/react";
 import { api, ApiError } from "../api/client";
 import type { Artifact, EditResult, Message } from "../api/types";
 import { Segments } from "../report/Report";
@@ -15,13 +15,21 @@ export function Chat({
   proposal = false,
   onOpen,
   onEdited,
+  open: controlledOpen,
+  onToggle,
 }: {
   runId: number;
   proposal?: boolean;
   artifact: Artifact | null;
   onOpen: OpenSource;
   onEdited: (res: EditResult) => void;
+  /** Collapse state (the header toggle). Uncontrolled when omitted; starts open. */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
 }) {
+  const [ownOpen, setOwnOpen] = useState(true);
+  const [viaPointer, setViaPointer] = useState(false);
+  const bodyId = useId();
   const [messages, setMessages] = useState<Message[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
@@ -50,7 +58,7 @@ export function Chat({
 
   useEffect(() => {
     list.current?.scrollTo({ top: list.current.scrollHeight });
-  }, [messages, pending, error]);
+  }, [messages, pending, error, controlledOpen, ownOpen]);
 
   const ask = async (question: string) => {
     const q = question.trim();
@@ -94,11 +102,40 @@ export function Chat({
     return rowKey.replace(/_/g, " ");
   };
   const showSuggestions = hasReport && suggestions.length > 0 && messages.length === 0 && !pending;
+  const open = controlledOpen ?? ownOpen;
+  const toggle = (e: MouseEvent<HTMLButtonElement>) => {
+    setViaPointer(e.detail > 0);
+    setOwnOpen(!open);
+    onToggle?.(!open);
+  };
+  const summary = !hasReport
+    ? proposal
+      ? "After the proposal is generated"
+      : "After the report is written"
+    : pending
+      ? "Answering..."
+      : messages.length
+        ? `${messages.length} ${messages.length === 1 ? "message" : "messages"}`
+        : proposal
+          ? "Ask about this proposal"
+          : "Ask about these quotes";
 
   return (
-    <section className={`chat${hasReport ? "" : " chat--idle"}`} aria-label="Ask about this report">
+    <section className={`chat${hasReport ? "" : " chat--idle"}${open ? "" : " chat--collapsed"}`} aria-labelledby={`${bodyId}-title`}>
+      <h2 className="chat__head" id={`${bodyId}-title`}>
+        <button type="button" className="chat__toggle" aria-expanded={open} aria-controls={bodyId} onClick={toggle}>
+          <span className="chat__title">Chat</span>
+          {open && messages.length > 0 && <span className="accordion__count">{messages.length}</span>}
+          {!open && <span className="accordion__summary">{summary}</span>}
+          <CaretDown size={16} aria-hidden className="chat__caret" />
+        </button>
+      </h2>
+      <div id={bodyId} className={`chat__body${viaPointer ? " fade-in" : ""}`} hidden={!open}>
       <div className="chat__log" ref={list} aria-live="polite" aria-relevant="additions">
         {!hasReport && <p className="chat__empty">{proposal ? "Generate a proposal to ask questions about its sources." : "Run a comparison to ask questions."}</p>}
+        {hasReport && !messages.length && !pending && !error && !showSuggestions && (
+          <p className="chat__empty">Answers cite the page they come from.</p>
+        )}
         {messages.map((m) => (
           <div key={m.id} className={`msg msg--${m.role}`}>
             {m.role === "user" ? (
@@ -209,6 +246,7 @@ export function Chat({
           <ArrowUp size={16} weight="bold" aria-hidden />
         </button>
       </form>
+      </div>
     </section>
   );
 }

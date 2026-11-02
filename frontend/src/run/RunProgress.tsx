@@ -1,6 +1,8 @@
+import { useId } from "react";
 import { ArrowsClockwise, CheckCircle, Circle, StopCircle, WarningCircle } from "@phosphor-icons/react";
 import type { Run, RunDocument } from "../api/types";
 import { hueOf } from "../report/Chip";
+import { MoreRow, useFold } from "../ui/Fold";
 import { statusText } from "../launch/RecentRuns";
 
 const DOC_TEXT: Record<RunDocument["status"], string> = {
@@ -18,13 +20,17 @@ export function RunProgress({
   onCancel,
   onRetry,
   busy,
+  pageCounts,
 }: {
   run: Run;
   onCancel: () => void;
   onRetry: () => void;
   busy: "cancel" | "retry" | null;
+  /** document_id -> page count, from GET /api/documents (the run payload has no page counts). */
+  pageCounts?: Map<number, number | null>;
 }) {
-  const settled = run.documents.filter((d) => d.status === "done" || d.status === "failed").length;
+  const listId = useId();
+  const fold = useFold(run.documents, (d) => docNews(d) != null && d.status !== "done");  const settled = run.documents.filter((d) => d.status === "done" || d.status === "failed").length;
   const summary = run.active
     ? run.status === "composing"
       ? "All documents read. Writing report..."
@@ -57,42 +63,56 @@ export function RunProgress({
           {run.error}
         </p>
       )}
-      <ul className="doc-rows" aria-label="Documents in this run">
-        {run.documents.map((d) => (
-          <li key={d.run_document_id} className={`doc-row doc-row--${d.status}`}>
-            <span className={`doc-letter hue-${hueOf(d.letter)}`} aria-hidden>
-              {d.letter}
-            </span>
-            <div className="doc-row__main">
+      <ul className="doc-rows" id={listId} aria-label="Documents in this run">
+        {fold.entries.map((e) => {
+          if (e.more) return <MoreRow key="more" hidden={fold.hidden} expanded={fold.expanded} onToggle={fold.toggle} noun="documents" controls={listId} />;
+          const d = e.item;
+          const pages = pageCounts?.get(d.document_id);
+          const news = docNews(d);
+          return (
+            <li key={d.run_document_id} className={`doc-row doc-row--${d.status}`}>
+              <span className={`doc-letter hue-${hueOf(d.letter)}`} aria-hidden>
+                {d.letter}
+              </span>
               <span className="doc-row__name" title={d.filename}>
                 <span className="sr-only">Document {d.letter}: </span>
                 {d.filename}
               </span>
-              {d.status === "failed" ? (
-                <span className="doc-row__error" role="alert">
-                  {d.error ?? "Failed"}
-                </span>
-              ) : (
-                <span className="doc-row__status">
-                  {d.status === "done" && d.option_count > 1
-                    ? `Done. Compared option 1 of ${d.option_count}`
-                    : d.progress && d.status !== "done" && d.status !== "queued"
-                      ? d.progress
-                      : DOC_TEXT[d.status]}
+              {pages != null && (
+                <span className="doc-row__pages">
+                  {pages} {pages === 1 ? "page" : "pages"}
                 </span>
               )}
-            </div>
-            <DocGlyph status={d.status} />
-          </li>
-        ))}
+              <DocGlyph status={d.status} />
+              {/* The glyph is the visual status; the word is for screen readers unless the row has news. */}
+              {news == null && <span className="sr-only">, {DOC_TEXT[d.status]}</span>}
+              {news != null &&
+                (d.status === "failed" ? (
+                  <span className="doc-row__news doc-row__news--error" role="alert">
+                    {news}
+                  </span>
+                ) : (
+                  <span className="doc-row__news">{news}</span>
+                ))}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
 }
 
+/** The second line of a row, only when it says something the glyph cannot. */
+function docNews(d: RunDocument): string | null {
+  if (d.status === "failed") return d.error ?? "Failed";
+  if (d.status === "done") return d.option_count > 1 ? `Compared option 1 of ${d.option_count}` : null;
+  if (d.status === "queued") return null;
+  return d.progress || DOC_TEXT[d.status];
+}
+
 function DocGlyph({ status }: { status: RunDocument["status"] }) {
-  if (status === "done") return <CheckCircle size={18} className="ok-glyph" aria-hidden />;
-  if (status === "failed") return <WarningCircle size={18} className="danger-glyph" aria-hidden />;
-  if (status === "queued") return <Circle size={18} className="muted-glyph" aria-hidden />;
-  return <span className="spinner" aria-hidden />;
+  if (status === "done") return <CheckCircle size={16} weight="fill" className="ok-glyph doc-row__glyph" aria-hidden />;
+  if (status === "failed") return <WarningCircle size={16} weight="fill" className="danger-glyph doc-row__glyph" aria-hidden />;
+  if (status === "queued") return <Circle size={16} className="muted-glyph doc-row__glyph" aria-hidden />;
+  return <span className="spinner doc-row__glyph" aria-hidden />;
 }

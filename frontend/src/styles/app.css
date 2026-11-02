@@ -328,9 +328,14 @@ a {
   border-radius: var(--radius-control);
 }
 
+/*
+ * Panel shares: the sections area shrinks to its content and scrolls only when the panel is
+ * full; chat with a report takes the remaining height (see .chat). Without a report, or folded,
+ * chat docks at the bottom and the sections own the panel.
+ */
 .panel-scroll {
-  flex: 1 1 auto;
-  min-height: 120px;
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-2);
   display: flex;
@@ -737,10 +742,31 @@ kbd {
   text-align: center;
 }
 
+.accordion__summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+  font-variant-numeric: var(--numeric-table);
+}
+
 .accordion__caret {
+  flex: none;
   margin-left: auto;
   color: var(--color-text-muted);
   transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* A body opened by pointer fades in (opacity only, kept under reduced motion); keyboard opens
+   carry no .fade-in and are instant. @starting-style fires when [hidden] is removed. */
+.fade-in:not([hidden]) {
+  transition: opacity var(--dur-fast) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .accordion.is-open .accordion__caret {
@@ -1065,44 +1091,172 @@ kbd {
   font-weight: var(--weight-semibold);
 }
 
-.doc-rows {
+/*
+ * Compact document rows (run panel and launch list share the shape): letter, filename, page
+ * count, status glyph [, Remove]. One line per document; a second line only for news. No
+ * per-row hairlines: the 32px rhythm separates them. Columns are placed explicitly so a row
+ * without a page count keeps its glyph aligned.
+ */
+.doc-rows,
+.file-rows--compact {
   display: flex;
   flex-direction: column;
-}
-
-.doc-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
+  padding-top: var(--space-1);
   border-top: var(--border-width) solid var(--color-hairline);
 }
 
-.doc-row__main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
+.doc-row,
+.file-rows--compact .file-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 16px;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  align-items: center;
+  min-height: 32px;
+  padding: var(--space-1) 0;
+  border-top: 0;
 }
 
-.doc-row__name {
+/* Launch list: the letter badge is the "ready" signal, so there is no glyph column; a rejected
+   row (no page count) shows its warning glyph in the page-count column. Remove is 32px visual
+   with the icon-btn 44px hit area. */
+.file-rows--compact .file-row {
+  grid-template-columns: 20px minmax(0, 1fr) auto 32px;
+  min-height: 36px;
+  padding: 2px 0;
+}
+
+.file-rows--compact .file-row__glyph {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.file-rows--compact .file-row__remove {
+  grid-column: 4;
+}
+
+.file-rows--compact .file-row__news {
+  grid-column: 2 / 4;
+}
+
+.file-rows--compact .file-row__warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.file-rows--compact .file-row__warn svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.file-rows--compact .file-row__remove {
+  width: 32px;
+  height: 32px;
+}
+
+.doc-row > .doc-letter,
+.file-rows--compact .file-row > .doc-letter,
+.file-rows--compact .file-row__icon {
+  grid-column: 1;
+}
+
+.doc-row__name,
+.file-rows--compact .file-row__name {
+  grid-column: 2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: var(--weight-medium);
 }
 
-.doc-row__status {
+.doc-row__pages,
+.file-row__pages {
+  grid-column: 3;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-variant-numeric: var(--numeric-table);
+  white-space: nowrap;
+}
+
+.doc-row__glyph,
+.file-row__glyph {
+  grid-column: 4;
+  justify-self: center;
+}
+
+.file-row__remove {
+  grid-column: 5;
+}
+
+.doc-row__news,
+.file-row__news {
+  grid-column: 2 / -1;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
   font-variant-numeric: var(--numeric-table);
 }
 
-.doc-row__error {
+.file-rows--compact .file-row__news {
+  grid-column: 2 / 5;
+  padding-bottom: var(--space-1);
+}
+
+.doc-row__news--error,
+.file-rows--compact .file-row__error {
   color: var(--color-danger-fg);
-  font-size: var(--text-xs);
-  line-height: var(--leading-xs);
+}
+
+.file-rows--compact .file-row__warn {
+  color: var(--color-stale-fg);
+}
+
+.warn-glyph {
+  color: var(--color-stale-fg);
+  flex: none;
+}
+
+/* "+N more" closes a folded list; same left edge as the filenames. */
+.more-row {
+  display: flex;
+  padding-left: calc(20px + var(--space-2));
+}
+
+.more-row__btn {
+  position: relative;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  margin-left: calc(-1 * var(--space-2));
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: var(--numeric-table);
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-fast) ease;
+}
+
+/* 44px hit area around the 32px visual row. */
+.more-row__btn::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.more-row__btn:active {
+  transform: scale(var(--press-scale));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Canvas, not the primary tint: primary text on the tint is 4.38:1, under 4.5. */
+  .more-row__btn:hover {
+    background: var(--color-canvas);
+  }
 }
 
 .new-run {
@@ -1114,17 +1268,79 @@ kbd {
 .chat {
   display: flex;
   flex-direction: column;
-  flex: 1 1 45%;
+  flex: 1 1 0;
   min-height: 240px;
+  margin-top: auto;
   border-top: var(--border-width) solid var(--color-hairline);
 }
 
-.chat--idle {
+.chat--idle,
+.chat--collapsed {
   flex: none;
   min-height: 0;
 }
 
 .chat--idle .chat__log {
+  flex: none;
+}
+
+.chat__head {
+  flex: none;
+  margin: 0;
+  padding: var(--space-1) var(--space-2) 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.chat--collapsed .chat__head {
+  padding-bottom: var(--space-1);
+}
+
+/* Same vocabulary as .accordion__toggle: title, count, summary when folded, caret. */
+.chat__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--size-button);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  font-weight: var(--weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.chat__caret {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* Chat docks at the bottom, so its caret points the way it moves: down to fold, up to open. */
+.chat--collapsed .chat__caret {
+  transform: rotate(180deg);
+}
+
+.chat__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.chat__body[hidden] {
+  display: none;
+}
+
+.chat--idle .chat__body {
   flex: none;
 }
 
@@ -1230,10 +1446,19 @@ kbd {
   color: var(--color-danger-fg);
 }
 
+/* When chat is at its 240px floor, the suggestions scroll rather than push the input out. */
 .suggestions {
   display: grid;
+  align-content: start;
   gap: var(--space-2);
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 0 var(--space-3) var(--space-3);
+}
+
+.chat__form {
+  flex: none;
 }
 
 .suggestions__title {

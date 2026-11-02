@@ -70,6 +70,26 @@ export function RunView({
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const wide = viewport === "wide";
+  // Left panel shares: Upload is open until the run is Done (the user's own toggle wins until
+  // the status changes, so a Retry reopens it); chat then takes the remaining height.
+  const [uploadOverride, setUploadOverride] = useState<boolean | null>(null);
+  const [chatOpen, setChatOpen] = useState(true);
+  const [pageCounts, setPageCounts] = useState<Map<number, number | null>>();
+  const runStatus = run?.status;
+  useEffect(() => setUploadOverride(null), [runStatus]);
+  // Folded while the run loads, so a Done run does not flash open then shut.
+  const uploadOpen = uploadOverride ?? (runStatus != null && runStatus !== "done");
+
+  useEffect(() => {
+    let live = true;
+    api.documents().then(
+      (docs) => live && setPageCounts(new Map(docs.map((d) => [d.id, d.page_count]))),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [runId]);
 
   // ------------------------------------------------------------------ loading
   const loadArtifact = useCallback(async () => {
@@ -358,11 +378,21 @@ export function RunView({
 
   return (
     <div className="workspace">
-      <LeftPanel viewport={viewport} label="Run panel">
+      <LeftPanel
+        viewport={viewport}
+        label="Run panel"
+        onReveal={(s) => (s === "uploads" ? setUploadOverride(true) : setChatOpen(true))}
+      >
         <div className="panel-scroll">
-          <Accordion title="Upload" count={run?.documents.length ?? 0} defaultOpen>
+          <Accordion
+            title="Upload"
+            count={run?.documents.length ?? 0}
+            open={uploadOpen}
+            onToggle={setUploadOverride}
+            summary={run ? uploadSummary(run) : undefined}
+          >
             {run ? (
-              <RunProgress run={run} busy={busy} onCancel={() => void cancelRun()} onRetry={() => void retryRun()} />
+              <RunProgress run={run} busy={busy} pageCounts={pageCounts} onCancel={() => void cancelRun()} onRetry={() => void retryRun()} />
             ) : (
               <div className="skeleton-lines" aria-hidden>
                 <span />
@@ -385,7 +415,17 @@ export function RunView({
             <Plus size={16} aria-hidden /> {isProposal ? "New proposal" : "New comparison"}
           </a>
         </div>
-        {run && <Chat runId={run.id} artifact={artifact} proposal={isProposal} onOpen={openSource} onEdited={(r) => afterEdit(r, "Edit applied")} />}
+        {run && (
+          <Chat
+            runId={run.id}
+            artifact={artifact}
+            proposal={isProposal}
+            open={chatOpen}
+            onToggle={setChatOpen}
+            onOpen={openSource}
+            onEdited={(r) => afterEdit(r, "Edit applied")}
+          />
+        )}
       </LeftPanel>
 
       <main className="pane" id="main" tabIndex={-1} aria-labelledby="pane-title">
@@ -569,6 +609,18 @@ export function RunView({
       </main>
     </div>
   );
+}
+
+/** One line for the folded Upload section: "3 documents, all read", "1 of 3 failed"... */
+function uploadSummary(run: Run): string {
+  const n = run.documents.length;
+  const noun = `${n} ${n === 1 ? "document" : "documents"}`;
+  const failed = run.documents.filter((d) => d.status === "failed").length;
+  const read = run.documents.filter((d) => d.status === "done").length;
+  if (run.active) return `${read + failed} of ${noun} read`;
+  if (failed) return `${noun}, ${failed} failed`;
+  if (read === n) return `${noun}, all read`;
+  return `${noun}, ${read} read`;
 }
 
 /** Input parameters of a proposal run (the stored, validated `run.parameters`). */
