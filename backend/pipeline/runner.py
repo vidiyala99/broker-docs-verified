@@ -63,6 +63,7 @@ from backend.pipeline import compose, extract, parse, verify
 from backend.providers import CallRecord, Provider, ProviderError, RunBudget
 from backend.schemas import (
     CITED_STATES,
+    ArtifactContent,
     EvidenceState,
     FactField,
     Notice,
@@ -239,7 +240,61 @@ def reconcile_interrupted_runs(factory: sessionmaker[Session]) -> list[int]:
     return sorted(ids)
 
 
+def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactField],
+                        sections: Sequence[SectionPlanItem], instructions: str,
+                        edits: Sequence[compose.ComposeEdit] = ()) -> compose.ComposeInput:
+    """Compose input from a run's documents and persisted facts (shared by the run and by
+    Regenerate prose, which passes the user's cell edits, D9)."""
+    facts_by_doc: dict[int, list[models.Fact]] = defaultdict(list)
+    for f in run.facts:
+        facts_by_doc[f.document_id].append(f)
+    columns, facts = [], []
+    budget_failed = other_failed = 0
+    for rd in run.documents:
+        failed = RunDocumentStatus(rd.status) == RunDocumentStatus.FAILED
+        if failed:
+            if rd.error_code == "budget_exhausted":
+                budget_failed += 1
+            else:
+                other_failed += 1
+        label = rd.document.filename
+        doc_facts = [] if failed else facts_by_doc.get(rd.document_id, [])
+        for f in doc_facts:
+            if f.field in LABEL_FIELDS and EvidenceState(f.state) in CITED_STATES and f.value:
+                label = f.value
+                break
+        columns.append(compose.ComposeColumn(
+            key=rd.letter, label=label, document_id=rd.document_id, filename=rd.document.filename,
+            failed=failed, failure_message=rd.error, option_count=rd.option_count or 1,
+            option_label=rd.option_label))
+        facts.extend(compose.ComposeFact(column_key=rd.letter, field=f.field, value=f.value,
+                                         state=EvidenceState(f.state), passage_id=f.passage_id,
+                                         page_no=f.page_no, fact_id=f.id) for f in doc_facts)
+    notices = []
+    if budget_failed:
+        notices.append(Notice(kind="budget_exhausted", message=(
+            f"The run's token budget ran out, so {budget_failed} of {len(columns)} documents were not "
+            "read. The report covers the rest.")))
+    if other_failed:
+        notices.append(Notice(kind="documents_failed", retryable=True, message=(
+            f"{other_failed} of {len(columns)} documents could not be read; their columns show why.")))
+    return compose.ComposeInput(title=title, fields=list(fields), sections=list(sections),
+                                columns=columns, facts=facts, instructions=instructions,
+                                notices=notices, edits=list(edits))
+
+
+def compose_input_for_run(run: models.Run, edits: Sequence[compose.ComposeEdit] = ()) -> compose.ComposeInput:
+    wf = run.workflow
+    return build_compose_input(
+        run, title=wf.name, fields=[FactField.model_validate(f) for f in wf.fact_schema],
+        sections=[SectionPlanItem.model_validate(x) for x in wf.section_plan],
+        instructions=wf.instructions or "", edits=edits)
+
+
 # --------------------------------------------------------------------- manager
+
+MergeEdits = Callable[[ArtifactContent, ArtifactContent], ArtifactContent]
+"""(previous latest content, freshly composed content) -> content to snapshot."""
 
 
 class RunManager:
@@ -257,7 +312,11 @@ class RunManager:
         compose_headroom: int = DEFAULT_COMPOSE_HEADROOM,
         max_workers: int = 4,
         bus: EventBus | None = None,
+        merge_edits: MergeEdits | None = None,
     ):
+        """`merge_edits`, when given, is applied on a retry that recomposes an artifact
+        that already exists, so the user's cell edits (D9) survive the new version."""
+        self._merge_edits = merge_edits
         self._factory = session_factory
         self.provider = provider
         self._load_bytes = load_bytes
@@ -270,6 +329,11 @@ class RunManager:
         self.bus = bus or EventBus()
 
     # ------------------------------------------------------------ public API
+
+    @property
+    def budget_limit(self) -> int:
+        """Per-run token budget (D3); calls after the run (chat, prose) count against it too (M4)."""
+        return self._budget_limit
 
     def is_active(self, run_id: int) -> bool:
         task = self._tasks.get(run_id)
@@ -681,42 +745,8 @@ class RunManager:
                 s.add(fact)
 
     def _compose_input(self, run: models.Run, plan: _Plan, budget: RunBudget) -> compose.ComposeInput:
-        facts_by_doc: dict[int, list[models.Fact]] = defaultdict(list)
-        for f in run.facts:
-            facts_by_doc[f.document_id].append(f)
-        columns, facts = [], []
-        budget_failed = other_failed = 0
-        for rd in run.documents:
-            failed = RunDocumentStatus(rd.status) == RunDocumentStatus.FAILED
-            if failed:
-                if rd.error_code == "budget_exhausted":
-                    budget_failed += 1
-                else:
-                    other_failed += 1
-            label = rd.document.filename
-            doc_facts = [] if failed else facts_by_doc.get(rd.document_id, [])
-            for f in doc_facts:
-                if f.field in LABEL_FIELDS and EvidenceState(f.state) in CITED_STATES and f.value:
-                    label = f.value
-                    break
-            columns.append(compose.ComposeColumn(
-                key=rd.letter, label=label, document_id=rd.document_id, filename=rd.document.filename,
-                failed=failed, failure_message=rd.error, option_count=rd.option_count or 1,
-                option_label=rd.option_label))
-            facts.extend(compose.ComposeFact(column_key=rd.letter, field=f.field, value=f.value,
-                                             state=EvidenceState(f.state), passage_id=f.passage_id,
-                                             page_no=f.page_no, fact_id=f.id) for f in doc_facts)
-        notices = []
-        if budget_failed:
-            notices.append(Notice(kind="budget_exhausted", message=(
-                f"The run's token budget ran out, so {budget_failed} of {len(columns)} documents were not "
-                "read. The report covers the rest.")))
-        if other_failed:
-            notices.append(Notice(kind="documents_failed", retryable=True, message=(
-                f"{other_failed} of {len(columns)} documents could not be read; their columns show why.")))
-        return compose.ComposeInput(title=plan.title, fields=plan.fields, sections=plan.sections,
-                                    columns=columns, facts=facts, instructions=plan.instructions,
-                                    notices=notices)
+        return build_compose_input(run, title=plan.title, fields=plan.fields, sections=plan.sections,
+                                   instructions=plan.instructions)
 
     async def _compose(self, run_id: int, plan: _Plan, budget: RunBudget) -> None:
         with db.session_scope(self._factory) as s:
@@ -750,7 +780,10 @@ class RunManager:
                 art = models.create_artifact(s, run, title=plan.title, content=result.content, note=note)
             else:
                 art = run.artifact
-                models.snapshot_version(s, art, result.content, note=f"retry, {note}")
+                content = result.content
+                if self._merge_edits is not None:
+                    content = self._merge_edits(art.latest_content(), content)
+                models.snapshot_version(s, art, content, note=f"retry, {note}")
             any_failed = any(RunDocumentStatus(rd.status) == RunDocumentStatus.FAILED for rd in run.documents)
             final = RunStatus.PARTIAL if any_failed or budget.exhausted else RunStatus.DONE
             models.transition_run(run, final)
