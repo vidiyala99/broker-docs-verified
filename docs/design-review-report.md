@@ -1,6 +1,6 @@
 # Design review report: BrokerDocs slice 1
 
-Date: 2026-11-02. Rounds run: 2 of 3. Stack: dev backend (scripted model), Chromium 156 via Playwright MCP, 1440 and 1024 widths.
+Date: 2026-11-02. Rounds run: 3 of 3 (cap reached). Stack: dev backend (scripted model), Chromium 156 via Playwright MCP, 1440 and 1024 widths.
 Ground truth: `../rea-out/frames/3kVG8k-01.jpg` (comparison report), `vLezj1-03.jpg` (proposal shell), `docs/reference/brokerdocs-ui-reference.md`.
 Skills applied: gstack, ui-ux-pro-max, taste-core, taste-redesign, impeccable (Operate mode), emil-design-eng, frontend-design.
 
@@ -43,11 +43,32 @@ Verification after the fixes: axe 0 violations on 14 screen and width combinatio
 
 Screenshots added: `r2-run1-1440`, `r2-run4-1440`, `r2-run6-390` (before), `r2-after-run6-390`, `r2-edit-1440` (before), `r2-after-edit-1440`, `r2-undo-toast-1440`.
 
-## Remaining
+## Round 3 (final)
 
-- F3 left panel density with 5 or more documents (low).
-- G4 rail tab stops (owner decision), G6 failed-run message repeated three times (low).
-- Not reviewed: cancel and retry flows in the browser, chat panel states (error, proposed edit), stale tag and regenerate flow, the other reference frames (upload accordion, run progress), phone widths other than 390.
-- Known gaps from the brief, unchanged: "sample quotes" link, version history UI, real too-large and too-many-pages upload rejections, Chromium only.
-- Dev DB note: the dev database now holds manual edits and e2e runs; re-seed before the next review.
-- Recommendation: one final round (3 of 3) on the "not reviewed" list, then stop.
+Scope: rail tab stops (owner approved the change), upload accordion, run progress, cancelled state, chat (answer, proposed edit, forced failure), stale tag and Regenerate prose, partial run with retries.
+
+| # | Screen | Difference | Severity | Verdict | Fix |
+|---|---|---|---|---|---|
+| H1 | Rail | 13 disabled items were 13 tab stops before content (was G4). | Low | Drift (a11y) | Owner approved: disabled rail items are `tabIndex=-1`. They keep `role=button`, `aria-disabled` and the "coming in a later slice" label, and the hover tooltip. |
+| H2 | Upload accordion | Per-file rows, A/B badges, inline "Not a PDF" rejection, count, primary button label "Compare 2 quotes". | None | Match | None. |
+| H3 | Run progress | Per-document rows with spinner, Cancel, skeleton report with a plain sentence. | None | Match | None. |
+| H4 | Chat | Answer with chips, proposed edit with Accept, "Couldn't answer. Retry." on failure. The 502 in the console is the scripted failure. | None | Match | None. |
+| H5 | Stale and Regenerate | Tag clears, version increments, "Prose regenerated." toast. | None | Match | None. |
+| H6 | Partial run (Run 3) | "Extraction failed" plus a Retry link repeats in every cell of a failed column (about 40 rows), on top of the same message in the column header. | Medium | Intentional (M1 decision: failed extraction shows "Extraction failed" + Retry) | Not changed. Recommendation for the owner: keep Retry in the header, make the cells quiet. |
+| H7 | Failure copy | "Extraction failed: Budget exhausted: ..." stacks two colons. | Low | Drift (copy) | Not fixed. |
+| H8 | Left panel with chat | Upload accordion stays open on a finished run, so the chat transcript gets about 250px. | Low | Intentional (upload accordion is the reference pattern); same cause as F3 | Not changed. Recommendation: collapse Upload when the run is Done. |
+
+Verification: `tsc --noEmit` clean; axe 0 violations on 14 screen and width combinations; `npx playwright test` 2 passed.
+
+Screenshots added: `r3-upload-1440`, `r3-progress-1440`, `r3-cancelled-run2-1440`, `r3-chat-proposed-1440`, `r3-chat-fail-1440`, `r3-regenerating-1440`, `r3-run3-partial-1440`.
+
+## Open items and recommendation (no round 4)
+
+1. H6 repeated "Extraction failed + Retry" in cells (medium): needs an owner call because M1 is a recorded decision.
+2. F3 / H8 left panel density: collapse Upload when a run is Done (owner call).
+3. H7 double colon in failure copy (low, copy edit).
+4. G6 failed-run message repeated three times on Run 1 (low).
+5. Known gaps from the brief, unchanged: "sample quotes" link, version history UI, real too-large and too-many-pages upload rejections, Chromium only; phone widths other than 390 were not reviewed.
+6. The cancel click in a live run could not be exercised (the scripted run finishes in about 2 s); the Cancelled state was reviewed from the seed (Run 2) and axe-checked.
+
+Round summary: round 1 fixed table fit and outline default; round 2 fixed toolbar wrap, cell editor, keyboard undo; round 3 fixed rail tab stops. All fixes committed in small commits.

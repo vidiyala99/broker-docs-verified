@@ -65,7 +65,7 @@ export function Rail() {
                     className="rail__item is-disabled"
                     role="button"
                     aria-disabled="true"
-                    tabIndex={0}
+                    tabIndex={-1}
                     aria-label={`${item.label}, coming in a later slice`}
                   >
                     {item.icon}
@@ -78,7 +78,7 @@ export function Rail() {
       ))}
       <div className="rail__bottom">
         <Tip text="Documents: coming in a later slice" side="right">
-          <span className="rail__item is-disabled" role="button" aria-disabled="true" tabIndex={0} aria-label="Documents, coming in a later slice">
+          <span className="rail__item is-disabled" role="button" aria-disabled="true" tabIndex={-1} aria-label="Documents, coming in a later slice">
             <Files size={20} aria-hidden />
           </span>
         </Tip>

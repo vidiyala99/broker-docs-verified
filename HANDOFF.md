@@ -62,3 +62,9 @@ long docs: 300 pages, windows + merge, conflicting values shown with a notice (n
 - Tesseract not installed (only matters for the local-OCR TODO). `yt-dlp` PATH quirk: see earlier note (Python312 Scripts first).
 - Agent worktrees live under `.claude/worktrees/` (gitignored); they can be deleted.
 - Fresh session recommended: this one has a long context.
+
+## Design review (2026-11-02): done, 3 of 3 rounds
+Report: `docs/design-review-report.md`; screenshots `frontend/qa-screenshots/review/`. Fixed: table column fit and scroll cue, outline collapsed below 1280,
+toolbar wrap, auto-growing cell editor, Ctrl/Cmd+Z for the Undo toast, disabled rail items out of the tab order. axe 0 on 14 combinations, e2e 2 passed.
+Owner calls left: repeated "Extraction failed + Retry" per cell (M1), collapse Upload when a run is Done, double-colon failure copy.
+Dev stack was left running (backend 8000, vite 5173); stop them when done. Re-seed the dev DB before reuse.
