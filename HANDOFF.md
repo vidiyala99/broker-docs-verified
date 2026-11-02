@@ -68,3 +68,12 @@ Report: `docs/design-review-report.md`; screenshots `frontend/qa-screenshots/rev
 toolbar wrap, auto-growing cell editor, Ctrl/Cmd+Z for the Undo toast, disabled rail items out of the tab order. axe 0 on 14 combinations, e2e 2 passed.
 Owner calls left: repeated "Extraction failed + Retry" per cell (M1), collapse Upload when a run is Done, double-colon failure copy.
 Dev stack was left running (backend 8000, vite 5173); stop them when done. Re-seed the dev DB before reuse.
+
+## Slice 2 Proposal Builder (2026-11-02): spec approved, eng review done, nothing built
+Spec and eng review: `docs/specs/2026-11-02-proposal-builder-design.md` (commit a845b61). Read its "Engineering review" section: decision ledger D1 to D6, tasks T1 to T8, lanes.
+Decided (do not re-ask): scope option 1 (wizard + generate + light edit, no TipTap); approach A (seeded `proposal-builder` workflow on the existing run pipeline); at least one quote PDF required;
+two templates (Standard, Premier); no-AI prose mode as its own deterministic renderer (D5); extraction cache deferred to slice 2c (D1); original file arrangement (D2);
+blocks declare `fact_sections`, unowned facts dropped (D3); one table per fact section (D4); template snapshot in run.parameters (D6). Live OpenAI calls approved for evals and spikes.
+Start with T1 (proposal-aware eval adapter, `backend/eval_hook.py:89` is hard-wired to Compare Quotes; scorer ignores unlisted fields), then lane A (T2 to T4 backend core), DOCX spike (T5) in parallel. Wizard (T7) goes through the design stack after the template API (T6).
+Still unasked: TODO for slice 2c (extraction cache); separate design fix for the left panel (chunky stack, chat cannot collapse, collapse Upload when a run is Done), see owner screenshot feedback.
+Not run: plan-reality check and the review dashboard. Fresh session recommended.
