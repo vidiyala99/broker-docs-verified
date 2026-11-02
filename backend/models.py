@@ -176,6 +176,9 @@ class RunDocument(Base):
     status: Mapped[RunDocumentStatus] = mapped_column(String(20), default=RunDocumentStatus.QUEUED)
     progress: Mapped[str | None] = mapped_column(String(100), nullable=True)  # "Reading pages 4/10"
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stable failure code for the column: a ParseErrorCode, a ProviderError code,
+    # or cancelled / interrupted / internal_error (set by pipeline.runner).
+    error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     option_count: Mapped[int] = mapped_column(Integer, default=1)  # D8
     option_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
