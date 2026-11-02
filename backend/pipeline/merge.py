@@ -25,6 +25,10 @@ shows, per field:
               endorsement rule (below) picks one ──► that value; the others
               │                                       are kept as `superseded`
               │                                       (logged, not shown)
+              ├─ containment rule (below): a value that is a less specific
+              │    mention of a longer one is folded into it; one group left
+              │    ──► the longer value, its earliest page, the mentions as
+              │        extra passages (resolution "contained")
               └─ ambiguous ──► state CONFLICTING, no value: every value is
                                kept in `conflicts` (earliest page first) with
                                its own verified evidence; compose shows
@@ -61,9 +65,39 @@ long_120 windows returned the header "Commercial General Liability Policy"
 as the policy form. False-positive risk: a real value printed as its own line
 on every page is dropped when some other value also came back. That is why
 identity fields (carrier, insured, producer, address), which legitimately
-sit in page headers, are not in the set. A substring rule (drop a value
-contained in a longer candidate) was considered and not used: the live
-header is not a substring of the real form line.
+sit in page headers, are not in the set. The containment rule below does not
+cover this case: the live header is not a substring of the real form line.
+
+Containment rule (contained_in, after the endorsement rule). Live eval, 3
+runs, long_120 and long_300 policy_form: page 2 states "CG 00 01 04 13
+Commercial General Liability Coverage Form (Occurrence)", later boilerplate
+pages state "Commercial General Liability Coverage Form"; both verified, so
+the cell was "Conflicting values" although the real value was found. When a
+value's normalized tokens (value_key: verify's tokens, case and spacing
+ignored) are a contiguous run inside a longer value's tokens, the shorter is
+a less specific mention of the longer and is merged into it like a repeated
+value: the longer value is shown, its earliest page is the primary passage,
+the shorter candidates become extra passages. Guards, so a shorter value
+that means something else still conflicts:
+1. the match is on whole tokens ("Form" never matches "Forms");
+2. the shorter value has at least 3 tokens (single words such as
+   "Admitted" against "Non-Admitted", or "Harborline Specialty" against the
+   full carrier name, keep conflicting);
+3. the shorter value has no number, so limits, deductibles and other amounts
+   ("$5,000" vs "$5,000 per occurrence", "$1,000,000" vs "$2,000,000") keep
+   their current behavior;
+4. the tokens the longer value adds hold no negation (NEGATION_TOKENS: no,
+   non, not, without, except, excluding, ... or a "non-" / "not-" prefix),
+   so "Admitted Carrier In California" vs "Not Admitted Carrier In
+   California" conflicts;
+5. a mention contained in two unrelated longer values (an Occurrence and a
+   Claims-Made form) is not folded into either.
+An endorsement winner is decided first and is never undone by this rule.
+False-positive risk: a 3+ word value that is a real, different value but
+reads as a run inside a longer one without a negation word (for example a
+qualifier the guards do not know, such as "Commercial General Liability
+Coverage Form" vs "... Coverage Form Excess Layer Only") is merged and the
+longer value is shown; its passage still appears as an extra chip.
 
 Endorsement rule (kept simple on purpose):
 1. A candidate "amends" when its quote or matched source text contains
@@ -112,7 +146,8 @@ class MergedFact(verify.VerifyResult):
     conflicts: tuple[verify.VerifyResult, ...] = ()
     superseded: tuple[verify.VerifyResult, ...] = ()  # other values an endorsement replaced
     dropped: tuple[verify.VerifyResult, ...] = ()  # candidates the plausibility filter removed
-    resolution: str = "single"  # absent | not_found | single | same_value | endorsement | ambiguous
+    # absent | not_found | single | same_value | contained | endorsement | ambiguous
+    resolution: str = "single"
     candidates: int = 0  # how many window candidates had a value
 
 
@@ -213,6 +248,54 @@ def running_header_pages(value: str | None, page_text: Mapping[int, str]) -> lis
                   if any(_header_line_key(ln) == key for ln in (text or "").splitlines()))
 
 
+# Containment rule: a value that is a token-boundary run inside a longer value is a less
+# specific mention of it (see the module docstring for the guards and the false-positive risk).
+CONTAINMENT_MIN_TOKENS = 3
+NEGATION_TOKENS = frozenset({"no", "non", "not", "never", "none", "without", "except", "excluding", "excluded"})
+
+
+def _is_number_key(tok: str) -> bool:
+    return tok.startswith("#")  # value_key writes numbers as "#<value><suffix>"
+
+
+def contained_in(short: Sequence[str], long: Sequence[str]) -> bool:
+    """True when ``short`` (a value_key) is a less specific mention of ``long``: a proper,
+    contiguous token run of it, with at least CONTAINMENT_MIN_TOKENS tokens and no number in
+    the shorter value, and no negation word ("non", "not", "no", ...) among the tokens the
+    longer value adds."""
+    n, m = len(short), len(long)
+    if n < CONTAINMENT_MIN_TOKENS or n >= m or any(_is_number_key(t) for t in short):
+        return False
+    for i in range(m - n + 1):
+        if tuple(long[i:i + n]) == tuple(short):
+            added = [*long[:i], *long[i + n:]]
+            if not any(t in NEGATION_TOKENS or t.startswith(("non-", "not-")) for t in added):
+                return True
+    return False
+
+
+def _fold_contained(groups: list[list[verify.VerifyResult]]) -> list[list[verify.VerifyResult]]:
+    """Fold each group whose value is contained in exactly one maximal longer value into that
+    value's group (its candidates go after the longer value's own, earliest page first). A
+    value contained in two unrelated longer values is left alone (still a conflict)."""
+    keys = [value_key(g[0].value) for g in groups]
+    inside = {i: [j for j in range(len(groups)) if j != i and contained_in(keys[i], keys[j])]
+              for i in range(len(groups))}
+    roots = {i for i in range(len(groups)) if not inside[i]}
+    folded: dict[int, list[verify.VerifyResult]] = {i: list(groups[i]) for i in sorted(roots)}
+    absorbed: dict[int, list[verify.VerifyResult]] = {i: [] for i in roots}
+    for i in range(len(groups)):
+        if i in roots:
+            continue
+        top = [j for j in inside[i] if j in roots]  # containment is transitive: the maximal ones
+        if len(top) == 1:
+            absorbed[top[0]].extend(groups[i])
+        else:
+            folded[i], absorbed[i] = list(groups[i]), []
+    out = [folded[i] + sorted(absorbed[i], key=_page) for i in folded]
+    return sorted(out, key=lambda g: _page(g[0]))
+
+
 def _from(r: verify.VerifyResult, **kw) -> MergedFact:
     base = {f: getattr(r, f) for f in verify.VerifyResult.__dataclass_fields__}
     base.update(kw)
@@ -301,6 +384,13 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
         log.info("merge: %s endorsement on page %s replaces %s", key, ordered[win][0].page_no,
                  [(r.value, r.page_no) for r in others])
         return with_extras(ordered[win], superseded=others, resolution="endorsement")
+    folded = _fold_contained(ordered)  # after the endorsement rule, before reporting a conflict
+    if len(folded) < len(ordered):
+        log.info("merge: %s folded less specific mentions into %s", key,
+                 [(g[0].value, g[0].page_no) for g in folded])
+    if len(folded) == 1:
+        return with_extras(folded[0], resolution="contained")
+    ordered = folded
     conflicts = tuple(g[0] for g in ordered)
     log.info("merge: %s has conflicting values %s; none is picked", key,
              [(r.value, r.page_no) for r in conflicts])
@@ -340,5 +430,6 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
     return f"This document states different values for {label}: {listed}. {tail}"
 
 
-__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "RUNNING_HEADER_FIELDS", "MergedFact", "conflict_message",
-           "implausible_reason", "merge_document", "merge_field", "running_header_pages", "value_key"]
+__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "MergedFact",
+           "conflict_message", "contained_in", "implausible_reason", "merge_document", "merge_field",
+           "running_header_pages", "value_key"]

@@ -299,6 +299,105 @@ def test_endorsement_winner_still_applies_after_the_filter():
     assert [s.value for s in m.superseded] == ["$5,000"]
 
 
+# --------------------------------------------------------------------- contained (less specific) mentions
+
+FORM_SHORT = "Commercial General Liability Coverage Form"
+
+
+def _pf(value, page, quote=None):
+    return vr(value, page, field="policy_form", quote=quote or f"Policy Form: {value}")
+
+
+@pytest.mark.parametrize("order", ["long_first", "short_first"])
+def test_shorter_contained_form_merges_into_the_longer_value_as_extras(order):
+    """Live eval (3 runs), long_120 / long_300 policy_form: the real form line on page 2 and a
+    later boilerplate mention that is a substring of it. Same value, not a conflict."""
+    cands = [_pf(LONG_FORM, 2), _pf(FORM_SHORT, 30, quote=f"{FORM_SHORT}, Section I"), _pf(FORM_SHORT, 77)]
+    if order == "short_first":
+        cands.reverse()
+    m = merge.merge_field(_field("policy_form"), cands)
+    assert (m.value, m.page_no, m.state, m.resolution) == (LONG_FORM, 2, V, "contained")
+    assert [(e.value, e.page_no) for e in m.extras] == [(FORM_SHORT, 30), (FORM_SHORT, 77)]
+    assert m.conflicts == () and m.superseded == () and m.candidates == 3
+
+
+def test_longer_value_keeps_its_earliest_page_even_when_the_shorter_comes_first():
+    m = merge.merge_field(_field("policy_form"), [_pf(FORM_SHORT, 1), _pf(LONG_FORM, 9), _pf(LONG_FORM, 4)])
+    assert (m.value, m.page_no, m.resolution) == (LONG_FORM, 4, "contained")
+    assert [e.page_no for e in m.extras] == [9, 1]  # the longer value's own repeats, then the mentions
+
+
+@pytest.mark.parametrize("name, form", [("long_120", LONG_FORM),
+                                        ("long_300", "CG 00 02 04 13 Commercial General Liability Coverage Form "
+                                                     "(Claims-Made)")])
+def test_long_fixture_boilerplate_mention_does_not_make_a_conflict(name, form):
+    pages = parse.parse_pdf((FIXTURE.parent / f"{name}.pdf").read_bytes()).pages
+    cands = [CandidateFact("policy_form", form, 2, f"Policy Form: {form}"),
+             CandidateFact("policy_form", FORM_SHORT, 5, f"{FORM_SHORT}, Section I: Coverages")]
+    checked = verify.verify_facts(cands, pages)
+    assert [c.state for c in checked] == [V, V]
+    m = merge.merge_field(_field("policy_form"), checked, {p.page_no: p.text for p in pages})
+    assert (m.value, m.page_no, m.state, m.resolution) == (form, 2, V, "contained")
+    assert [e.page_no for e in m.extras] == [5]
+
+
+@pytest.mark.parametrize("field, short, long", [
+    ("admitted_status", "Admitted", "Non-Admitted"),  # single token, and not a token-boundary match
+    ("admitted_status", "Admitted", "Non Admitted"),  # single token
+    ("admitted_status", "Admitted Carrier In California", "Not Admitted Carrier In California"),  # negation
+    ("admitted_status", "Admitted Carrier In California", "Non Admitted Carrier In California"),
+    ("admitted_status", "Admitted Carrier In California", "Admitted Carrier In California: No"),
+    ("carrier_name", "Harborline Specialty", "Harborline Specialty Insurance Company"),  # under 3 tokens
+    ("policy_form", "Liability Coverage Form", "Commercial General Liability Coverage Forms"),  # not on a token edge
+    ("retention", "$1,000,000", "$2,000,000"),
+    ("retention", "$5,000", "$5,000 per occurrence"),  # numbers and limits keep their behavior
+    ("retention", "$5,000 per occurrence", "$5,000 per occurrence each claim"),
+    ("retention", "Each Occurrence $1,000,000", "Each Occurrence $1,000,000 Aggregate"),
+    ("named_insured", "Northwind Logistics Group", "Harbor Freight Partners LLC"),  # unrelated
+])
+def test_values_that_are_not_a_safe_containment_still_conflict(field, short, long):
+    for cands in ([vr(short, 2, field=field), vr(long, 40, field=field)],
+                  [vr(long, 2, field=field), vr(short, 40, field=field)]):
+        m = merge.merge_field(_field(field), cands)
+        assert (m.state, m.resolution) == (C, "ambiguous")
+        assert sorted(c.value for c in m.conflicts) == sorted([short, long])
+
+
+def test_amendment_winner_is_decided_before_containment():
+    amended = "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)"
+    cands = [_pf(LONG_FORM, 2), _pf(FORM_SHORT, 30),
+             _pf(amended, 90, quote=f"Amendatory Endorsement: Policy Form replaced with {amended}")]
+    m = merge.merge_field(_field("policy_form"), cands)
+    assert (m.value, m.page_no, m.state, m.resolution) == (amended, 90, V, "endorsement")
+    assert [(s.value, s.page_no) for s in m.superseded] == [(LONG_FORM, 2), (FORM_SHORT, 30)]
+
+
+def test_mention_contained_in_two_unrelated_values_stays_a_conflict():
+    claims = "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)"
+    m = merge.merge_field(_field("policy_form"), [_pf(LONG_FORM, 2), _pf(claims, 3), _pf(FORM_SHORT, 30)])
+    assert (m.state, m.resolution) == (C, "ambiguous")
+    assert [c.page_no for c in m.conflicts] == [2, 3, 30]
+
+
+def test_containment_folds_the_mention_but_a_real_conflict_remains():
+    m = merge.merge_field(_field("policy_form"), [_pf(LONG_FORM, 2), _pf(FORM_SHORT, 30),
+                                                  _pf("Businessowners Coverage Form BP 00 03", 50)])
+    assert (m.state, m.resolution) == (C, "ambiguous")
+    assert [(c.value, c.page_no) for c in m.conflicts] == [(LONG_FORM, 2),
+                                                           ("Businessowners Coverage Form BP 00 03", 50)]
+
+
+def test_contained_value_helper_guards():
+    k = merge.value_key
+    assert merge.contained_in(k(FORM_SHORT), k(LONG_FORM))
+    assert merge.contained_in(k("general liability coverage form"), k(LONG_FORM))  # case-insensitive
+    assert not merge.contained_in(k(LONG_FORM), k(FORM_SHORT))  # proper containment only
+    assert not merge.contained_in(k(LONG_FORM), k(LONG_FORM))
+    assert not merge.contained_in(k("Coverage Form"), k(LONG_FORM))  # under 3 tokens
+    assert not merge.contained_in(k("Admitted Carrier Status"), k("Not Admitted Carrier Status"))
+    assert not merge.contained_in(k("Each Occurrence $1,000,000"), k("Each Occurrence $1,000,000 Aggregate"))
+
+
 def test_value_key_compares_numbers_by_value_but_keeps_words():
     assert merge.value_key("$10,000") == merge.value_key("10000") == merge.value_key("$10,000.00")
     assert merge.value_key("$10,000") != merge.value_key("$10,000 per occurrence")
