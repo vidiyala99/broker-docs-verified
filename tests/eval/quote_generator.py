@@ -121,6 +121,11 @@ class Fixture:
     notes: str = ""
     raw_bytes: bytes | None = None  # corrupt / non-PDF fixtures
     password: str | None = None
+    # Long-document fixtures: fields tagged on several pages with one value, and
+    # facts whose text runs across several pages (no single page holds the value).
+    repeated_fields: set[str] = field(default_factory=set)
+    straddles: list[dict] = field(default_factory=list)
+    compact: bool = False  # merge content streams (keeps long documents small)
 
 
 # ---------------------------------------------------------------------------
@@ -506,6 +511,10 @@ def render_pdf(fx: Fixture, rng: random.Random) -> bytes:
         out = doc.tobytes(garbage=4, deflate=True, no_new_id=True,
                           encryption=fitz.PDF_ENCRYPT_AES_256,
                           user_pw=fx.password, owner_pw=fx.password + "-owner")
+    elif fx.compact:
+        # clean=True merges the per-run content streams into one stream per page
+        # (hundreds of pages would otherwise cost one PDF object per text line).
+        out = doc.tobytes(garbage=4, deflate=True, clean=True, no_new_id=True)
     else:
         out = doc.tobytes(garbage=4, deflate=True, no_new_id=True)
     doc.close()
@@ -536,10 +545,13 @@ def build_truth(fx: Fixture, seed: int, pdf_bytes: bytes) -> dict:
         for region in spec.images:
             tagged.extend((r, "image") for r in region.runs if r.field)
         for r, source in tagged:
-            if facts[r.field] is not None:
-                raise ValueError(f"{fx.fixture_id}: field {r.field} tagged twice")
             if r.value is None or r.value not in r.text:
                 raise ValueError(f"{fx.fixture_id}: {r.field} value not inside its quote")
+            if facts[r.field] is not None:
+                # A deliberately repeated fact keeps its first (earliest) occurrence.
+                if r.field in fx.repeated_fields and facts[r.field]["value"] == r.value:
+                    continue
+                raise ValueError(f"{fx.fixture_id}: field {r.field} tagged twice")
             facts[r.field] = {
                 "value": r.value,
                 "page": pno,
@@ -548,6 +560,17 @@ def build_truth(fx: Fixture, seed: int, pdf_bytes: bytes) -> dict:
                 "source": source,
                 "accepted_values": fx.accepted_values.get(r.field, []),
             }
+    for s in fx.straddles:
+        if facts[s["field"]] is not None:
+            raise ValueError(f"{fx.fixture_id}: field {s['field']} tagged twice")
+        facts[s["field"]] = {
+            "value": s["value"],
+            "page": s["pages"][0],
+            "pages": list(s["pages"]),
+            "quote": s["quote"],
+            "source": "text",
+            "accepted_values": fx.accepted_values.get(s["field"], []),
+        }
     for d in fx.decoys:
         d.setdefault("pages", [i for i, t in enumerate(texts, 1) if d["value"] in t])
     return {
@@ -578,6 +601,397 @@ def build_truth(fx: Fixture, seed: int, pdf_bytes: bytes) -> dict:
 # ---------------------------------------------------------------------------
 # Fixture catalogue
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Long documents (120 and 300 pages)
+# ---------------------------------------------------------------------------
+
+# The long-document cap and the extraction window the backend uses. Overlap
+# between windows is what lets a fact that straddles a window edge be read.
+LONG_CAP_PAGES = 300
+LONG_WINDOW_PAGES = 15
+
+_SUBJECTS = [
+    "The Named Insured", "The Carrier", "Any insured", "The first Named Insured",
+    "A person or organization seeking coverage", "The Producer of record",
+    "Each insured", "The Carrier's authorized representative",
+]
+_ACTS = [
+    "must give written notice of an occurrence that may result in a claim",
+    "shall cooperate with the Carrier in the investigation, settlement or defense of any claim",
+    "may not voluntarily make a payment, assume an obligation or incur an expense",
+    "must send the Carrier copies of any demand, notice, summons or legal paper received",
+    "is required to permit inspection of premises and operations at reasonable times",
+    "will keep records of the information needed to compute the premium",
+    "must preserve the rights of recovery against any other party",
+    "shall provide access to books and records that relate to this insurance",
+    "may be asked to submit to examination under oath about the claim",
+    "will notify the Carrier of any change in ownership or operations",
+    "must not impair any right of recovery the Carrier may have",
+    "agrees to report each premises and each operation that is added during the policy period",
+]
+_QUALS = [
+    "as soon as practicable", "within the period stated in the Conditions",
+    "at the Carrier's request", "to the extent permitted by applicable law",
+    "unless the Carrier agrees otherwise in writing", "before any suit is brought",
+    "at the insured's own cost", "whether or not a claim is later made",
+    "as a condition of this insurance", "for each location shown in the Schedule",
+]
+_TERMS = [
+    ("Bodily injury", "means bodily injury, sickness or disease sustained by a person, including death resulting from any of these at any time"),
+    ("Property damage", "means physical injury to tangible property, including all resulting loss of use, or loss of use of tangible property that is not physically injured"),
+    ("Occurrence", "means an accident, including continuous or repeated exposure to substantially the same general harmful conditions"),
+    ("Suit", "means a civil proceeding in which damages because of bodily injury or property damage are alleged"),
+    ("Impaired property", "means tangible property, other than your product or your work, that cannot be used or is less useful because it incorporates a defective or inadequate element"),
+    ("Insured contract", "means a contract for a lease of premises, a sidetrack agreement or an easement, excluding any easement for work within fifty feet of a railroad"),
+    ("Policy period", "means the period of time stated in the Declarations unless it is ended earlier by cancellation"),
+    ("Temporary worker", "means a person who is furnished to the insured to substitute for a permanent employee on leave or to meet seasonal or short-term workload conditions"),
+    ("Mobile equipment", "means any land vehicle, including attached machinery or apparatus, that is not subject to compulsory or financial responsibility laws"),
+    ("Products-completed operations hazard", "includes all bodily injury and property damage occurring away from premises you own or rent and arising out of your product or your work"),
+    ("Volunteer worker", "means a person who donates his or her work, acts at the direction of the insured and is not paid a fee, salary or other compensation"),
+    ("Advertisement", "means a notice that is broadcast or published to the general public or specific market segments about goods, products or services for the purpose of attracting customers"),
+]
+_EVENTS = [
+    "the date the claim is first made", "receipt of the demand or suit papers",
+    "the end of the policy period", "discovery of the loss", "the date of the inspection",
+    "the effective date of the change", "the date the audit worksheet is mailed",
+    "written request by the Carrier",
+]
+_HEADINGS = [
+    "Duties in the Event of Occurrence, Offense, Claim or Suit", "Legal Action Against Us",
+    "Other Insurance", "Premium Audit", "Representations", "Separation of Insureds",
+    "Transfer of Rights of Recovery", "Supplementary Payments", "Bankruptcy",
+    "Examination of Your Books and Records", "Inspections and Surveys",
+    "Liberalization", "Concealment, Misrepresentation or Fraud", "Changes",
+    "Cancellation", "Nonrenewal", "Conformity with Statute", "Policy Territory Definitions",
+    "Knowledge of Occurrence", "Coverage Extension for Newly Acquired Organizations",
+    "Exclusions Applicable to Coverage A", "Exclusions Applicable to Coverage B",
+    "Medical Payments", "Duty to Defend", "Limits of Insurance Application",
+]
+_FORM_TITLES = [
+    "Commercial General Liability Coverage Form, Section I: Coverages",
+    "Commercial General Liability Coverage Form, Section II: Who Is An Insured",
+    "Commercial General Liability Coverage Form, Section III: Limits of Insurance",
+    "Commercial General Liability Coverage Form, Section IV: Conditions",
+    "Commercial General Liability Coverage Form, Section V: Definitions",
+    "Common Policy Conditions", "Premium Audit and Reporting Conditions",
+    "Exclusions and Limitations Form", "Supplemental Coverage Provisions",
+    "Property Damage Limitations Form", "Policy Interpretation and Notices Form",
+]
+_ENDORSEMENT_TITLES = [
+    "Additional Insured: Designated Person or Organization",
+    "Waiver of Transfer of Rights of Recovery Against Others",
+    "Exclusion: Designated Work",
+    "Notice of Cancellation to Designated Person or Organization",
+    "Amendment of Cancellation Provisions or Coverage Change",
+    "Limitation of Coverage to Designated Premises or Project",
+    "Exclusion: Access or Disclosure of Confidential Information",
+    "Primary and Noncontributory: Other Insurance Condition",
+    "Exclusion: Total Pollution with Building Heating Equipment Exception",
+    "Additional Insured: Owners, Lessees or Contractors, Completed Operations",
+    "Employee Benefits Liability Coverage",
+    "Exclusion: Unmanned Aircraft",
+    "Amendment of Insured Contract Definition",
+    "Contractual Liability Limitation",
+    "Blanket Additional Insured: Managers or Lessors of Premises",
+    "Limited Coverage for Fungi or Bacteria",
+]
+_STREETS = ["Quillfeather Way", "Marrow Creek Road", "Tamarack Row", "Lowell Foundry Street",
+            "Sable Heron Drive", "Pinecone Terrace", "Wickersham Parkway", "Dovetail Court",
+            "Granary Mill Road", "Alder Spur Lane", "Cobbett Station Road", "Fenwick Crossing"]
+_CITIES = [("Dayton", "OH", "45402"), ("Erie", "PA", "16501"), ("Raleigh", "NC", "27601"),
+           ("Toledo", "OH", "43604"), ("Scranton", "PA", "18503"), ("Durham", "NC", "27701"),
+           ("Akron", "OH", "44308"), ("Harrisburg", "PA", "17101")]
+_ROMAN = ["I", "II", "III", "IV", "V"]
+
+
+def _sentence(rng: random.Random) -> str:
+    k = rng.randrange(7)
+    if k <= 1:
+        return f"{rng.choice(_SUBJECTS)} {rng.choice(_ACTS)} {rng.choice(_QUALS)}."
+    if k == 2:
+        term, meaning = rng.choice(_TERMS)
+        return f"\"{term}\" {meaning}."
+    if k == 3:
+        return (f"See Section {rng.choice(_ROMAN)}, paragraph {rng.randint(1, 12)}"
+                f"({rng.choice('abcdefgh')}) for the conditions that apply.")
+    if k == 4:
+        return (f"Notice under this provision must be given within {rng.choice([10, 15, 30, 45, 60, 90])} "
+                f"days of {rng.choice(_EVENTS)}.")
+    if k == 5:
+        return (f"{rng.choice(_SUBJECTS)} {rng.choice(_ACTS)}, and {rng.choice(_SUBJECTS).lower()} "
+                f"{rng.choice(_ACTS)} {rng.choice(_QUALS)}.")
+    return (f"This provision does not apply to the extent it conflicts with a statute or regulation "
+            f"that governs {rng.choice(_EVENTS)}.")
+
+
+def _paragraph(rng: random.Random) -> str:
+    return " ".join(_sentence(rng) for _ in range(rng.randint(3, 5)))
+
+
+LONG_LH = 12.0
+LONG_BODY_LIMIT = PAGE_H - MARGIN - 20
+
+
+def _long_cursor() -> Cursor:
+    return Cursor(lh=LONG_LH)
+
+
+def _fill(c: Cursor, rng: random.Random, limit_y: float = LONG_BODY_LIMIT) -> None:
+    """Append varied policy boilerplate until the page body is full."""
+    n_head = rng.randint(1, 99)
+    while c.y + c.lh <= limit_y:
+        if rng.random() < 0.3:
+            n_head += 1
+            c.line(f"{n_head}. {rng.choice(_HEADINGS)}", size=9.5, bold=True)
+        for ln in textwrap.wrap(_paragraph(rng), 98):
+            if c.y + c.lh > limit_y:
+                return
+            c.line(ln, size=9)
+        c.y += 4
+
+
+def _wrapped(c: Cursor, text: str, *, width: int = 98) -> None:
+    for ln in textwrap.wrap(text, width):
+        c.line(ln, size=9)
+    c.y += 4
+
+
+LONG_TERRITORIES = [
+    (
+        "Coverage territory: the United States of America, its territories and possessions,",
+        "Puerto Rico and Canada, and also international waters and airspace, provided the "
+        "insured's responsibility for the damages is determined in a suit on the merits "
+        "brought within the United States of America, its territories and possessions,",
+        "Puerto Rico or Canada, or in a settlement we agree to.",
+    ),
+    (
+        "Coverage territory: all locations within the State of Ohio and the contiguous",
+        "states of Pennsylvania, Kentucky, Indiana, Michigan and West Virginia, and goods in "
+        "transit between those locations, and also temporary operations at trade shows held",
+        "within those states for a period not exceeding thirty days.",
+    ),
+]
+
+
+@dataclass
+class LongSpec:
+    fixture_id: str
+    pages: int
+    carrier: str
+    admitted: bool
+    absent: list[str]
+    insured: tuple[str, str]
+    producer: str
+    idx: int
+    declared_deductible: str
+    amended_deductible: str
+    territory: int
+
+
+LONG_SPECS = [
+    LongSpec("long_120", 120, "Alderbrook Mutual Indemnity Company", True, ["rate"],
+             INSUREDS[1], PRODUCERS[0], 0, "$5,000", "$10,000", 0),
+    LongSpec("long_300", LONG_CAP_PAGES, "Ironvale Specialty Insurance Company", False,
+             ["am_best_rating"], INSUREDS[2], PRODUCERS[1], 1, "$1,500", "$7,500", 1),
+]
+
+
+def _long_layout(n: int) -> dict[str, int]:
+    """Page numbers of the planted facts, scaled to the document length."""
+    return {
+        "premium": round(0.30 * n),
+        "limits_mid": round(0.50 * n),
+        "endorse_start": round(0.70 * n),
+        "amend": round(0.87 * n),
+        "schedule_start": round(0.93 * n),
+        "limits_end": n - 4,
+        "subjectivities": n - 3,
+        "expiration": n - 2,
+        "notices": n - 1,
+        "signature": n,
+    }
+
+
+def long_policy_fixture(seed: int, spec: LongSpec) -> Fixture:
+    """A policy-like long document: declarations first, form pages, endorsements
+    and schedules later. Deterministic from ``seed``."""
+    n = spec.pages
+    rng = random.Random(seed * 31 + 200 + spec.idx)
+    prof = build_profile(random.Random(seed * 31 + 110 + spec.idx), spec.carrier, spec.admitted,
+                         spec.idx, spec.insured, spec.producer, spec.absent)
+    prof["retention"] = spec.amended_deductible
+    prof["territory"] = None
+    segs = LONG_TERRITORIES[spec.territory]
+    terr_value = " ".join(s.removeprefix("Coverage territory: ") for s in segs)
+    polno = f"LG-{rng.randrange(100000, 999999)}"
+    lay = _long_layout(n)
+    agg = prof["aggregate_limit"]
+    straddle_pages = [14, 15, 16]
+
+    specs: list[PageSpec] = []
+    endorse_no = 0
+    amend_no = 0
+    for i in range(1, n + 1):
+        c = _long_cursor()
+        c.line(f"Policy No. {polno}", size=13, bold=True)
+        c.line(f"Commercial General Liability Policy    Page {i} of {n}", size=9)
+        c.y += 10
+        tail: Callable[[], None] | None = None
+        reserve = 0
+
+        if i == 1:
+            c.line("Declarations", size=12, bold=True)
+            c.y += 4
+            for f in ("named_insured", "carrier_name", "admitted_status", "policy_term"):
+                c.fact(prof, f)
+        elif i == 2:
+            c.line("Declarations (continued)", size=12, bold=True)
+            c.y += 4
+            for f in ("address", "producer", "am_best_rating", "policy_form"):
+                c.fact(prof, f)
+        elif i == 3:
+            c.line("Declarations: Limits of Insurance", size=12, bold=True)
+            c.y += 4
+            c.fact(prof, "each_occurrence_limit")
+            c.fact(prof, "aggregate_limit")
+            c.line(f"Deductible (per Declarations): {spec.declared_deductible} per occurrence")
+        elif i == 4:
+            c.line("Schedule of Forms and Endorsements", size=12, bold=True)
+            c.y += 4
+            for k in range(1, 15):
+                c.line(f"OM-GL {100 + k * 7} ({rng.choice(['04', '07', '10', '12'])}/{rng.choice(['11', '13', '15'])})"
+                       f"    {rng.choice(_FORM_TITLES)}", size=9)
+        elif i == straddle_pages[0]:
+            c.line(rng.choice(_FORM_TITLES), size=12, bold=True)
+            c.y += 4
+            lines1 = textwrap.wrap(segs[0], 98)
+            reserve = len(lines1) + 2
+
+            def tail(c=c, lines1=lines1) -> None:  # noqa: E306
+                c.y += 4
+                c.line("Policy Territory", size=10, bold=True)
+                for ln in lines1:
+                    c.line(ln, size=9)
+        elif i == straddle_pages[1]:
+            c.line("Policy Territory (continued)", size=12, bold=True)
+            c.y += 4
+            _wrapped(c, segs[1])
+        elif i == straddle_pages[2]:
+            _wrapped(c, segs[2])
+        elif i == lay["premium"]:
+            c.line("Premium Summary", size=12, bold=True)
+            c.y += 4
+            for f in ("total_premium", "taxes_and_fees", "total_cost", "rate"):
+                c.fact(prof, f)
+        elif i == lay["limits_mid"]:
+            c.line("Limits Summary", size=12, bold=True)
+            c.y += 4
+            c.line(f"General Aggregate Limit (applies per policy period): {agg}",
+                   field_name="aggregate_limit", value=agg)
+        elif i == lay["amend"]:
+            endorse_no += 1
+            amend_no = endorse_no
+            c.line(f"Endorsement No. {endorse_no}: Amendment of Deductible", size=12, bold=True)
+            c.y += 4
+            c.line("This endorsement modifies insurance provided under the Commercial General "
+                   "Liability Coverage Part.", size=9)
+            c.line("The deductible shown in the Declarations is deleted and replaced with the "
+                   "following:", size=9)
+            c.line(f"Amended Deductible: {spec.amended_deductible} per occurrence",
+                   field_name="retention", value=spec.amended_deductible)
+        elif lay["endorse_start"] <= i < lay["schedule_start"]:
+            if (i - lay["endorse_start"]) % 2 == 0:
+                endorse_no += 1
+                title = _ENDORSEMENT_TITLES[(endorse_no + spec.idx) % len(_ENDORSEMENT_TITLES)]
+                c.line(f"Endorsement No. {endorse_no}: {title}", size=12, bold=True)
+                c.y += 4
+                c.line("This endorsement modifies insurance provided under the Commercial "
+                       "General Liability Coverage Part.", size=9)
+            else:
+                c.line(f"Endorsement No. {endorse_no} (continued)", size=12, bold=True)
+                c.y += 4
+        elif lay["schedule_start"] <= i < lay["limits_end"]:
+            c.line("Schedule of Locations and Classifications", size=12, bold=True)
+            c.y += 4
+            for k in range(1, 23):
+                city, st, zp = rng.choice(_CITIES)
+                c.line(f"Loc {k + 22 * (i - lay['schedule_start']):03d}  "
+                       f"{rng.randint(10, 9800)} {rng.choice(_STREETS)}, {city}, {st} {zp}   "
+                       f"Class {rng.randint(40000, 69999)}   Area {rng.randint(1200, 98000):,} sq ft",
+                       size=8.5)
+        elif i == lay["limits_end"]:
+            c.line("Schedule of Insurance Summary", size=12, bold=True)
+            c.y += 4
+            c.line(f"Schedule of Limits: General Aggregate Limit {agg} applies, as amended by "
+                   f"the endorsements attached.", field_name="aggregate_limit", value=agg)
+        elif i == lay["subjectivities"]:
+            c.line("Subjectivities", size=12, bold=True)
+            c.y += 4
+            for k, s in enumerate(SUBJECTIVITIES, 1):
+                c.line(f"{k}. {s}")
+        elif i == lay["expiration"]:
+            c.line("Binding Terms", size=12, bold=True)
+            c.y += 4
+            c.fact(prof, "quote_expiration")
+        elif i == lay["notices"]:
+            c.line("Notices", size=12, bold=True)
+            c.y += 4
+        elif i == lay["signature"]:
+            c.line("Authorized Representative", size=12, bold=True)
+            c.y += 4
+        else:
+            c.line(_FORM_TITLES[((i - 5) // 3) % len(_FORM_TITLES)] if i < lay["endorse_start"]
+                   else "Policy Provisions", size=11, bold=True)
+            c.y += 4
+        c.y += 6
+        _fill(c, rng, LONG_BODY_LIMIT - reserve * LONG_LH)
+        if tail is not None:
+            tail()
+        specs.append(PageSpec(runs=c.runs))
+
+    quote = " ".join(segs)
+    absent_note = f"Absent field (must return null): {', '.join(spec.absent)}."
+    fx = Fixture(
+        spec.fixture_id, "long_document", "long",
+        f"Policy-like {n}-page document from {spec.carrier}: declarations on pages 1 to 3, "
+        f"form pages, endorsements from page {lay['endorse_start']}, schedules from page "
+        f"{lay['schedule_start']}. General aggregate limit repeats on three pages with one value. "
+        f"The Declarations deductible ({spec.declared_deductible}) is replaced by Endorsement "
+        f"No. {amend_no} on page {lay['amend']} (truth is the amended {spec.amended_deductible}). The "
+        f"coverage territory runs across pages 14, 15 and 16, so no single {LONG_WINDOW_PAGES}-page "
+        f"window without overlap holds it whole. {absent_note}",
+        specs, carrier=spec.carrier, accepted_values=_accepted(prof),
+        compact=True, repeated_fields={"aggregate_limit"},
+        straddles=[{"field": "territory", "value": terr_value, "pages": straddle_pages,
+                    "quote": quote}],
+        decoys=[{"field": "retention", "value": spec.declared_deductible, "kind": "superseded"}],
+        expect={
+            "window_pages": LONG_WINDOW_PAGES,
+            "straddle_field": "territory", "straddle_pages": straddle_pages,
+            "repeated_field": "aggregate_limit",
+            "conflict_field": "retention", "conflict_amend_page": lay["amend"],
+        },
+        notes="Effective value chosen as truth: a later endorsement amends the declarations.")
+    return fx
+
+
+def long_filler_fixture(fixture_id: str, n: int, carrier: str, description: str) -> Fixture:
+    """Policy filler pages only (no facts); used for the over-cap fixture."""
+    rng = random.Random(f"{fixture_id}-{n}")
+    pages = []
+    for i in range(1, n + 1):
+        c = _long_cursor()
+        c.line("Policy No. LG-000301", size=13, bold=True)
+        c.line(f"Commercial General Liability Policy    Page {i} of {n}", size=9)
+        c.y += 16
+        _fill(c, rng)
+        pages.append(PageSpec(runs=c.runs))
+    return Fixture(
+        fixture_id, "over_cap", "parse_only", description, pages, carrier=carrier, compact=True,
+        expect={"parse": "failed", "failure_reason": "over_cap", "cap": "pages",
+                "cap_value": LONG_CAP_PAGES})
 
 
 def _scanned(pages: list[PageSpec]) -> list[PageSpec]:
@@ -796,7 +1210,17 @@ def build_fixtures(seed: int, include_oversize: bool = False) -> list[Fixture]:
         expect={"parse": "failed", "failure_reason": "over_cap", "cap": "pages",
                 "cap_value": CAP_PAGES}))
 
+    # Long documents (appended after the original catalogue so earlier fixtures keep
+    # their index, and with it their per-fixture rng and bytes).
+    for ls in LONG_SPECS:
+        fixtures.append(long_policy_fixture(seed, ls))
+
     if include_oversize:
+        fixtures.append(long_filler_fixture(
+            "long_301", LONG_CAP_PAGES + 1, name,
+            f"{LONG_CAP_PAGES + 1} pages, one over the {LONG_CAP_PAGES}-page long-document cap. "
+            "Must be rejected before any model call with a message naming the page limit. "
+            "Generated only with --include-oversize (not committed)."))
         # Not committed (about 16 MB). Incompressible seeded noise image.
         orng = random.Random(seed + 9)
         side = 2400

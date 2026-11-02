@@ -17,6 +17,7 @@ EXPECTED_IDS = {
     "multi_option", "conflicting_endorsement", "injection",
     "parse_sparse", "parse_mixed", "password_protected",
     "corrupt_garbage", "corrupt_truncated", "not_a_pdf", "over_cap_pages",
+    "long_120", "long_300",
 }
 
 
@@ -108,7 +109,8 @@ def test_truth_schema(truths):
     for fid, t in truths.items():
         assert t["schema_version"] == qg.TRUTH_SCHEMA_VERSION
         assert set(t["facts"]) == set(qg.FIELDS), fid
-        assert t["gate_bucket"] in {"clean", "multi_column", "scanned", "report_only", "parse_only"}
+        assert t["gate_bucket"] in {"clean", "multi_column", "scanned", "report_only", "parse_only",
+                                   "long"}
         for f, fact in t["facts"].items():
             if fact is None:
                 continue

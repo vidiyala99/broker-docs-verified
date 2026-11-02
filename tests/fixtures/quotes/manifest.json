@@ -240,6 +240,26 @@
       "sha256": "51c8787a87baf8e46de1a6406055c638d74da9c964751310d455b38ca09a8f2c",
       "deterministic_bytes": true,
       "description": "81 pages, one over the 80-page cap. Must be rejected before any model call with a message naming the page limit."
+    },
+    {
+      "fixture_id": "long_120",
+      "file": "long_120.pdf",
+      "truth": "long_120.truth.json",
+      "variant": "long_document",
+      "gate_bucket": "long",
+      "sha256": "ad49ccc8807adf1931a84da5bb91797a26bc3ee268b09b97b73d869257d726eb",
+      "deterministic_bytes": true,
+      "description": "Policy-like 120-page document from Alderbrook Mutual Indemnity Company: declarations on pages 1 to 3, form pages, endorsements from page 84, schedules from page 112. General aggregate limit repeats on three pages with one value. The Declarations deductible ($5,000) is replaced by Endorsement No. 11 on page 104 (truth is the amended $10,000). The coverage territory runs across pages 14, 15 and 16, so no single 15-page window without overlap holds it whole. Absent field (must return null): rate."
+    },
+    {
+      "fixture_id": "long_300",
+      "file": "long_300.pdf",
+      "truth": "long_300.truth.json",
+      "variant": "long_document",
+      "gate_bucket": "long",
+      "sha256": "5f17225ef3c3304c96f9ff8d32ae95ee4782a95930991d386e4b2dd815369ed8",
+      "deterministic_bytes": true,
+      "description": "Policy-like 300-page document from Ironvale Specialty Insurance Company: declarations on pages 1 to 3, form pages, endorsements from page 210, schedules from page 279. General aggregate limit repeats on three pages with one value. The Declarations deductible ($1,500) is replaced by Endorsement No. 27 on page 261 (truth is the amended $7,500). The coverage territory runs across pages 14, 15 and 16, so no single 15-page window without overlap holds it whole. Absent field (must return null): am_best_rating."
     }
   ]
 }

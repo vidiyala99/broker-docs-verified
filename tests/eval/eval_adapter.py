@@ -71,6 +71,7 @@ LIVE_RUNS: dict[str, list[str]] = {
     "scanned": ["carrier_a_scanned", "carrier_b_scanned", "carrier_c_scanned",
                 "carrier_d_scanned"],
     "adversarial": ["multi_option", "conflicting_endorsement", "injection"],
+    "long": ["long_120", "long_300"],
     "parse": ["parse_sparse", "parse_mixed", "password_protected", "corrupt_garbage",
               "corrupt_truncated", "not_a_pdf", "over_cap_pages"],
 }
@@ -98,4 +99,6 @@ def run_suite(adapter: Callable[[list[str]], dict], fixture_dir: Path, truths: d
             result = g.DocResult.from_dict({**raw, "fixture_id": fid})
             scores.append(g.score_document(truths[fid], result))
     metrics = g.aggregate(scores, run_tokens)
-    return metrics, g.evaluate_gates(metrics)
+    # The full suite must have data in every gated bucket (clean, multi-column, long).
+    required = tuple(g.GATED_BUCKETS) if runs is None else ("clean", "multi_column")
+    return metrics, g.evaluate_gates(metrics, require_buckets=required)

@@ -33,6 +33,8 @@ Gates (R6, initial bars, tuned after the first live run):
   * hard fails == 0 across every fixture (gated)
   * field accuracy on the clean bucket >= 0.90 (gated)
   * field accuracy on the multi-column bucket >= 0.80 (gated)
+  * field accuracy on the long bucket (120 and 300 page documents) >= 0.85, and
+    zero hard fails in that bucket (gated; required when the full suite runs)
   * field accuracy on the scanned bucket: reported, not gated
   * max input tokens per run <= 600,000 (D3 budget, gated when reported)
 Everything else is reported, not gated.
@@ -52,9 +54,11 @@ from typing import Iterable, Mapping
 HARD_FAIL_MAX = 0
 FIELD_ACCURACY_CLEAN_MIN = 0.90
 FIELD_ACCURACY_MULTI_COLUMN_MIN = 0.80
+FIELD_ACCURACY_LONG_MIN = 0.85
 RUN_INPUT_TOKEN_BUDGET = 600_000
 
-GATED_BUCKETS = {"clean": FIELD_ACCURACY_CLEAN_MIN, "multi_column": FIELD_ACCURACY_MULTI_COLUMN_MIN}
+GATED_BUCKETS = {"clean": FIELD_ACCURACY_CLEAN_MIN, "multi_column": FIELD_ACCURACY_MULTI_COLUMN_MIN,
+                 "long": FIELD_ACCURACY_LONG_MIN}
 REPORTED_BUCKETS = ("scanned", "report_only", "parse_only")
 
 STATES = ("verified", "scan_read", "not_found", "failed")
@@ -493,6 +497,13 @@ def evaluate_gates(m: SuiteMetrics, *, require_buckets: Iterable[str] = ("clean"
         else:
             res.append(GateResult(f"field_accuracy[{bucket}]", acc, f">= {bar:.2f}", True,
                                   acc >= bar))
+    lb = m.buckets.get("long")
+    if lb is not None:
+        res.append(GateResult("hard_fails[long]", lb.hard_fails, f"== {HARD_FAIL_MAX}", True,
+                              lb.hard_fails <= HARD_FAIL_MAX))
+    elif "long" in required:
+        res.append(GateResult("hard_fails[long]", None, f"== {HARD_FAIL_MAX}", True, False,
+                              "no data"))
     for bucket in REPORTED_BUCKETS:
         b = m.buckets.get(bucket)
         if b is not None:
