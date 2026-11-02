@@ -62,9 +62,10 @@ export function LeftPanel({ viewport, label, children }: { viewport: Viewport; l
           <ChatCircleText size={20} aria-hidden />
         </button>
       </div>
+      {open && <div className="panel-scrim" aria-hidden onClick={() => setOpen(false)} />}
       {open && (
         <aside className="left-panel left-panel--overlay" aria-label={label}>
-          <button type="button" className="btn btn--ghost btn--sm left-panel__close" onClick={() => setOpen(false)}>
+          <button type="button" className="btn btn--ghost btn--sm left-panel__close" autoFocus onClick={() => setOpen(false)}>
             <SidebarSimple size={16} aria-hidden /> Hide panel
           </button>
           {children}

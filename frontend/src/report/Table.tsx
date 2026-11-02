@@ -176,7 +176,7 @@ function EditableCell({
       data-state={state}
       tabIndex={canEdit && !editing ? 0 : undefined}
       aria-label={editing ? undefined : `${label}: ${describe(cell, state)}${canEdit ? ". Press Enter to edit" : ""}`}
-      onDoubleClick={() => !editing && begin()}
+      onDoubleClick={(e) => !editing && !(e.target as HTMLElement).closest("button") && begin()}
       onKeyDown={onKey}
     >
       {editing ? (

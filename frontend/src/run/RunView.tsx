@@ -55,13 +55,14 @@ export function RunView({
   const [tab, setTab] = useState<Tab>("report");
   const [split, setSplit] = useState(false);
   const [splitAnim, setSplitAnim] = useState(false);
-  const [outlineOpen, setOutlineOpen] = useState(true);
+  const [outlineOpen, setOutlineOpen] = useState(viewport !== "narrow");
   const [focusCount, setFocusCount] = useState(0);
   const [filter, setFilter] = useState<TrustFilter | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
   const [announce, setAnnounce] = useState("");
   const [reconnecting, setReconnecting] = useState(false);
+  const [generation, setGeneration] = useState(0);
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const wide = viewport === "wide";
@@ -77,15 +78,17 @@ export function RunView({
     }
   }, [runId]);
 
-  const loadRun = useCallback(async () => {
+  const loadRun = useCallback(async (): Promise<Run | null> => {
     try {
       const r = await api.run(runId);
       setRun(r);
       setLoadError(null);
       if (r.artifact) await loadArtifact();
       else setArtifact(null);
+      return r;
     } catch (e) {
       setLoadError(e instanceof ApiError ? e.message : "Couldn't load this run.");
+      return null;
     }
   }, [runId, loadArtifact]);
 
@@ -110,11 +113,15 @@ export function RunView({
     onArtifact: () => void loadArtifact(),
     onEnd: () => {
       setReconnecting(false);
-      void loadRun();
+      void loadRun().then((r) => {
+        // The replay can end with an earlier execution's run.end while a retry is still
+        // running: follow the stream again from after that event.
+        if (r && !r.terminal) setGeneration((g) => g + 1);
+      });
       onRunsChanged();
     },
     onConnection: (s) => setReconnecting(s === "reconnecting"),
-  });
+  }, generation);
 
   // ------------------------------------------------------------------ sources
   const openSource = useCallback(
@@ -137,7 +144,8 @@ export function RunView({
 
   useEffect(() => {
     if (!wide) setSplit(false);
-  }, [wide]);
+    if (viewport === "narrow") setOutlineOpen(false);
+  }, [wide, viewport]);
 
   const exitSplit = useCallback(() => {
     setSplit(false);
@@ -517,7 +525,7 @@ export function RunView({
                 </span>
                 <span className="source-pane__name">{activePdf.filename}</span>
                 <button type="button" className="btn btn--ghost btn--sm" onClick={exitSplit}>
-                  Exit <kbd>Esc</kbd>
+                  {split ? "Exit" : "Back to report"} <kbd>Esc</kbd>
                 </button>
               </div>
               <Suspense fallback={<div className="pdf__frame"><div className="pdf__skeleton" aria-hidden /></div>}><PdfViewer target={activePdf} /></Suspense>

@@ -19,13 +19,16 @@ const TYPES = ["run.status", "document.status", "run.usage", "artifact.ready", "
  * when the browser gives up (readyState CLOSED) we reopen with ?last_event_id=N so the
  * stream resumes after the last event we saw. The server closes the stream after run.end.
  */
-export function useRunEvents(runId: number | null, active: boolean, handlers: RunEventHandlers) {
+export function useRunEvents(runId: number | null, active: boolean, handlers: RunEventHandlers, generation = 0) {
   const ref = useRef(handlers);
   ref.current = handlers;
+  // Survives resubscribes, so a new stream resumes after the last event seen (for example
+  // after the run.end of an earlier execution when a retry is already running).
+  const last = useRef<{ runId: number | null; id: number | undefined }>({ runId: null, id: undefined });
+  if (last.current.runId !== runId) last.current = { runId, id: undefined };
 
   useEffect(() => {
     if (runId == null || !active) return;
-    let lastId: number | undefined;
     let source: EventSource | null = null;
     let ended = false;
     let retryTimer: number | undefined;
@@ -37,7 +40,7 @@ export function useRunEvents(runId: number | null, active: boolean, handlers: Ru
       } catch {
         return;
       }
-      if (typeof ev.id === "number") lastId = ev.id;
+      if (typeof ev.id === "number") last.current.id = ev.id;
       const h = ref.current;
       const d = ev.data;
       switch (ev.type) {
@@ -63,7 +66,7 @@ export function useRunEvents(runId: number | null, active: boolean, handlers: Ru
     };
 
     const open = () => {
-      source = new EventSource(api.eventsUrl(runId, lastId));
+      source = new EventSource(api.eventsUrl(runId, last.current.id));
       source.onopen = () => ref.current.onConnection?.("open");
       for (const t of TYPES) source.addEventListener(t, handle as EventListener);
       source.onerror = () => {
@@ -81,5 +84,5 @@ export function useRunEvents(runId: number | null, active: boolean, handlers: Ru
       window.clearTimeout(retryTimer);
       source?.close();
     };
-  }, [runId, active]);
+  }, [runId, active, generation]);
 }

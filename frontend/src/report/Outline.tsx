@@ -65,16 +65,27 @@ export function Outline({
 
   useEffect(() => {
     if (!scrollRoot) return;
-    const els = Array.from(scrollRoot.querySelectorAll<HTMLElement>("[data-section]"));
-    const io = new IntersectionObserver(
-      (entries) => {
-        const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (top) setCurrent((top.target as HTMLElement).dataset.section ?? null);
-      },
-      { root: scrollRoot, rootMargin: "0px 0px -70% 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    // Current section = the last heading that has passed the top third of the report pane.
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const line = scrollRoot.getBoundingClientRect().top + scrollRoot.clientHeight / 3;
+      let id: string | null = null;
+      for (const el of scrollRoot.querySelectorAll<HTMLElement>("[data-section]")) {
+        if (el.getBoundingClientRect().top <= line) id = el.dataset.section ?? null;
+        else break;
+      }
+      setCurrent(id ?? artifact.content.sections[0]?.id ?? null);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scrollRoot.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
   }, [scrollRoot, artifact]);
 
   const choose = (key: TrustFilter) => {

@@ -165,7 +165,7 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
           <MagnifyingGlassPlus size={16} aria-hidden />
         </button>
       </div>
-      <div className="pdf__frame" ref={frame} tabIndex={0} aria-label={`${target.filename}, page ${page} of ${total || "unknown"}`}>
+      <div className="pdf__frame" ref={frame} tabIndex={0} role="region" aria-label={`${target.filename}, page ${page} of ${total || "unknown"}`}>
         {error ? (
           <div className="pdf__error" role="alert">
             <p>Couldn't open this file.</p>
