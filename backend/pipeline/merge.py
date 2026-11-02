@@ -46,7 +46,10 @@ dropped when its value:
    example "Producer", "Producer of record", "Coverage Territory";
 2. ends with "Definition(s)" (a definitions heading);
 3. ends with a dot leader and a page number (a table-of-contents entry);
-4. is shorter than 4 characters, has no digit and is not an upper-case code
+4. is pagination only ("Page 27 of 300", "Page 4", "27 / 300"; live eval
+   long_300.policy_term, 2026-11-02, a page header's "Page 27 of 300" came
+   back as the policy term); a bare number such as "12" is not dropped;
+5. is shorter than 4 characters, has no digit and is not an upper-case code
    (so "A-", "A++" and "USA" pass, "of" and "Ab" do not).
 False-positive risk: a real value that is literally the label's words (for
 example a producer whose registered name is "Producer Of Record") is
@@ -67,6 +70,22 @@ on every page is dropped when some other value also came back. That is why
 identity fields (carrier, insured, producer, address), which legitimately
 sit in page headers, are not in the set. The containment rule below does not
 cover this case: the live header is not a substring of the real form line.
+The same goes for a candidate whose stating line (the whole line or lines its
+matched text spans) is printed verbatim on 3 or more pages (repeated_line_pages,
+reason running_header too): live eval 2026-11-02, a long_300 window returned
+"Commercial General Liability Coverage Part" from "This endorsement modifies
+insurance provided under the Commercial General Liability Coverage Part.",
+a formula line on every endorsement page. Such a boilerplate line also never
+counts as an amendment (endorsement rule, any field).
+
+Definition rule (definition_body, any field). A candidate whose value directly
+follows a quoted defined term and "means" / "includes" / "is defined as"
+('"Policy period" means the period of time stated in the Declarations ...')
+is the body of a definition, not a stated value; it is dropped (reason
+definition_body) only when another cited, non-definition candidate is left,
+so a value the document gives only as a definition is still shown. Live eval
+2026-11-02 (fix lane run 1): long_300.policy_term conflicted between the real
+period on page 1 and that definition on page 171.
 
 Containment rule (contained_in, after the endorsement rule). Live eval, 3
 runs, long_120 and long_300 policy_form: page 2 states "CG 00 01 04 13
@@ -111,7 +130,12 @@ Endorsement rule (kept simple on purpose):
 2. The amending candidates must all state one value, and that value must
    first appear on a later page than every other value (an endorsement comes
    after the declarations it changes).
-3. Otherwise the conflict is ambiguous.
+3. A candidate on a boilerplate line (the same line on 3 or more pages) never
+   amends: an amendment states a new value once. Live eval 2026-11-02:
+   "This endorsement modifies insurance provided under the Commercial General
+   Liability Coverage Part" (every endorsement page of long_300) carries the
+   word "endorsement" and was picked over the real form on page 2.
+4. Otherwise the conflict is ambiguous.
 
 Extension point: a page-scoring pass that skips windows with no likely
 facts would plug in before extraction (pipeline.windows.select_windows);
@@ -159,6 +183,8 @@ GENERIC_LABEL_WORDS = frozenset({
 })
 _DEFINITIONS_RE = re.compile(r"\bdefinitions?\W*$", re.I)
 _TOC_RE = re.compile(r"(?:\.\s*){4,}\d+\s*$")
+# pagination only: "Page 27 of 300", "Page 4", "p. 12", "27 / 300", "- 27 -"
+_PAGINATION_RE = re.compile(r"^\W*(?:(?:page|pg|p)\.?\s*)?\d+(?:\s*(?:of|/)\s*\d+)?\W*$", re.I)
 
 
 def _words(text: str) -> list[str]:
@@ -179,6 +205,8 @@ def implausible_reason(fdef: FactField | str, value: str | None) -> str | None:
         return "definitions_heading"
     if _TOC_RE.search(v):
         return "table_of_contents"
+    if _PAGINATION_RE.match(v) and re.search(r"[a-z/]", v, re.I):
+        return "page_number"
     if len(v) < 4 and not any(ch.isdigit() for ch in v) and v != v.upper():
         return "too_short"
     return None
@@ -248,6 +276,57 @@ def running_header_pages(value: str | None, page_text: Mapping[int, str]) -> lis
                   if any(_header_line_key(ln) == key for ln in (text or "").splitlines()))
 
 
+def _stating_lines(r: verify.VerifyResult, page_text: Mapping[int, str]) -> list[str]:
+    """The whole lines of the candidate's page that its matched text (else quote, else value) spans."""
+    text = page_text.get(r.page_no, "") if r.page_no is not None else ""
+    if not text:
+        return []
+    for needle in (r.matched_text, r.quote, r.value):
+        words = (needle or "").split()
+        if not words:
+            continue
+        mo = re.search(r"\s+".join(re.escape(w) for w in words), text, re.I)
+        if mo:
+            start = text.rfind("\n", 0, mo.start()) + 1
+            end = text.find("\n", mo.end())
+            return [ln for ln in text[start:end if end != -1 else len(text)].splitlines() if ln.strip()]
+    return []
+
+
+def repeated_line_pages(r: verify.VerifyResult, page_text: Mapping[int, str]) -> list[int]:
+    """Pages that print every line stating the candidate, verbatim (page numbering and spacing
+    ignored). Three or more mark boilerplate: a running header or a fixed formula such as the
+    line on every endorsement, "This endorsement modifies insurance provided under the
+    Commercial General Liability Coverage Part." (live eval long_300.policy_form, 2026-11-02)."""
+    keys = {k for k in (_header_line_key(ln) for ln in _stating_lines(r, page_text)) if k}
+    if not keys:
+        return []
+    return sorted(p for p, text in page_text.items()
+                  if keys <= {_header_line_key(ln) for ln in (text or "").splitlines()})
+
+
+_DEFINED_TERM_RE = re.compile(r"[\"“”']\s*[^\"“”\n]{1,60}?\s*[\"“”']\s+(?:means|includes|is\s+defined\s+as)(?:\s+(?:the|a|an|any|all))?\s*$", re.I)
+
+
+def definition_body(r: verify.VerifyResult, page_text: Mapping[int, str]) -> bool:
+    """True when the candidate's value is the body of a definition ('"Policy period" means
+    <value>'): the document defines a term there, it does not state the field's value."""
+    text = page_text.get(r.page_no, "") if r.page_no is not None else ""
+    words = (r.value or "").split()
+    if not text or not words:
+        return False
+    for mo in re.finditer(r"\s+".join(re.escape(w) for w in words), text, re.I):
+        before = " ".join(text[max(0, mo.start() - 120):mo.start()].split())
+        if _DEFINED_TERM_RE.search(before + " "):
+            return True
+    return False
+
+
+def _boilerplate(r: verify.VerifyResult, page_text: Mapping[int, str]) -> bool:
+    return (len(running_header_pages(r.value, page_text)) >= RUNNING_HEADER_MIN_PAGES
+            or len(repeated_line_pages(r, page_text)) >= RUNNING_HEADER_MIN_PAGES)
+
+
 # Containment rule: a value that is a token-boundary run inside a longer value is a less
 # specific mention of it (see the module docstring for the guards and the false-positive risk).
 CONTAINMENT_MIN_TOKENS = 3
@@ -304,10 +383,17 @@ def _from(r: verify.VerifyResult, **kw) -> MergedFact:
 
 def _resolve_endorsement(groups: list[list[verify.VerifyResult]],
                          page_text: Mapping[int, str]) -> int | None:
-    """Index of the group an endorsement makes effective, or None when ambiguous."""
-    amending = [i for i, g in enumerate(groups) if any(_amends_by_quote(r) for r in g)]
+    """Index of the group an endorsement makes effective, or None when ambiguous. A candidate
+    stated on a boilerplate line (the same line on 3+ pages, _boilerplate) never amends: an
+    amendment states a new value once, while "This endorsement modifies insurance provided
+    under the ... Coverage Part" is printed on every endorsement and changes no value."""
+    def one_off(r: verify.VerifyResult) -> bool:
+        return not page_text or not _boilerplate(r, page_text)
+
+    amending = [i for i, g in enumerate(groups) if any(_amends_by_quote(r) and one_off(r) for r in g)]
     if not amending:  # an endorsement heading on, or just above, the line that states the value
-        amending = [i for i, g in enumerate(groups) if any(_amends_near_match(r, page_text) for r in g)]
+        amending = [i for i, g in enumerate(groups)
+                    if any(_amends_near_match(r, page_text) and one_off(r) for r in g)]
     if len(amending) != 1:
         return None
     win = amending[0]
@@ -332,14 +418,21 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
             reasons[id(c)] = why
         (dropped if why else plausible).append(c)
     if key in RUNNING_HEADER_FIELDS and page_text:
-        headers = [c for c in plausible
-                   if len(running_header_pages(c.value, page_text)) >= RUNNING_HEADER_MIN_PAGES]
+        headers = [c for c in plausible if _boilerplate(c, page_text)]
         header_ids = {id(c) for c in headers}
         rest = [c for c in plausible if id(c) not in header_ids]
         if headers and any(c.state in (EvidenceState.VERIFIED, EvidenceState.SCAN_READ) for c in rest):
             for c in headers:
                 reasons[id(c)] = "running_header"
             plausible, dropped = rest, dropped + headers
+    if page_text:  # any field: a definition body loses to a value the document states
+        defs = [c for c in plausible if definition_body(c, page_text)]
+        def_ids = {id(c) for c in defs}
+        rest = [c for c in plausible if id(c) not in def_ids]
+        if defs and any(c.state in (EvidenceState.VERIFIED, EvidenceState.SCAN_READ) for c in rest):
+            for c in defs:
+                reasons[id(c)] = "definition_body"
+            plausible, dropped = rest, dropped + defs
     if dropped:
         log.info("merge: %s dropped implausible values %s", key,
                  [(r.value, r.page_no or r.cited_page, reasons[id(r)]) for r in dropped])
@@ -431,5 +524,5 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
 
 
 __all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "MergedFact",
-           "conflict_message", "contained_in", "implausible_reason", "merge_document", "merge_field",
-           "running_header_pages", "value_key"]
+           "conflict_message", "contained_in", "definition_body", "implausible_reason", "merge_document", "merge_field",
+           "repeated_line_pages", "running_header_pages", "value_key"]

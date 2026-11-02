@@ -161,6 +161,102 @@ def test_long_120_amended_deductible_still_wins(long_120_pages):
     assert [s.value for s in m.superseded] == ["$5,000"]
 
 
+LONG_300 = FIXTURE.parent / "long_300.pdf"
+LONG_300_FORM = "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)"
+COVERAGE_PART = "Commercial General Liability Coverage Part"
+APPLIES_LINE = f"This endorsement modifies insurance provided under the {COVERAGE_PART}."
+
+
+@pytest.fixture(scope="module")
+def long_300_pages():
+    return parse.parse_pdf(LONG_300.read_bytes()).pages
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_long_300_endorsement_applicability_line_never_wins(long_300_pages, reverse):
+    """Live eval 2026-11-02 11:37 hard fail: a window returned the coverage part named on every
+    endorsement page ("This endorsement modifies insurance provided under the ...") as the
+    policy form; its quote holds the word "endorsement" and it sits on a later page, so the
+    endorsement rule showed it as verified over the real form on page 2."""
+    cands = [CandidateFact("policy_form", LONG_300_FORM, 2, f"Policy Form: {LONG_300_FORM}"),
+             CandidateFact("policy_form", COVERAGE_PART, 248, APPLIES_LINE)]
+    if reverse:
+        cands.reverse()
+    checked = verify.verify_facts(cands, long_300_pages)
+    assert [c.state for c in checked] == [V, V]  # both really are on their pages
+    text = {p.page_no: p.text for p in long_300_pages}
+    part = next(c for c in checked if c.value == COVERAGE_PART)
+    assert len(merge.repeated_line_pages(part, text)) >= 3
+    m = merge.merge_field(_field("policy_form"), checked, text)
+    assert m.resolution != "endorsement"
+    assert (m.value, m.page_no, m.state) == (LONG_300_FORM, 2, V)
+    assert [d.value for d in m.dropped] == [COVERAGE_PART]
+
+
+def test_boilerplate_line_does_not_amend_even_outside_the_header_fields():
+    # retention is not a running-header field, so nothing is dropped, but a line printed on every
+    # endorsement page is not a one-time amendment: the cell is a conflict, never an endorsement pick
+    line = "This endorsement applies to the Deductible: $10,000"
+    pages = {2: "Declarations\nDeductible: $5,000", **{p: f"Endorsement No. {p}\n{line}\nBody." for p in (9, 10, 11)}}
+    cands = [vr("$5,000", 2), vr("$10,000", 9, quote=line)]
+    m = merge.merge_field(_field("retention"), cands, pages)
+    assert (m.state, m.resolution) == (C, "ambiguous")
+    assert m.dropped == ()
+    # the same amendment printed once still wins
+    once = {2: pages[2], 9: pages[9]}
+    m1 = merge.merge_field(_field("retention"), cands, once)
+    assert (m1.value, m1.state, m1.resolution) == ("$10,000", V, "endorsement")
+
+
+def test_repeated_line_is_kept_when_it_is_the_only_value():
+    pages = {p: f"Header\n{APPLIES_LINE}\nBody {p}." for p in (5, 6, 7)}
+    only = vr(COVERAGE_PART, 5, field="policy_form", quote=APPLIES_LINE)
+    m = merge.merge_field(_field("policy_form"), [only], pages)
+    assert (m.value, m.state, m.dropped) == (COVERAGE_PART, V, ())
+
+
+def test_long_300_page_footer_is_not_a_policy_term(long_300_pages):
+    """Live eval 2026-11-02 11:37: long_300.policy_term was 'Conflicting values' between the real
+    period on page 1 and the page header's 'Page 27 of 300'."""
+    term = "January 1, 2027 to January 1, 2028"
+    cands = [CandidateFact("policy_term", term, 1, f"Policy Period: {term}"),
+             CandidateFact("policy_term", "Page 27 of 300", 27, "Commercial General Liability Policy Page 27 of 300")]
+    checked = verify.verify_facts(cands, long_300_pages)
+    assert [c.state for c in checked] == [V, V]
+    m = merge.merge_field(_field("policy_term"), checked, {p.page_no: p.text for p in long_300_pages})
+    assert (m.value, m.page_no, m.state, m.resolution) == (term, 1, V, "single")
+    assert [d.value for d in m.dropped] == ["Page 27 of 300"]
+
+
+def test_long_300_definition_body_is_not_a_policy_term(long_300_pages):
+    """Fix-lane live run 1 (2026-11-02): policy_term conflicted between page 1 and the body of the
+    '"Policy period" means ...' definition on page 171."""
+    term = "January 1, 2027 to January 1, 2028"
+    body = "period of time stated in the Declarations unless it is ended earlier by cancellation."
+    cands = [CandidateFact("policy_term", term, 1, f"Policy Period: {term}"),
+             CandidateFact("policy_term", body, 171, f'"Policy period" means the {body}')]
+    checked = verify.verify_facts(cands, long_300_pages)
+    assert [c.state for c in checked] == [V, V]
+    text = {p.page_no: p.text for p in long_300_pages}
+    assert merge.definition_body(checked[1], text) and not merge.definition_body(checked[0], text)
+    m = merge.merge_field(_field("policy_term"), checked, text)
+    assert (m.value, m.page_no, m.state) == (term, 1, V)
+    assert [d.value for d in m.dropped] == [body]
+
+
+def test_definition_body_is_kept_when_it_is_the_only_value():
+    pages = {3: 'Definitions\n"Coverage territory" means the United States of America.'}
+    only = vr("the United States of America", 3, field="territory",
+              quote='"Coverage territory" means the United States of America.')
+    m = merge.merge_field(_field("territory"), [only], pages)
+    assert (m.value, m.state, m.dropped) == ("the United States of America", V, ())
+    # a value stated by label beside it wins, the definition body is dropped
+    pages[1] = "Coverage territory: Worldwide"
+    m2 = merge.merge_field(_field("territory"), [only, vr("Worldwide", 1, field="territory",
+                                                          quote="Coverage territory: Worldwide")], pages)
+    assert (m2.value, m2.state, [d.value for d in m2.dropped]) == ("Worldwide", V, ["the United States of America"])
+
+
 def _header_pages(n=6, header=LONG_HEADER):
     return {i: f"Policy No. LG-1\n{header}    Page {i} of {n}\nPolicy wording page {i}." for i in range(1, n + 1)}
 
@@ -244,6 +340,10 @@ def test_conflict_message_names_every_value_and_page():
     ("key_exclusions", "Exclusions ........ 14"),  # table-of-contents entry
     ("named_insured", "Ab"),  # two letters, not a name
     ("named_insured", "of"),
+    ("policy_term", "Page 27 of 300"),  # pagination from a page header or footer
+    ("policy_term", "page 4"),
+    ("quote_expiration", "27 / 300"),
+    ("policy_term", "Pg. 3 of 12"),
 ])
 def test_label_and_heading_values_are_implausible(field, value):
     assert merge.implausible_reason(_field(field), value) is not None
@@ -262,6 +362,10 @@ def test_label_and_heading_values_are_implausible(field, value):
     ("policy_form", "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)"),
     ("policy_form", "Claims-Made"),
     ("key_endorsements", "CG 20 10 Additional Insured"),
+    ("policy_term", "12"),  # a bare number is not pagination
+    ("policy_term", "12 months"),
+    ("policy_term", "January 1, 2027 to January 1, 2028"),
+    ("quote_expiration", "12/15/2026"),
 ])
 def test_real_values_pass_the_plausibility_filter(field, value):
     assert merge.implausible_reason(_field(field), value) is None
@@ -336,9 +440,15 @@ def test_long_fixture_boilerplate_mention_does_not_make_a_conflict(name, form):
              CandidateFact("policy_form", FORM_SHORT, 5, f"{FORM_SHORT}, Section I: Coverages")]
     checked = verify.verify_facts(cands, pages)
     assert [c.state for c in checked] == [V, V]
-    m = merge.merge_field(_field("policy_form"), checked, {p.page_no: p.text for p in pages})
-    assert (m.value, m.page_no, m.state, m.resolution) == (form, 2, V, "contained")
-    assert [e.page_no for e in m.extras] == [5]
+    text = {p.page_no: p.text for p in pages}
+    m = merge.merge_field(_field("policy_form"), checked, text)
+    # the mention is a section heading line printed on many pages: dropped as boilerplate
+    # (repeated_line_pages) before containment would fold it; the real form is shown either way
+    assert (m.value, m.page_no, m.state, m.resolution) == (form, 2, V, "single")
+    assert [d.value for d in m.dropped] == [FORM_SHORT]
+    # without page text (no repetition known) containment still folds it
+    c = merge.merge_field(_field("policy_form"), checked)
+    assert (c.value, c.resolution, [e.page_no for e in c.extras]) == (form, "contained", [5])
 
 
 @pytest.mark.parametrize("field, short, long", [
