@@ -333,6 +333,80 @@ def test_temporal_field_values_with_a_date_or_duration_pass(field, value):
     assert merge.implausible_reason(_field(field), value) is None
 
 
+QUOTE_DATE = "December 15, 2026"
+NOTICE_45 = "45 days of the end of the policy period"
+
+
+def _expiry(value, page, quote=None):
+    return vr(value, page, field="quote_expiration", quote=quote or f"Quote Valid Until: {value}")
+
+
+@pytest.mark.parametrize("value", [
+    NOTICE_45,
+    "within 45 days of the end of the policy period",
+    "30 days after the expiration of the policy period",
+    "sixty (60) days from the effective date of the policy period",
+    "10 days before the end of the policy period",
+])
+def test_quote_expiration_duration_anchored_to_the_policy_period_is_implausible(value):
+    # a notice clause measured from the policy period, not when the quote lapses
+    assert merge.implausible_reason(_field("quote_expiration"), value) == "policy_period_duration"
+
+
+def test_policy_term_durations_are_unchanged_by_the_quote_expiration_rule():
+    assert merge.implausible_reason(_field("policy_term"), NOTICE_45) is None
+
+
+def test_long_300_notice_duration_does_not_conflict_with_the_quote_date():
+    """Live eval 2026-11-02: long_300.quote_expiration conflicted between '45 days of the end of the
+    policy period' (page 6, a notice clause) and 'December 15, 2026' (page 298)."""
+    line = "workload conditions. Notice under this provision must be given within 45 days of the end of the"
+    pages = {6: f"{line}\npolicy period.", 298: f"Binding Terms\nQuote Valid Until: {QUOTE_DATE}"}
+    m = merge.merge_field(_field("quote_expiration"), [_expiry(NOTICE_45, 6, f"{NOTICE_45}."),
+                                                       _expiry(QUOTE_DATE, 298)], pages)
+    assert (m.value, m.page_no, m.state, m.resolution) == (QUOTE_DATE, 298, V, "single")
+    assert m.conflicts == () and [d.value for d in m.dropped] == [NOTICE_45]
+
+
+def test_undated_quote_expiration_does_not_conflict_with_a_stated_date():
+    rel = "30 days from the date of this quotation"
+    pages = {2: f"Quote valid for {rel}.", 90: f"Quote Valid Until: {QUOTE_DATE}"}
+    m = merge.merge_field(_field("quote_expiration"), [_expiry(rel, 2, f"Quote valid for {rel}."),
+                                                       _expiry(QUOTE_DATE, 90)], pages)
+    assert (m.value, m.page_no, m.state) == (QUOTE_DATE, 90, V)
+    assert m.conflicts == () and [d.value for d in m.dropped] == [rel]
+    # with no dated value, the stated duration is still the value
+    only = merge.merge_field(_field("quote_expiration"), [_expiry(rel, 2, f"Quote valid for {rel}.")], pages)
+    assert (only.value, only.state, only.dropped) == (rel, V, ())
+
+
+def test_two_different_quote_expiration_dates_still_conflict():
+    a, b = "12/15/2026", "January 15, 2027"
+    pages = {3: f"Quote Valid Until: {a}", 90: f"Binding Terms\nQuote Valid Until: {b}"}
+    m = merge.merge_field(_field("quote_expiration"), [_expiry(a, 3), _expiry(b, 90),
+                                                       _expiry(NOTICE_45, 6, f"{NOTICE_45}.")], pages)
+    assert (m.state, m.resolution) == (C, "ambiguous")
+    assert [(c.value, c.page_no) for c in m.conflicts] == [(a, 3), (b, 90)]
+    assert [d.value for d in m.dropped] == [NOTICE_45]
+
+
+@pytest.mark.parametrize("value, dated", [
+    ("12/15/2026", True), ("December 15, 2026", True), ("2026-12-15", True), ("15 December 2026", True),
+    ("Dec. 15, 2026", True), ("30 days from the date of this quotation", False), ("2026", False),
+    ("December 2026", False), (NOTICE_45, False),
+])
+def test_states_date_needs_month_day_and_year(value, dated):
+    assert merge.states_date(value) is dated
+
+
+def test_policy_term_duration_still_conflicts_with_a_date_range():
+    # unchanged: the dated-value preference is for quote_expiration only
+    a, b = "01/01/2027 to 01/01/2028", "18 months"
+    pages = {1: f"Policy Period: {a}", 40: f"Policy Term: {b}"}
+    m = merge.merge_field(_field("policy_term"), [_term(a, 1), _term(b, 40, f"Policy Term: {b}")], pages)
+    assert (m.state, m.resolution) == (C, "ambiguous")
+
+
 def test_definition_body_is_kept_when_it_is_the_only_value():
     pages = {3: 'Definitions\n"Coverage territory" means the United States of America.'}
     only = vr("the United States of America", 3, field="territory",

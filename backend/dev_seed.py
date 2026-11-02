@@ -101,19 +101,26 @@ def extract(text: str) -> dict[str, Any]:
         # A value the model "saw" that is not on the page: verify drops it to Couldn't verify.
         found["minimum_earned_premium"] = {"field": "minimum_earned_premium", "value": "35% of annual premium",
                                            "page": 2, "quote": "Minimum Earned Premium: 35% of annual premium"}
-    pages = [int(p) for p in re.findall(r"\[page (\d+)\]", block)]
-    if pages and 30 <= min(pages) <= 45 and "policy_form" not in found:
-        # Later window of a long document: it states another "policy form", so merge reports
-        # conflicting values (cell notice).
-        cur = 0
+    if "each_occurrence_limit" not in found:
+        # Later window of a long document (long_120 page 60): the model misreads the aggregate
+        # limit under a "Limits Summary" heading as the each-occurrence limit, so merge reports
+        # conflicting values ($1,000,000 on page 3, $2,000,000 on page 60; cell notice). The
+        # decoy must be a conflict merge keeps: a one-off line with an amount (the old decoy, a
+        # section heading repeated on 3+ pages, is dropped as boilerplate; a wordy mention of
+        # the real policy form is folded into it by the containment rule).
+        cur, summary = 0, False
         for line in block.splitlines():
             m = re.match(r"\[page (\d+)\]", line.strip())
             if m:
-                cur = int(m.group(1))
+                cur, summary = int(m.group(1)), False
                 continue
-            mm = re.match(r"\s*(.{3,80}?):\s+(\S.{2,60}?)\s*$", line)
-            if mm and cur:
-                found["policy_form"] = {"field": "policy_form", "value": mm.group(2), "page": cur, "quote": line.strip()}
+            if line.strip() == "Limits Summary":
+                summary = True
+                continue
+            amount = re.search(r"\$[\d,]+", line) if summary else None
+            if amount:
+                found["each_occurrence_limit"] = {"field": "each_occurrence_limit", "value": amount.group(0),
+                                                  "page": cur, "quote": line.strip()}
                 break
     multi = "Juniper Peak" in block
     return {"facts": list(found.values()) + conflicts, "options_detected": 3 if multi else 1,
