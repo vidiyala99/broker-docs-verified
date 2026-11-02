@@ -84,3 +84,8 @@ Open:
 2. New false conflict seen once in a live long run: `long_300.quote_expiration` '45 days of the end of the policy period (page 6)' vs 'December 15, 2026'. Options: require a date, drop durations measured from the policy period, or leave (noise only).
 3. Not started, need owner decisions: save-outline-as-template / bigger template library; left-panel design fix; extraction cache (2c); Standard-template eval coverage; PRODUCT.md. Rotate the OpenAI key.
 4. Dev backend was reaped for low memory at 13:16; restart with a fresh seed: `BROKERDOCS_DATA_DIR=<scratch> BROKERDOCS_UI_ORIGIN=http://localhost:5173`, `python -m backend.dev_seed seed` then `serve` (venv: `backend/.venv`).
+
+## Session end 2026-11-02 14:30: T8 follow-up merged (fbec2b0), live eval PASS
+- Merged: seed conflict fix (page-60 aggregate misread as each-occurrence limit, test_dev_seed.py), quote_expiration needs a date, policy-period durations dropped. Backend 913 pass/2 skip, e2e 3/3 axe 0.
+- Full 23-doc live eval on merged main: PASS, 0 hard fails, 268/286 (0.937), clean 1.000, multi_column 1.000, long 0.933, tokens 440k. Misses: territory in long_120/long_300 (known), password_protected (expected). Run live eval with the key loaded: set -a; . ./.env; set +a before pytest -m live.
+- Open (owner decisions): template library, left-panel design fix, extraction cache 2c, Standard-template eval, PRODUCT.md, rotate OpenAI key. Stale: qa-screenshots/1440-state-conflicting.png (regenerate with own node_modules). Possible merge false positive: heading 'Schedule of Forms and Endorsements' read as amendment marker (unseen today). Worktree .claude/worktrees/t8-followup has a node_modules junction (remove before deleting).
