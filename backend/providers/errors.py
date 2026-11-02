@@ -67,6 +67,12 @@ class BudgetExhausted(ProviderError):
         self.remaining = remaining
 
 
+class DocumentBudgetExhausted(BudgetExhausted):
+    """One document's own ceiling (T14, DocumentBudget) cannot cover this call. Nothing was sent."""
+
+    code = "document_budget_exhausted"
+
+
 class ContextOverflow(ProviderError):
     """Estimated input plus reserved output exceeds the model context window. Nothing was sent."""
 

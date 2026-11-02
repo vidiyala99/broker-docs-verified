@@ -15,7 +15,8 @@ cancel reaches every child and waits for it):
 
     READING     load bytes + parse (thread pool); OCR pages that trip M3
                 (render in the thread pool, vision call on the loop)
-    EXTRACTING  pipeline.extract (one strict call)
+    EXTRACTING  pipeline.extract (one strict call); over 15 pages, pipeline.windows
+                (page windows, progress "Extracting window k/N", T14)
     VERIFYING   pipeline.verify (thread pool), then fact + passage rows
     DONE / FAILED (ParseError code, ProviderError code, cancelled, internal_error)
 
@@ -29,7 +30,10 @@ minus tokens the run already spent (retries count against the same cap).
 Before any document starts, `compose_headroom` tokens are reserved and held
 back so extraction cannot starve the report; the hold is released just
 before compose. A document whose call does not fit fails with
-budget_exhausted and the run completes PARTIAL with a budget notice.
+budget_exhausted and the run completes PARTIAL with a budget notice. Each
+document spends through its own DocumentBudget child (T14, 400k ceiling by
+default) so one long document cannot starve the rest; a document over its
+ceiling fails with document_budget_exhausted.
 
 Idempotency: `submit` returns the active run for the same workflow,
 documents and parameters instead of creating a second one (double-click
@@ -59,7 +63,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend import db, models
-from backend.pipeline import compose, extract, parse, verify
+from backend.pipeline import compose, extract, parse, verify, windows
 from backend.providers import CallRecord, Provider, ProviderError, RunBudget
 from backend.schemas import (
     CITED_STATES,
@@ -85,6 +89,7 @@ _current_document: contextvars.ContextVar[int | None] = contextvars.ContextVar("
 
 _MESSAGES = {
     "budget_exhausted": "Budget exhausted: the run's token budget ran out before this document was read.",
+    "document_budget_exhausted": "This document needs more tokens than one document may use in a run.",
     "refusal": "The model declined to read this document.",
     "schema_invalid": "The model's answer could not be read, twice in a row.",
     "truncated": "The model's answer was cut off before it finished.",
@@ -254,6 +259,7 @@ class RunManager:
         limits: parse.ParseLimits = parse.DEFAULT_LIMITS,
         verify_config: verify.VerifyConfig = verify.DEFAULT_CONFIG,
         budget_limit: int | None = None,
+        document_budget_limit: int | None = None,
         compose_headroom: int = DEFAULT_COMPOSE_HEADROOM,
         max_workers: int = 4,
         bus: EventBus | None = None,
@@ -264,6 +270,7 @@ class RunManager:
         self._limits = limits
         self._verify_config = verify_config
         self._budget_limit = budget_limit or provider.config.run_token_budget
+        self._document_budget_limit = document_budget_limit or provider.config.document_token_budget
         self._headroom = max(0, compose_headroom)
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="brokerdocs-pipeline")
         self._tasks: dict[int, asyncio.Task] = {}
@@ -573,15 +580,17 @@ class RunManager:
     async def _process_document(self, run_id: int, rd_id: int, ref: DocumentRef, plan: _Plan,
                                 budget: RunBudget) -> None:
         token = _current_document.set(ref.id)
+        budget = budget.child(self._document_budget_limit, label=f"document:{ref.id}")  # T14 ceiling
         try:
             self._update_doc(run_id, rd_id, RunDocumentStatus.READING, progress="Reading pages")
             pages = await self._read_pages(run_id, rd_id, ref, budget)
             self._update_doc(run_id, rd_id, RunDocumentStatus.EXTRACTING, progress="Extracting")
-            result = await extract.extract_document(
+            result = await windows.extract_document(
                 self.provider, budget, plan.fields, pages, document_name=ref.filename,
-                instructions=plan.instructions, label=f"extract:{ref.id}")
+                instructions=plan.instructions, label=f"extract:{ref.id}",
+                on_progress=lambda k, n: self._update_doc(run_id, rd_id, progress=f"Extracting window {k}/{n}"))
             self._update_doc(run_id, rd_id, RunDocumentStatus.VERIFYING, progress="Verifying")
-            verified = await self._in_thread(verify.verify_facts, result.facts, pages, self._verify_config)
+            verified = await self._in_thread(windows.verify_document, result, pages, self._verify_config)
             self._store_facts(run_id, ref.id, verified)
             self._update_doc(run_id, rd_id, RunDocumentStatus.DONE, progress=None,
                              option_count=result.option_count, option_label=result.option_label)
@@ -678,6 +687,7 @@ class RunManager:
                     passage = models.upsert_passage(s, doc_id, r.page_no,
                                                     verified=r.state == EvidenceState.VERIFIED, rects=r.rects)
                     fact.passage_id = passage.id
+                    models.attach_merged_evidence(s, fact, doc_id, r)  # T14: no-op for single-call facts
                 s.add(fact)
 
     def _compose_input(self, run: models.Run, plan: _Plan, budget: RunBudget) -> compose.ComposeInput:
@@ -705,7 +715,10 @@ class RunManager:
                 option_label=rd.option_label))
             facts.extend(compose.ComposeFact(column_key=rd.letter, field=f.field, value=f.value,
                                              state=EvidenceState(f.state), passage_id=f.passage_id,
-                                             page_no=f.page_no, fact_id=f.id) for f in doc_facts)
+                                             page_no=f.page_no, fact_id=f.id,
+                                             extra_passage_ids=tuple(f.extra_passage_ids or ()),
+                                             conflicts=tuple((c["value"], c.get("page_no"))
+                                                             for c in f.conflicts or ())) for f in doc_facts)
         notices = []
         if budget_failed:
             notices.append(Notice(kind="budget_exhausted", message=(

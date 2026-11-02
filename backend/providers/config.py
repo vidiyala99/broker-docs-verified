@@ -66,7 +66,8 @@ FALLBACK_PRICE = ModelPrice(5.00, 0.50, 40.00)
 # conservative floor; slice 1 calls (one quote, about 10 pages) are far below it.
 DEFAULT_CONTEXT_WINDOW = 128_000
 
-RUN_TOKEN_BUDGET = 600_000  # D3
+RUN_TOKEN_BUDGET = 1_500_000  # T14 (D3 had 600k)
+DOCUMENT_TOKEN_BUDGET = 400_000  # T14: per-document ceiling inside the run budget
 MAX_CONCURRENCY = 4  # M6
 RETRY_DELAYS_S = (1.0, 2.0, 4.0)  # M8: 3 retries at 1/2/4 seconds
 SCHEMA_RETRIES = 1  # spec section 6: one retry
@@ -82,6 +83,7 @@ class ProviderConfig:
     context_windows: dict[str, int] = field(default_factory=dict)
     default_context_window: int = DEFAULT_CONTEXT_WINDOW
     run_token_budget: int = RUN_TOKEN_BUDGET
+    document_token_budget: int = DOCUMENT_TOKEN_BUDGET
     max_concurrency: int = MAX_CONCURRENCY
     retry_delays_s: tuple[float, ...] = RETRY_DELAYS_S
     schema_retries: int = SCHEMA_RETRIES
@@ -111,7 +113,8 @@ class ProviderConfig:
 
     @classmethod
     def from_env(cls, env: "os._Environ[str] | dict[str, str] | None" = None) -> "ProviderConfig":
-        """Defaults plus overrides: BROKERDOCS_MODEL_<ROLE>, BROKERDOCS_RUN_TOKEN_BUDGET, BROKERDOCS_MAX_CONCURRENCY."""
+        """Defaults plus overrides: BROKERDOCS_MODEL_<ROLE>, BROKERDOCS_RUN_TOKEN_BUDGET,
+        BROKERDOCS_DOCUMENT_TOKEN_BUDGET, BROKERDOCS_MAX_CONCURRENCY."""
         env = os.environ if env is None else env
         cfg = cls()
         models = dict(cfg.models)
@@ -122,6 +125,8 @@ class ProviderConfig:
         changes: dict = {"models": models}
         if env.get("BROKERDOCS_RUN_TOKEN_BUDGET"):
             changes["run_token_budget"] = int(env["BROKERDOCS_RUN_TOKEN_BUDGET"])
+        if env.get("BROKERDOCS_DOCUMENT_TOKEN_BUDGET"):
+            changes["document_token_budget"] = int(env["BROKERDOCS_DOCUMENT_TOKEN_BUDGET"])
         if env.get("BROKERDOCS_MAX_CONCURRENCY"):
             changes["max_concurrency"] = int(env["BROKERDOCS_MAX_CONCURRENCY"])
         return replace(cfg, **changes)

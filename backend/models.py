@@ -263,6 +263,10 @@ class Fact(Base):
     reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
     repointed_from: Mapped[int | None] = mapped_column(Integer, nullable=True)
     passage_id: Mapped[int | None] = mapped_column(ForeignKey("passage.id"), nullable=True)
+    # T14 (long documents, pipeline.merge): the same value found on other pages,
+    # and different values the document also states (each {"value", "page_no", "passage_id"}).
+    extra_passage_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    conflicts: Mapped[list[Any]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     run: Mapped[Run] = relationship(back_populates="facts")
@@ -438,6 +442,31 @@ def upsert_passage(
     passage.verified = bool(passage.verified) or verified
     session.flush()
     return passage
+
+
+def attach_merged_evidence(session: Session, fact: Fact, document_id: int, merged: Any) -> None:
+    """Store a merged long-document fact's extra passages and conflicting values (T14).
+
+    `merged` is a pipeline.merge.MergedFact (duck-typed: `extras` and
+    `conflicts` are sequences of verify results with state, page_no, rects).
+    """
+
+    def passage_for(r: Any) -> int | None:
+        state = EvidenceState(r.state)
+        if r.page_no is None or state not in (EvidenceState.VERIFIED, EvidenceState.SCAN_READ):
+            return None
+        return upsert_passage(session, document_id, r.page_no, verified=state == EvidenceState.VERIFIED,
+                              rects=r.rects).id
+
+    extras: list[int] = []
+    for r in getattr(merged, "extras", ()) or ():
+        pid = passage_for(r)
+        if pid is not None and pid != fact.passage_id and pid not in extras:
+            extras.append(pid)
+    conflicts = [{"value": r.value, "page_no": r.page_no, "passage_id": passage_for(r)}
+                 for r in getattr(merged, "conflicts", ()) or ()]
+    fact.extra_passage_ids = extras
+    fact.conflicts = conflicts
 
 
 def assign_chip_labels(entries: Iterable[tuple[int, str, int]]) -> dict[int, str]:

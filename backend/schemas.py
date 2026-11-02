@@ -117,6 +117,20 @@ class Segment(BaseModel):
     passage_ids: list[int] = Field(default_factory=list)
 
 
+class Notice(BaseModel):
+    """A warning row (DG5). Run-level in ArtifactContent.notices; cell-level in Cell.notice.
+
+    conflicting_values (T14, cell-level): one document states different values
+    for the field and no rule picks one; the message names every value and its
+    page, and the cell shows the earliest.
+    """
+
+    kind: Literal["compose_fallback", "budget_exhausted", "documents_failed", "info", "conflicting_values"]
+    message: str
+    retryable: bool = False
+    dismissible: bool = False
+
+
 class Cell(BaseModel):
     value: str | None = None
     passage_ids: list[int] = Field(default_factory=list)
@@ -127,6 +141,8 @@ class Cell(BaseModel):
     # available as "original source".
     original_value: str | None = None
     original_passage_ids: list[int] = Field(default_factory=list)
+    # T14: cell-level warning, for example conflicting_values in a long document.
+    notice: Notice | None = None
 
 
 class Column(BaseModel):
@@ -195,15 +211,6 @@ class Section(BaseModel):
     level: int = 1
     stale: bool = False  # D9: prose cites an edited cell
     blocks: list[Block] = Field(default_factory=list)
-
-
-class Notice(BaseModel):
-    """Run-level row at the top of the artifact (DG5)."""
-
-    kind: Literal["compose_fallback", "budget_exhausted", "documents_failed", "info"]
-    message: str
-    retryable: bool = False
-    dismissible: bool = False
 
 
 class ArtifactContent(BaseModel):
