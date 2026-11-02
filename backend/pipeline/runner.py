@@ -31,7 +31,7 @@ Before any document starts, `compose_headroom` tokens are reserved and held
 back so extraction cannot starve the report; the hold is released just
 before compose. A document whose call does not fit fails with
 budget_exhausted and the run completes PARTIAL with a budget notice. Each
-document spends through its own DocumentBudget child (T14, 400k ceiling by
+document spends through its own DocumentBudget child (T14, 500k ceiling by
 default) so one long document cannot starve the rest; a document over its
 ceiling fails with document_budget_exhausted.
 

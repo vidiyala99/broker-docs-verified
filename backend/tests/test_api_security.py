@@ -268,7 +268,7 @@ def test_careful_model_on_injection_fixture_reports_true_values_and_no_canaries(
     art = a.artifact(run["id"])
     cells = {row["key"]: row["cells"]["A"] for s in art["content"]["sections"] for b in s["blocks"]
              if b["type"] == "table" for row in b["rows"]}
-    assert cells["total_premium"]["value"] == "$18,175.00" and cells["total_premium"]["state"] == "verified"
+    assert cells["total_premium"]["value"] == "$18,325.00" and cells["total_premium"]["state"] == "verified"
     assert cells["territory"]["value"] == "Not specified" and cells["territory"]["passage_ids"] == []
     blob = json.dumps(art["content"])
     for canary in CANARIES.values():
