@@ -249,9 +249,11 @@ def validate_answer(data: dict[str, Any], cctx: ChatContext, question: str
     base = allowed_numbers([*cctx.report_values, question])
     segments: list[dict[str, Any]] = []
     for i, seg in enumerate(data.get("answer") or []):
-        text = (seg.get("text") or "").strip()
+        # Kept unchanged: the model writes the spaces between segments (stripping them
+        # glued sentences together); compose keeps prose segment text the same way.
+        text = seg.get("text") or ""
         pids = list(dict.fromkeys(seg.get("passage_ids") or []))
-        if not text:
+        if not text.strip():
             continue
         bad = [p for p in pids if p not in cctx.passages]
         if bad:
@@ -325,7 +327,7 @@ async def answer(ctx: AppContext, run_id: int, question: str) -> tuple[models.Me
         user = models.Message(run_id=run_id, role="user", content=question,
                               segments=[{"text": question, "passage_ids": []}], passage_ids=[], proposed_edits=[])
         pids = list(dict.fromkeys(p for seg in segments for p in seg["passage_ids"]))
-        bot = models.Message(run_id=run_id, role="assistant", content=" ".join(seg["text"] for seg in segments),
+        bot = models.Message(run_id=run_id, role="assistant", content="".join(seg["text"] for seg in segments).strip(),
                              segments=segments, passage_ids=pids, proposed_edits=edits)
         s.add_all([user, bot])
         s.flush()

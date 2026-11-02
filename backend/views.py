@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.edits import all_passage_ids, iter_cells
+from backend.pipeline.runner import is_retryable
 from backend.schemas import ArtifactContent, RunStatus
 
 TERMINAL_RUN_STATUSES = {str(RunStatus.DONE), str(RunStatus.PARTIAL), str(RunStatus.FAILED),
@@ -59,7 +60,7 @@ def run_out(run: models.Run, *, active: bool) -> dict[str, Any]:
         "active": active,
         "terminal": str(run.status) in TERMINAL_RUN_STATUSES and not active,
         "error": run.error,
-        "retryable": bool(run.retryable),
+        "retryable": is_retryable(run.status, active=active),  # POST /retry would be accepted
         "parameters": run.parameters or {},
         "tokens_in": run.tokens_in or 0,
         "tokens_out": run.tokens_out or 0,

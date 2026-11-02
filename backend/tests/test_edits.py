@@ -115,6 +115,17 @@ def test_chat_validation_numbers_come_from_report_question_or_cited_page():
     assert "the answer is empty" in validate_answer(empty, _cctx(), "q")[0]
 
 
+def test_chat_validation_keeps_segment_text_unchanged():
+    # The model writes the spaces between segments; stripping them glued sentences together.
+    data = {"answer": [{"text": "The fee is $250", "passage_ids": [8]}, {"text": " per inspection. ", "passage_ids": []},
+                       {"text": " ", "passage_ids": []}, {"text": "See the quote.", "passage_ids": [8]}],
+            "proposed_edits": []}
+    errors, segs, _ = validate_answer(data, _cctx(), "fee?")
+    assert errors == []
+    assert [s["text"] for s in segs] == ["The fee is $250", " per inspection. ", "See the quote."]
+    assert "".join(s["text"] for s in segs) == "The fee is $250 per inspection. See the quote."
+
+
 def test_chat_validation_keeps_only_proposed_edits_for_real_cells():
     data = {"answer": [{"text": "Done as a proposal.", "passage_ids": []}], "proposed_edits": [
         {"block_id": "t", "row_key": "premium", "column_key": "A", "value": " $300 ", "reason": "asked"},

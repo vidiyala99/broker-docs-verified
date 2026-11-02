@@ -122,17 +122,31 @@ def format_sse(event: dict[str, Any]) -> str:
 class EventBus:
     """In-memory event fan-out per run with bounded replay history.
 
-    Event shape: {"id": int, "run_id": int, "type": str, "data": dict}; ids are
-    increasing across the process, so an SSE Last-Event-ID resumes a stream.
+    Event shape: {"id": int, "run_id": int, "execution": int, "type": str, "data": dict};
+    ids are increasing across the process, so an SSE Last-Event-ID resumes a
+    stream. `execution` counts task launches of the run (1 for the first run,
+    2 after the first retry, ...; 0 for events of a run never started in this
+    process), so a reader can tell the run.end of an earlier execution from the
+    current one.
     """
 
     def __init__(self, max_history: int = 1000):
         self._ids = itertools.count(1)
         self._history: dict[int, deque] = defaultdict(lambda: deque(maxlen=max_history))
         self._subscribers: dict[int, set[asyncio.Queue]] = defaultdict(set)
+        self._executions: dict[int, int] = defaultdict(int)
+
+    def begin_execution(self, run_id: int) -> int:
+        """A new task is about to run for `run_id`; later events belong to it."""
+        self._executions[run_id] += 1
+        return self._executions[run_id]
+
+    def execution(self, run_id: int) -> int:
+        return self._executions.get(run_id, 0)
 
     def publish(self, run_id: int, type_: str, data: dict[str, Any]) -> dict[str, Any]:
-        event = {"id": next(self._ids), "run_id": run_id, "type": type_, "data": data}
+        event = {"id": next(self._ids), "run_id": run_id, "execution": self.execution(run_id),
+                 "type": type_, "data": data}
         self._history[run_id].append(event)
         for q in list(self._subscribers.get(run_id, ())):
             q.put_nowait(event)
@@ -211,8 +225,15 @@ def _doc_payload(rd: models.RunDocument) -> dict[str, Any]:
     }
 
 
-def _run_payload(run: models.Run) -> dict[str, Any]:
-    return {"id": run.id, "status": str(run.status), "error": run.error, "retryable": bool(run.retryable),
+def is_retryable(status: RunStatus | str, *, active: bool = False) -> bool:
+    """True exactly when `RunManager.retry` would accept the run: FAILED, PARTIAL or
+    CANCELLED, and no task is running for it."""
+    return not active and RunStatus(status) in RETRYABLE_STATUSES
+
+
+def _run_payload(run: models.Run, *, active: bool = False) -> dict[str, Any]:
+    return {"id": run.id, "status": str(run.status), "error": run.error,
+            "retryable": is_retryable(run.status, active=active),
             "tokens_in": run.tokens_in or 0, "tokens_out": run.tokens_out or 0,
             "cost_usd": run.cost_usd or 0.0}
 
@@ -412,7 +433,9 @@ class RunManager:
                 raise LookupError(f"no run {run_id}")
             if RunStatus(run.status) != RunStatus.QUEUED:
                 return False
-        task = asyncio.get_running_loop().create_task(self._execute(run_id), name=f"brokerdocs-run-{run_id}")
+        loop = asyncio.get_running_loop()
+        self.bus.begin_execution(run_id)
+        task = loop.create_task(self._execute(run_id), name=f"brokerdocs-run-{run_id}")
         self._tasks[run_id] = task
         task.add_done_callback(functools.partial(self._task_done, run_id))
         return True
@@ -478,24 +501,36 @@ class RunManager:
                 raise LookupError(f"no run {run_id}")
             art = run.artifact
             return {
-                "run": _run_payload(run),
+                "run": _run_payload(run, active=self.is_active(run_id)),
                 "documents": [_doc_payload(rd) for rd in run.documents],
                 "artifact": {"id": art.id, "version": art.current_version} if art else None,
             }
 
     async def events(self, run_id: int, last_event_id: int | None = None) -> AsyncIterator[dict[str, Any]]:
-        """Replay history after `last_event_id`, then live events until run.end.
+        """Replay history after `last_event_id`, then live events until the run.end
+        of the current execution.
+
+        A retried run's history holds the run.end of every earlier execution;
+        those are superseded and skipped (never yielded), so a client that
+        stops at run.end follows the retry to its own end. The other events
+        of earlier executions are replayed as they happened.
 
         A run that is not active and has nothing to replay yields one
-        run.snapshot event (id None) built from the database, then ends.
+        run.snapshot event (id None) built from the database, then ends; so
+        does an idle run whose replay has no current run.end to close on.
         """
+
+        def superseded_end(e: dict[str, Any]) -> bool:
+            return e["type"] == "run.end" and e.get("execution", 0) < self.bus.execution(run_id)
+
         q = self.bus.subscribe(run_id)
         try:
             seen = last_event_id or 0
-            yielded = False
             for e in self.bus.history(run_id, after=last_event_id):
+                seen = e["id"]
+                if superseded_end(e):
+                    continue
                 yield e
-                yielded, seen = True, e["id"]
                 if e["type"] == "run.end":
                     return
             while True:
@@ -503,15 +538,16 @@ class RunManager:
                     e = q.get_nowait()
                 except asyncio.QueueEmpty:
                     if not self.is_active(run_id):
-                        if not yielded:
-                            yield {"id": None, "run_id": run_id, "type": "run.snapshot",
-                                   "data": self.snapshot(run_id)}
+                        yield {"id": None, "run_id": run_id, "execution": self.bus.execution(run_id),
+                               "type": "run.snapshot", "data": self.snapshot(run_id)}
                         return
                     e = await q.get()
                 if e["id"] <= seen:
                     continue
+                seen = e["id"]
+                if superseded_end(e):
+                    continue
                 yield e
-                yielded, seen = True, e["id"]
                 if e["type"] == "run.end":
                     return
         finally:
@@ -571,7 +607,7 @@ class RunManager:
                 return False
             changed = _fail_open_documents(run, "cancelled", failure_message("cancelled"))
             models.transition_run(run, RunStatus.CANCELLED)
-            run.finished_at = models.utcnow()
+            run.retryable, run.finished_at = True, models.utcnow()
             s.flush()
             docs = [_doc_payload(rd) for rd in changed]
             payload = _run_payload(run)
@@ -802,6 +838,7 @@ class RunManager:
             any_failed = any(RunDocumentStatus(rd.status) == RunDocumentStatus.FAILED for rd in run.documents)
             final = RunStatus.PARTIAL if any_failed or budget.exhausted else RunStatus.DONE
             models.transition_run(run, final)
+            run.retryable = final == RunStatus.PARTIAL
             run.finished_at = models.utcnow()
             s.flush()
             artifact = {"artifact_id": art.id, "version": art.current_version, "fallback": result.fallback}
