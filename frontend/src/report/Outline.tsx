@@ -69,7 +69,7 @@ export function Outline({
     let frame = 0;
     const update = () => {
       frame = 0;
-      const line = scrollRoot.getBoundingClientRect().top + scrollRoot.clientHeight / 3;
+      const line = scrollRoot.getBoundingClientRect().top + scrollRoot.clientHeight / 4;
       let id: string | null = null;
       for (const el of scrollRoot.querySelectorAll<HTMLElement>("[data-section]")) {
         if (el.getBoundingClientRect().top <= line) id = el.dataset.section ?? null;

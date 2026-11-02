@@ -17,6 +17,7 @@ export function Segments({
     <>
       {segments.map((s, i) => (
         <span key={i}>
+          {i > 0 && !/\s$/.test(segments[i - 1]!.text) && !/^[\s.,;:)]/.test(s.text) && segments[i - 1]!.passage_ids.length === 0 ? " " : ""}
           {s.text}
           {s.passage_ids.length > 0 && (
             <>

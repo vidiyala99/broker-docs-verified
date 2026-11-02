@@ -64,7 +64,7 @@ export function App() {
               <div className="pane__body pane__body--center">
                 <div className="state-block" role="alert">
                   <p className="state-block__title">Can't reach the local server.</p>
-                  <p>{wsError}</p>
+                  <p>{wsError.startsWith("Can't reach") ? "Start the backend (see frontend/README.md), then retry." : wsError}</p>
                   <button type="button" className="btn btn--primary" onClick={() => { loadWorkspace(); loadRuns(); }}>
                     Retry
                   </button>

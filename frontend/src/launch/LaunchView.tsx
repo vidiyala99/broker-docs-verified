@@ -49,7 +49,11 @@ export function LaunchView({
         <div className="panel-scroll">
           <Accordion title="Upload" count={ready.length} defaultOpen>
             <div className="upload">
-              <DropZone limits={workspace.limits} onFiles={uploads.add} />
+              {hasRuns || runs == null ? (
+                <DropZone limits={workspace.limits} onFiles={uploads.add} />
+              ) : (
+                uploads.rows.length === 0 && <p className="hint">Add quote PDFs with the drop zone on the right.</p>
+              )}
               <FileRows rows={uploads.rows} onRemove={uploads.remove} />
               {startError && (
                 <p className="inline-error" role="alert">
