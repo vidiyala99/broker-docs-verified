@@ -17,7 +17,7 @@ Skills applied: gstack, ui-ux-pro-max, taste-core, taste-redesign, impeccable (O
 
 ## Accessibility
 
-axe (`@axe-core/playwright`) on the launch page and runs 1 to 6, at 1440 and 1024, before the fixes: 0 violations on all 14 combinations. Not re-run after the fixes in this round (CSS min-widths and a default state only); re-run in round 2 or before release.
+axe (`@axe-core/playwright`) on the launch page and runs 1 to 6, at 1440 and 1024, before the round 1 fixes: 0 violations on all 14 combinations. Re-run after the round 2 fixes: still 0 on all 14, and the e2e suite's own axe checks are 0 as well.
 
 ## Screenshots
 
