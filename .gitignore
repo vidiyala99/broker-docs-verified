@@ -10,3 +10,4 @@ frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
 .playwright-mcp/
+*.egg-info/
