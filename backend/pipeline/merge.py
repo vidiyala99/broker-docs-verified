@@ -50,12 +50,28 @@ dropped when its value:
    long_300.policy_term, 2026-11-02, a page header's "Page 27 of 300" came
    back as the policy term); a bare number such as "12" is not dropped;
 5. is shorter than 4 characters, has no digit and is not an upper-case code
-   (so "A-", "A++" and "USA" pass, "of" and "Ab" do not).
+   (so "A-", "A++" and "USA" pass, "of" and "Ab" do not);
+6. field type (TEMPORAL_FIELDS: policy_term, quote_expiration, whose value is
+   a date, a date range or a length of time): states no date, year or
+   duration (states_time: "01/01/2027 - 01/01/2028", "January 1, 2027 to ...",
+   "2027-01-01", "12 months", "thirty (30) days", "one-year", "Annual" and a
+   bare number such as "12" pass). Live eval 2026-11-02 (compare_eval2):
+   long_300.policy_term conflicted between the real period on page 1 and
+   "Policy No. LG-773595" (page 170), the first line of every page: a window
+   that starts on a body page returned the header's identifier as the term.
+   The running header rule below did not catch it because it is limited to
+   policy_form (identity fields legitimately sit in headers), and the policy
+   number varies per document, so no word list could: the value simply is
+   not a date. A real conflict between two date ranges (an amended term)
+   still conflicts or resolves by the endorsement rule.
 False-positive risk: a real value that is literally the label's words (for
 example a producer whose registered name is "Producer Of Record") is
 dropped; every word of the label must be present, so one-word values such
 as "Admitted" for Admitted Status still pass. A short lower-case value such
 as "No" is dropped, and so is a real value that ends with "Definitions".
+A term or expiry stated only in words the time check does not know (for
+example "Upon binding" or "Same as expiring") is dropped; when nothing else
+came back the cell reads "Couldn't verify", not a wrong value.
 The filter runs on windowed (long) documents only; a single-call quote
 never reaches merge.
 
@@ -187,8 +203,33 @@ _TOC_RE = re.compile(r"(?:\.\s*){4,}\d+\s*$")
 _PAGINATION_RE = re.compile(r"^\W*(?:(?:page|pg|p)\.?\s*)?\d+(?:\s*(?:of|/)\s*\d+)?\W*$", re.I)
 
 
+# Field-type rule (implausible_reason rule 6). Fields whose value is a date, a date range or a
+# length of time; a candidate for them that states none of these is not the field's value.
+TEMPORAL_FIELDS = frozenset({"policy_term", "quote_expiration"})
+_MONTH = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
+_NUMBER_WORD = (r"(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen"
+                r"|sixteen|eighteen|twenty|twenty-four|thirty|thirty-six|forty-five|sixty|ninety|hundred)")
+_TEMPORAL_RE = re.compile(
+    r"\b\d{1,4}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}\b"  # 01/01/2027, 2027-01-01, 1.1.27
+    rf"|\b{_MONTH}\s+\d{{1,2}}\b|\b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?{_MONTH}(?![a-z])"  # Jan 1, 1st of January
+    rf"|\b{_MONTH}\s*,?\s*(?:19|20)\d{{2}}\b"  # January 2027
+    r"|(?<![\w-])(?:19|20)\d{2}(?![\w-])"  # a year on its own
+    rf"|(?:\b\d+|\b{_NUMBER_WORD})\)?\s*-?\s*(?:calendar\s+|consecutive\s+|policy\s+)?"
+    r"(?:hours?|days?|weeks?|months?|mos?\.?|years?|yrs?\.?)\b"  # 12 months, thirty (30) days, one-year
+    r"|\b(?:annual|annually|semi-annual|monthly|quarterly|continuous|until\s+cancell?ed)\b",
+    re.I,
+)
+
+
 def _words(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def states_time(value: str | None) -> bool:
+    """True when ``value`` states a date, a date range or a length of time (or is a bare number,
+    such as "12" for a 12-month term): what a TEMPORAL_FIELDS value must contain."""
+    v = (value or "").strip()
+    return bool(re.fullmatch(r"\d+", v) or _TEMPORAL_RE.search(v))
 
 
 def implausible_reason(fdef: FactField | str, value: str | None) -> str | None:
@@ -209,6 +250,9 @@ def implausible_reason(fdef: FactField | str, value: str | None) -> str | None:
         return "page_number"
     if len(v) < 4 and not any(ch.isdigit() for ch in v) and v != v.upper():
         return "too_short"
+    key = fdef.key if isinstance(fdef, FactField) else str(fdef)
+    if key in TEMPORAL_FIELDS and not states_time(v):
+        return "not_a_date"
     return None
 
 
@@ -523,6 +567,7 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
     return f"This document states different values for {label}: {listed}. {tail}"
 
 
-__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "MergedFact",
-           "conflict_message", "contained_in", "definition_body", "implausible_reason", "merge_document", "merge_field",
-           "repeated_line_pages", "running_header_pages", "value_key"]
+__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "TEMPORAL_FIELDS",
+           "MergedFact", "conflict_message", "contained_in", "definition_body", "implausible_reason",
+           "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "states_time",
+           "value_key"]
