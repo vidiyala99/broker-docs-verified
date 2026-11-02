@@ -11,11 +11,12 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from backend import db, models
+from backend import db, models, proposal
 from backend.context import AppContext
 from backend.pipeline.runner import format_sse
 from backend.routes.common import ApiError, get_ctx, not_found
 from backend.routes.workspace import find_workflow
+from backend.schemas import ParameterErrors
 from backend.views import run_out
 
 router = APIRouter(tags=["runs"])
@@ -37,13 +38,23 @@ def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
 
 @router.post("/runs")
 async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSONResponse:
+    parameters = body.parameters
     with ctx.factory() as s:
         wf = find_workflow(s, body.workflow)
         if wf is None:
             raise not_found("workflow", body.workflow)
         workflow_id = wf.id
+        if wf.slug == db.PROPOSAL_BUILDER_SLUG:
+            # Untrusted outline (it reaches the prompt): validate, then snapshot the template (D6).
+            try:
+                parameters = proposal.prepare_parameters(s, wf, body.parameters)
+            except ParameterErrors as exc:
+                fields = [{"loc": ["body", "parameters", *(str(x) for x in loc)], "message": msg}
+                          for loc, msg in exc.errors]
+                raise ApiError(422, "invalid_request", "The proposal settings are not valid.",
+                               fields=fields) from None
     try:
-        run_id, created = ctx.manager.submit(workflow_id, body.document_ids, body.parameters)
+        run_id, created = ctx.manager.submit(workflow_id, body.document_ids, parameters)
     except ValueError as exc:
         limit = ctx.settings.limits.max_documents_per_run if "limit" in str(exc) else None
         raise ApiError(422, "invalid_run", str(exc), limit=limit) from None

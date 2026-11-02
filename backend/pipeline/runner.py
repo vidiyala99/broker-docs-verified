@@ -71,9 +71,12 @@ from backend.schemas import (
     EvidenceState,
     FactField,
     Notice,
+    OutlineBlock,
     RunDocumentStatus,
     RunStatus,
     SectionPlanItem,
+    StoredProposal,
+    outline_errors,
 )
 
 log = logging.getLogger("brokerdocs.runner")
@@ -190,14 +193,66 @@ class _PageData:
 
 
 @dataclass(frozen=True)
-class _Plan:
-    run_id: int
+class ComposePlan:
+    """What a run composes from: the workflow's fields, title and sections, or for a
+    proposal the run's outline and brief (slice 2). Built by `compose_plan`, the one
+    helper used by the run, retry recompose and Regenerate prose (S2)."""
+
+    title: str
     fields: list[FactField]
     sections: list[SectionPlanItem]
     instructions: str
-    title: str
+    outline: tuple[OutlineBlock, ...] = ()
+    fact_sections: tuple[SectionPlanItem, ...] = ()
+    brief: compose.ProposalBrief | None = None
+
+
+def proposal_title(client_name: str) -> str:
+    return (f"Insurance Proposal for {client_name}" if client_name else "Insurance Proposal")[:200]
+
+
+def compose_plan(run: models.Run) -> ComposePlan:
+    """The run's compose plan. Only the proposal-builder workflow reads an outline from
+    run.parameters, re-validated here (it reaches the prompt); a stored outline that
+    fails validation raises ValueError (the run fails, nothing is composed from it)."""
+    wf = run.workflow
+    fields = [FactField.model_validate(f) for f in wf.fact_schema]
+    static = [SectionPlanItem.model_validate(x) for x in wf.section_plan]
+    params = run.parameters or {}
+    if wf.slug != db.PROPOSAL_BUILDER_SLUG or "outline" not in params:
+        return ComposePlan(title=wf.name, fields=fields, sections=static, instructions=wf.instructions or "")
+    stored = StoredProposal.model_validate(params)
+    problems = outline_errors(stored.outline, {x.id for x in static})
+    if problems:
+        raise ValueError(f"stored proposal outline is invalid: {problems[0][1]}")
+    outline = tuple(stored.outline)
+    brief = compose.ProposalBrief(
+        title=proposal_title(stored.client_name), client_name=stored.client_name, broker_name=stored.broker_name,
+        brokerage_name=stored.brokerage_name, additional_context=stored.additional_context,
+        no_ai_prose=stored.no_ai_prose)
+    return ComposePlan(title=brief.title, fields=fields, sections=compose.outline_sections(outline),
+                       instructions=wf.instructions or "", outline=outline, fact_sections=tuple(static),
+                       brief=brief)
+
+
+@dataclass(frozen=True)
+class _Plan:
+    run_id: int
+    compose: ComposePlan
     todo: list[tuple[int, DocumentRef]]  # (run_document id, document)
     budget_limit: int
+
+    @property
+    def fields(self) -> list[FactField]:
+        return self.compose.fields
+
+    @property
+    def instructions(self) -> str:
+        return self.compose.instructions
+
+    @property
+    def title(self) -> str:
+        return self.compose.title
 
 
 def files_dir() -> Path:
@@ -268,7 +323,9 @@ def reconcile_interrupted_runs(factory: sessionmaker[Session]) -> list[int]:
 
 def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactField],
                         sections: Sequence[SectionPlanItem], instructions: str,
-                        edits: Sequence[compose.ComposeEdit] = ()) -> compose.ComposeInput:
+                        edits: Sequence[compose.ComposeEdit] = (), outline: Sequence[OutlineBlock] = (),
+                        fact_sections: Sequence[SectionPlanItem] = (),
+                        brief: compose.ProposalBrief | None = None) -> compose.ComposeInput:
     """Compose input from a run's documents and persisted facts (shared by the run and by
     Regenerate prose, which passes the user's cell edits, D9)."""
     facts_by_doc: dict[int, list[models.Fact]] = defaultdict(list)
@@ -309,15 +366,20 @@ def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactFie
             f"{other_failed} of {len(columns)} documents could not be read; their columns show why.")))
     return compose.ComposeInput(title=title, fields=list(fields), sections=list(sections),
                                 columns=columns, facts=facts, instructions=instructions,
-                                notices=notices, edits=list(edits))
+                                notices=notices, edits=list(edits), outline=tuple(outline),
+                                fact_sections=tuple(fact_sections), brief=brief)
+
+
+def _input_from_plan(run: models.Run, plan: ComposePlan,
+                     edits: Sequence[compose.ComposeEdit] = ()) -> compose.ComposeInput:
+    return build_compose_input(run, title=plan.title, fields=plan.fields, sections=plan.sections,
+                               instructions=plan.instructions, edits=edits, outline=plan.outline,
+                               fact_sections=plan.fact_sections, brief=plan.brief)
 
 
 def compose_input_for_run(run: models.Run, edits: Sequence[compose.ComposeEdit] = ()) -> compose.ComposeInput:
-    wf = run.workflow
-    return build_compose_input(
-        run, title=wf.name, fields=[FactField.model_validate(f) for f in wf.fact_schema],
-        sections=[SectionPlanItem.model_validate(x) for x in wf.section_plan],
-        instructions=wf.instructions or "", edits=edits)
+    """Compose input for retry and Regenerate prose: same plan as the run (S2)."""
+    return _input_from_plan(run, compose_plan(run), edits)
 
 
 # --------------------------------------------------------------------- manager
@@ -636,16 +698,12 @@ class RunManager:
             run = s.get(models.Run, run_id)
             models.transition_run(run, RunStatus.RUNNING)
             run.started_at = run.started_at or models.utcnow()
-            wf = run.workflow
             todo = [(rd.id, DocumentRef(rd.document_id, rd.document.filename, rd.document.stored_name))
                     for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.QUEUED]
             spent = (run.tokens_in or 0) + (run.tokens_out or 0)
             plan = _Plan(
                 run_id=run_id,
-                fields=[FactField.model_validate(f) for f in wf.fact_schema],
-                sections=[SectionPlanItem.model_validate(x) for x in wf.section_plan],
-                instructions=wf.instructions or "",
-                title=wf.name,
+                compose=compose_plan(run),
                 todo=todo,
                 budget_limit=max(1, self._budget_limit - spent),
             )
@@ -796,8 +854,7 @@ class RunManager:
                 s.add(fact)
 
     def _compose_input(self, run: models.Run, plan: _Plan, budget: RunBudget) -> compose.ComposeInput:
-        return build_compose_input(run, title=plan.title, fields=plan.fields, sections=plan.sections,
-                                   instructions=plan.instructions)
+        return _input_from_plan(run, plan.compose)
 
     async def _compose(self, run_id: int, plan: _Plan, budget: RunBudget) -> None:
         with db.session_scope(self._factory) as s:

@@ -95,6 +95,123 @@ Use `limits` for the drop zone text (DG6) and `app_name` for the wordmark (DG7).
  "fact_schema": [{"key": "carrier_name", "label": "Carrier", "description": "...", "section": "common_declarations"}]}
 ```
 
+## Proposal templates (slice 2)
+
+### `GET /api/templates`
+
+```json
+{"templates": [{"id": 1, "slug": "standard", "name": "Standard", "description": "...", "block_count": 8},
+               {"id": 2, "slug": "premier", "name": "Premier", "description": "...", "block_count": 11}]}
+```
+
+### `GET /api/templates/{id_or_slug}`
+
+```json
+{"id": 1, "slug": "standard", "name": "Standard", "description": "...", "block_count": 8,
+ "workflow": "proposal-builder",
+ "blocks": [OutlineBlock],
+ "theme": {"font_family": "Calibri", "body_size_pt": 10.5, "heading_color": "#1F3A5F",
+           "heading_sizes_pt": {"1": 20, "2": 15, "3": 12}, "accent_color": "#2F6FB0"},
+ "variables": ["agency_name", "broker_name", "client_name"],
+ "kinds": [{"kind": "premium_comparison", "title": "Premium Comparison", "table": true,
+            "description": "...", "fact_sections": ["rate", "premium"]}],
+ "fact_sections": [{"id": "premium", "title": "Premium",
+                    "fields": [{"key": "total_premium", "label": "Total Premium"}]}],
+ "limits": {"max_blocks": 20, "max_title_chars": 120, "max_description_chars": 400,
+            "max_instruction_chars": 1000, "max_fact_sections_per_block": 10,
+            "max_context_chars": 4000, "max_name_chars": 200}}
+```
+
+`404 not_found`. `kinds` is the library for "add a block" (locked kinds are
+not in it; `fact_sections` is the default binding for a new block of that
+kind). `fact_sections` is the catalogue a block can bind to. `theme` is
+applied at export only.
+
+`OutlineBlock`:
+
+```json
+{"id": "premium", "kind": "premium_comparison", "title": "Premium Comparison",
+ "description": "...", "ai_instruction": "...", "fact_sections": ["rate", "premium"], "locked": false}
+```
+
+- `kind`: `cover_page`, `table_of_contents` (both locked), `client_details`,
+  `line_comparison`, `premium_comparison`, `subjectivities` (these four show
+  tables), `narrative` (prose only).
+- `id`: `^[a-z][a-z0-9_]{0,39}$`, unique. `cover` and `toc` are reserved for
+  the locked blocks, which must be blocks 1 and 2.
+- `fact_sections` (D3): the fact sections whose facts the block shows. A
+  table block names at least one and gets one table per fact section; a fact
+  section has **at most one table** in an outline (D4), while narrative blocks
+  may name any. Facts of a fact section no block names are left out of the
+  proposal. Locked blocks name none.
+- `locked` is derived from `kind`; a value sent by the client is ignored.
+
+## Proposal runs (slice 2)
+
+`POST /api/runs` with `"workflow": "proposal-builder"` takes these
+`parameters` (no other keys):
+
+```json
+{"template_id": "standard", "broker_name": "Dana Ruiz", "brokerage_name": "Ruiz and Partners",
+ "client_name": "Cedar Hollow LLC", "additional_context": "...", "no_ai_prose": false,
+ "outline": [OutlineBlock]}
+```
+
+`template_id` is an id or slug (required). `outline` is optional: omit it to
+use the template's blocks as they are. Text caps: names 200, additional
+context 4000, title 120 (one line), instruction 1000, description 400; at most
+20 blocks. At least one document is still required (`422 invalid_run`).
+
+A bad parameter returns `422 invalid_request` with one `fields` entry per
+problem; `loc` is the path from the request body, with list indexes as
+strings (as for every `invalid_request`):
+
+```json
+{"error": {"code": "invalid_request", "message": "The proposal settings are not valid.",
+  "fields": [{"loc": ["body", "parameters", "outline", "2", "kind"], "message": "Input should be ..."},
+             {"loc": ["body", "parameters", "outline", "8", "fact_sections", "0"],
+              "message": "Fact section 'premium' already has a table in block 'premium'; a fact section can have only one table."}]}}
+```
+
+Paths: `outline` (missing locked block, too many blocks, no section besides
+the locked ones), `outline.N.kind`, `outline.N.id` (pattern, duplicate,
+reserved, locked id), `outline.N.title`, `outline.N.ai_instruction`,
+`outline.N.fact_sections` (empty on a table block, set on a locked block),
+`outline.N.fact_sections.M` (unknown, repeated, second table), `template_id`
+(unknown template), or the parameter name.
+
+The stored `Run.parameters` is the validated input plus the resolved template
+(D6). Export and Regenerate prose read this snapshot, never the live template:
+
+```json
+{"template_id": 1, "broker_name": "...", "brokerage_name": "...", "client_name": "...",
+ "additional_context": "...", "no_ai_prose": false, "outline": [OutlineBlock],
+ "template": {"id": 1, "slug": "standard", "name": "Standard", "blocks": [OutlineBlock],
+              "theme": {...}, "variables": [...]}}
+```
+
+The proposal artifact uses the slice 1 blocks:
+
+- Title `Insurance Proposal for <client_name>` (or `Insurance Proposal`).
+- One section per outline block, in order, with the block's `id` and `title`.
+  The cover and TOC sections have `number` `""`; the others are numbered `1`, `2`, ...
+- Section `cover`: heading `cover-title` (level 1, the title), then list
+  `cover-details` ("Prepared for ...", "Prepared by <broker>, <brokerage>") when
+  those fields are set. Section `toc`: list `toc-entries`, one item per
+  numbered section (`"1 Executive Summary"`). Both are built in code: no chips,
+  no model call.
+- Tables: id `<fact section>-table` (for example `premium-table`), so cell
+  edits survive a reorder or retitle. A block with one fact section titles its
+  table with the block title; with several, each table takes the catalogue title.
+- Prose: the model writes only the other sections; each section may cite and
+  state only the facts of its own block. Text the user typed (titles,
+  instructions, additional context, names) reaches the model in a separate
+  delimited brief and is never a source of facts; the checker still gates
+  every number and chip.
+- `no_ai_prose: true`: no compose call. Each section gets plain text from the
+  verified facts (with chips), deterministic, no `compose_fallback` notice.
+  Retry and Regenerate prose keep the mode.
+
 ## Documents
 
 ### `POST /api/documents` (multipart)
@@ -160,7 +277,10 @@ URL to pdf.js for the source viewer. `404 file_missing` if the file is gone
 ```
 
 `workflow` (slug or id) and `parameters` are optional. Order of
-`document_ids` is the column order (A, B, ...).
+`document_ids` is the column order (A, B, ...). For `compare-quotes`,
+`parameters` is stored as sent and not used. For `proposal-builder`, see
+"Proposal runs" below: the parameters are validated and stored with the
+template snapshot.
 
 - `201 {"run": Run, "created": true}` for a new run (it starts at once).
 - `200 {"run": Run, "created": false}` when an identical run is still active

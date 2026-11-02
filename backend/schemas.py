@@ -6,10 +6,22 @@ layer can use these types without a database.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Collection, Sequence
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 # --------------------------------------------------------------------- enums
 
@@ -83,6 +95,232 @@ class SectionPlanItem(BaseModel):
     number: str
     title: str
     guidance: str = ""
+
+
+# --------------------------------------------------------------------- proposal outline (slice 2)
+#
+# A proposal's outline is an ordered list of blocks. It is untrusted input: the
+# wizard sends it, and its titles and instructions reach the compose prompt (in
+# the delimited brief channel, never as facts). Single-block rules live on
+# OutlineBlock; rules across blocks live in `outline_errors`.
+#
+# D3: a block names the fact sections it shows (`fact_sections`); facts in a
+# section no block names are dropped from the proposal, never relocated.
+# D4: a fact section has at most one table, so a table id is `<fact section>-table`:
+# unique, and stable when blocks are reordered or retitled (S5).
+
+
+class BlockKind(StrEnum):
+    COVER_PAGE = "cover_page"  # locked, id "cover", first; generated in code
+    TABLE_OF_CONTENTS = "table_of_contents"  # locked, id "toc", second; generated in code
+    CLIENT_DETAILS = "client_details"
+    LINE_COMPARISON = "line_comparison"
+    PREMIUM_COMPARISON = "premium_comparison"
+    SUBJECTIVITIES = "subjectivities"
+    NARRATIVE = "narrative"  # prose only; may repeat fact sections that have a table elsewhere
+
+
+# kind -> (required block id, required position)
+LOCKED_BLOCKS: dict[BlockKind, tuple[str, int]] = {
+    BlockKind.COVER_PAGE: ("cover", 0),
+    BlockKind.TABLE_OF_CONTENTS: ("toc", 1),
+}
+LOCKED_BLOCK_IDS = frozenset(i for i, _ in LOCKED_BLOCKS.values())
+TABLE_KINDS = frozenset({BlockKind.CLIENT_DETAILS, BlockKind.LINE_COMPARISON,
+                         BlockKind.PREMIUM_COMPARISON, BlockKind.SUBJECTIVITIES})
+
+MAX_OUTLINE_BLOCKS = 20
+MAX_TITLE_CHARS = 120
+MAX_DESCRIPTION_CHARS = 400
+MAX_INSTRUCTION_CHARS = 1000
+MAX_FACT_SECTIONS_PER_BLOCK = 10
+MAX_CONTEXT_CHARS = 4000
+MAX_NAME_CHARS = 200
+# Lowercase, no hyphen: generated ids ("<block>-p1", "<fact section>-table") can never collide.
+SLUG_ID_PATTERN = r"^[a-z][a-z0-9_]{0,39}$"
+TEMPLATE_SLUG_PATTERN = r"^[a-z][a-z0-9-]{0,63}$"
+
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")  # tab, LF and CR allowed in long text
+_LINE_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+SlugId = Annotated[str, Field(pattern=SLUG_ID_PATTERN)]
+Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITLE_CHARS)]
+Name = Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_NAME_CHARS)]
+
+
+def _no_line_control(value: str) -> str:
+    if _LINE_CONTROL.search(value):
+        raise ValueError("must be one line of text without control characters")
+    return value
+
+
+def _no_control(value: str) -> str:
+    if _CONTROL.search(value):
+        raise ValueError("must not contain control characters")
+    return value
+
+
+class OutlineBlock(BaseModel):
+    """One block of a proposal outline (template block or per-run block)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: SlugId
+    kind: BlockKind
+    title: Title
+    description: str = Field("", max_length=MAX_DESCRIPTION_CHARS)
+    ai_instruction: str = Field("", max_length=MAX_INSTRUCTION_CHARS)
+    fact_sections: list[SlugId] = Field(default_factory=list, max_length=MAX_FACT_SECTIONS_PER_BLOCK)
+    locked: bool = False  # derived from `kind`; a client value is ignored
+
+    @field_validator("title")
+    @classmethod
+    def _title_one_line(cls, v: str) -> str:
+        return _no_line_control(v)
+
+    @field_validator("description", "ai_instruction")
+    @classmethod
+    def _text_clean(cls, v: str) -> str:
+        return _no_control(v.strip())
+
+    @model_validator(mode="after")
+    def _derive_locked(self) -> OutlineBlock:
+        self.locked = self.kind in LOCKED_BLOCKS
+        return self
+
+    @property
+    def has_table(self) -> bool:
+        return self.kind in TABLE_KINDS
+
+
+class ProposalParameters(BaseModel):
+    """`POST /api/runs` parameters for the proposal-builder workflow (as the client sends them)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    template_id: StrictInt | Annotated[str, Field(pattern=TEMPLATE_SLUG_PATTERN)]
+    broker_name: Name = ""
+    brokerage_name: Name = ""
+    client_name: Name = ""
+    additional_context: str = Field("", max_length=MAX_CONTEXT_CHARS)
+    no_ai_prose: StrictBool = False
+    # None: use the template's blocks as they are
+    outline: list[OutlineBlock] | None = Field(None, max_length=MAX_OUTLINE_BLOCKS)
+
+    @field_validator("broker_name", "brokerage_name", "client_name")
+    @classmethod
+    def _names_one_line(cls, v: str) -> str:
+        return _no_line_control(v)
+
+    @field_validator("additional_context")
+    @classmethod
+    def _context_clean(cls, v: str) -> str:
+        return _no_control(v.strip())
+
+
+class TemplateSnapshot(BaseModel):
+    """The resolved template, copied into run.parameters at run creation (D6)."""
+
+    id: int
+    slug: str
+    name: str
+    blocks: list[OutlineBlock]
+    theme: dict[str, Any] = Field(default_factory=dict)
+    variables: list[str] = Field(default_factory=list)
+
+
+class StoredProposal(BaseModel):
+    """What run.parameters holds for a proposal-builder run (validated parameters plus the snapshot)."""
+
+    template_id: int
+    broker_name: str = ""
+    brokerage_name: str = ""
+    client_name: str = ""
+    additional_context: str = ""
+    no_ai_prose: bool = False
+    outline: list[OutlineBlock]
+    template: TemplateSnapshot
+
+
+Loc = tuple[str | int, ...]
+
+
+def outline_errors(outline: Sequence[OutlineBlock],
+                   known_fact_sections: Collection[str] | None = None) -> list[tuple[Loc, str]]:
+    """Rules across blocks. Each error is (location relative to the outline list, message).
+
+    Locked blocks present once, with their fixed id and position; unique ids; at
+    least one section besides the locked ones; locked blocks own no facts; a table
+    block owns at least one fact section; fact sections known (when the catalogue
+    is given) and listed once per block; at most one table per fact section (D4).
+    """
+    errors: list[tuple[Loc, str]] = []
+    for kind, (block_id, pos) in LOCKED_BLOCKS.items():
+        name = "Cover Page" if kind == BlockKind.COVER_PAGE else "Table of Contents"
+        where = [i for i, b in enumerate(outline) if b.kind == kind]
+        if not where:
+            errors.append(((), f"The outline must keep the locked {name} block."))
+            continue
+        for i in where:
+            if i != pos:
+                errors.append(((i, "kind"), f"The {name} is locked as block {pos + 1} and appears only once."))
+            elif outline[i].id != block_id:
+                errors.append(((i, "id"), f"The {name} block must have the id {block_id!r}."))
+    seen_ids: dict[str, int] = {}
+    for i, b in enumerate(outline):
+        if b.id in seen_ids:
+            errors.append(((i, "id"), f"Block id {b.id!r} is already used by block {seen_ids[b.id] + 1}."))
+        else:
+            seen_ids[b.id] = i
+        if b.id in LOCKED_BLOCK_IDS and b.kind not in LOCKED_BLOCKS:
+            errors.append(((i, "id"), f"Block id {b.id!r} is reserved for a locked block."))
+    if not any(b.kind not in LOCKED_BLOCKS for b in outline):
+        errors.append(((), "Add at least one section besides the Cover Page and Table of Contents."))
+    table_owner: dict[str, str] = {}
+    for i, b in enumerate(outline):
+        if b.kind in LOCKED_BLOCKS and b.fact_sections:
+            errors.append(((i, "fact_sections"), "A locked block shows no document facts."))
+            continue
+        if b.has_table and not b.fact_sections:
+            errors.append(((i, "fact_sections"), "A comparison block needs at least one fact section."))
+        listed: set[str] = set()
+        for j, fs in enumerate(b.fact_sections):
+            if fs in listed:
+                errors.append(((i, "fact_sections", j), f"Fact section {fs!r} is listed twice."))
+                continue
+            listed.add(fs)
+            if known_fact_sections is not None and fs not in known_fact_sections:
+                errors.append(((i, "fact_sections", j), f"Unknown fact section {fs!r}."))
+                continue
+            if b.has_table:
+                if fs in table_owner:
+                    errors.append(((i, "fact_sections", j),
+                                   f"Fact section {fs!r} already has a table in block {table_owner[fs]!r}; "
+                                   "a fact section can have only one table."))
+                else:
+                    table_owner[fs] = b.id
+    return errors
+
+
+class ParameterErrors(ValueError):
+    """Invalid run parameters: (location relative to `parameters`, message) per problem."""
+
+    def __init__(self, errors: Sequence[tuple[Loc, str]]):
+        super().__init__("; ".join(m for _, m in errors))
+        self.errors = list(errors)
+
+
+def parse_proposal_parameters(raw: Any, known_fact_sections: Collection[str] | None = None) -> ProposalParameters:
+    """Validate client parameters for a proposal run. Raises ParameterErrors with field paths."""
+    try:
+        params = ProposalParameters.model_validate(raw)
+    except ValidationError as exc:
+        raise ParameterErrors([(tuple(e["loc"]), e["msg"]) for e in exc.errors()]) from None
+    if params.outline is not None:
+        problems = outline_errors(params.outline, known_fact_sections)
+        if problems:
+            raise ParameterErrors([(("outline", *loc), msg) for loc, msg in problems])
+    return params
 
 
 # --------------------------------------------------------------------- extraction I/O (step 2)
