@@ -111,12 +111,12 @@
       "accepted_values": []
     },
     "total_premium": {
-      "value": "$14,240.00",
+      "value": "$14,490.00",
       "page": 2,
       "pages": [
         2
       ],
-      "quote": "Annual Premium: $14,240.00",
+      "quote": "Total Payable: $14,490.00",
       "source": "text",
       "accepted_values": []
     },
@@ -208,7 +208,7 @@
     },
     {
       "field": "total_premium",
-      "value": "$19,860.00",
+      "value": "$20,110.00",
       "kind": "other_option",
       "pages": [
         2

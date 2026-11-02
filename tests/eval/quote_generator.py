@@ -58,7 +58,7 @@ FIELDS: dict[str, str] = {
     "territory": "Coverage territory",
     "producer": "Producer or broker of record",
     "policy_form": "Policy form name and number",
-    "total_premium": "Annual premium before taxes and fees",
+    "total_premium": "Total premium payable, including taxes and fees (printed as Total Payable)",
     "taxes_and_fees": "Taxes and fees",
     "each_occurrence_limit": "Each occurrence limit",
     "aggregate_limit": "General aggregate limit",
@@ -231,9 +231,11 @@ def build_profile(rng: random.Random, carrier_name: str, admitted: bool, idx: in
         "territory": TERRITORIES[idx % len(TERRITORIES)],
         "producer": producer,
         "policy_form": FORMS[idx % len(FORMS)],
-        "total_premium": _money(premium, cents),
+        # ``premium`` (before taxes and fees) is printed but not scored: the backend
+        # has no field for it. ``total_premium`` is the Total Payable figure.
+        "premium": _money(premium, cents),
         "taxes_and_fees": _money(fees, True),
-        "total_cost": _money(total, True),
+        "total_premium": _money(total, True),
         "each_occurrence_limit": occ,
         "aggregate_limit": agg,
         "retention": DEDUCTIBLES[idx % len(DEDUCTIBLES)],
@@ -262,9 +264,9 @@ LABELS = {
     "territory": "Coverage Territory",
     "producer": "Producer",
     "policy_form": "Policy Form",
-    "total_premium": "Annual Premium",
+    "premium": "Annual Premium",
     "taxes_and_fees": "Taxes and Fees",
-    "total_cost": "Total Payable",
+    "total_premium": "Total Payable",
     "each_occurrence_limit": "Each Occurrence Limit",
     "aggregate_limit": "General Aggregate Limit",
     "retention": "Deductible",
@@ -274,7 +276,7 @@ LABELS = {
 
 DECL_FIELDS = ["named_insured", "address", "producer", "carrier_name", "admitted_status",
                "am_best_rating", "policy_term", "policy_form", "territory"]
-PREMIUM_FIELDS = ["total_premium", "taxes_and_fees", "total_cost", "rate"]
+PREMIUM_FIELDS = ["premium", "taxes_and_fees", "total_premium", "rate"]
 LIMIT_FIELDS = ["each_occurrence_limit", "aggregate_limit", "retention"]
 
 
@@ -303,7 +305,7 @@ class Cursor:
         v = profile.get(f)
         if v is None:
             return
-        # Generator-only text (not in FIELDS, e.g. total_cost) is printed but untagged.
+        # Generator-only text (not in FIELDS, e.g. premium) is printed but untagged.
         self.line(f"{LABELS[f]}: {v}", field_name=f if f in FIELDS else None,
                   value=v if f in FIELDS else None)
 
@@ -408,7 +410,7 @@ def multicolumn_pages(profile: dict, carrier: str) -> list[PageSpec]:
         if v is None:
             continue
         label_runs.append(Run(left_x, y, LABELS[f]))
-        scored = f in FIELDS  # generator-only text (total_cost) stays untagged
+        scored = f in FIELDS  # generator-only text (premium) stays untagged
         value_runs.append(Run(right_x, y, v, field=f if scored else None, value=v if scored else None))
         y += 16
     p2_tail = Cursor(left_x, y + 12)
@@ -883,7 +885,7 @@ def long_policy_fixture(seed: int, spec: LongSpec) -> Fixture:
         elif i == lay["premium"]:
             c.line("Premium Summary", size=12, bold=True)
             c.y += 4
-            for f in ("total_premium", "taxes_and_fees", "total_cost", "rate"):
+            for f in ("premium", "taxes_and_fees", "total_premium", "rate"):
                 c.fact(prof, f)
         elif i == lay["limits_mid"]:
             c.line("Limits Summary", size=12, bold=True)
@@ -1031,10 +1033,10 @@ def build_fixtures(seed: int, include_oversize: bool = False) -> list[Fixture]:
     name = EXTRA_CARRIERS["multi_option"]
     prof = build_profile(random.Random(seed * 31 + 101), name, True, 0, insured, producer, [])
     opt2 = {"each_occurrence_limit": "$2,000,000", "aggregate_limit": "$4,000,000",
-            "retention": "$7,500", "total_premium": "$19,860.00"}
-    prof["total_premium"] = "$14,240.00"
+            "retention": "$7,500", "premium": "$19,860.00"}
+    prof["premium"] = "$14,240.00"
     prof["taxes_and_fees"] = "$250.00"
-    prof["total_cost"] = "$14,490.00"
+    prof["total_premium"] = "$14,490.00"
     opt2_total = "$20,110.00"
 
     def options_block(c: Cursor) -> None:
@@ -1048,7 +1050,7 @@ def build_fixtures(seed: int, include_oversize: bool = False) -> list[Fixture]:
         c.line(f"Each Occurrence Limit, Option 2: {opt2['each_occurrence_limit']}")
         c.line(f"General Aggregate Limit, Option 2: {opt2['aggregate_limit']}")
         c.line(f"Deductible, Option 2: {opt2['retention']}")
-        c.line(f"Annual Premium, Option 2: {opt2['total_premium']}")
+        c.line(f"Annual Premium, Option 2: {opt2['premium']}")
         c.line(f"Total Payable, Option 2: {opt2_total}")
 
     fixtures.append(Fixture(
@@ -1057,8 +1059,9 @@ def build_fixtures(seed: int, include_oversize: bool = False) -> list[Fixture]:
         "Truth is option 1 (the first presented); option 2 values are decoys (D8).",
         clean_pages(prof, name, limits_block=options_block), carrier=name,
         expect={"option_count": 2}, primary_option="Option 1",
-        decoys=[{"field": k, "value": v, "kind": "other_option"} for k, v in opt2.items()]
-))
+        decoys=[{"field": k, "value": v, "kind": "other_option"}
+                for k, v in {**{k: v for k, v in opt2.items() if k != "premium"},
+                             "total_premium": opt2_total}.items()]))
 
     # Conflicting endorsement (M5): the endorsement supersedes the declarations.
     name = EXTRA_CARRIERS["conflict"]
@@ -1122,7 +1125,7 @@ def build_fixtures(seed: int, include_oversize: bool = False) -> list[Fixture]:
     s1.para(FILLER[1])
     s2 = Cursor()
     s2.line("Premium Summary", size=12, bold=True)
-    for f in ("total_premium", "total_cost"):
+    for f in ("premium", "total_premium"):
         s2.fact(prof, f)
     s3 = [Run(MARGIN, PAGE_H - MARGIN, "Page 3 of 3", size=9)]
     fixtures.append(Fixture(
@@ -1145,7 +1148,7 @@ def build_fixtures(seed: int, include_oversize: bool = False) -> list[Fixture]:
     img_rect = (MARGIN, 140.0, PAGE_W - MARGIN, 140.0 + 0.62 * PAGE_H)  # about 47% of page
     ic = Cursor(MARGIN + 20, 170.0)
     ic.line("DECLARATIONS", size=12, bold=True)
-    for f in ("total_premium", "each_occurrence_limit", "aggregate_limit", "retention"):
+    for f in ("premium", "each_occurrence_limit", "aggregate_limit", "retention"):
         ic.fact(prof, f)
     m3 = Cursor()
     _header(m3, name, "Quote Proposal", 3, 4)

@@ -89,7 +89,7 @@ _DATE_ISO = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b")
 _DATE_MDY = re.compile(r"\b([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b")
 _DATE_DMY = re.compile(r"\b(\d{1,2})\s+([a-z]{3,9})\.?,?\s+(\d{4})\b")
 _NUMBER = re.compile(
-    r"(?<![a-z0-9@.,])\$?\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s?(thousand|million|billion|mm|k|m|b)?(?![a-z0-9])")
+    r"(?<![a-z0-9@.,])\$?\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s?(thousand|million|billion|mm|k|m|b)?(\s?%)?(?![a-z0-9])")
 _TOKEN = re.compile(r"[a-z0-9]+(?:\+\+|\+|-(?=\s|$|[(),]))?")
 
 
@@ -133,7 +133,7 @@ def _sub_numbers(s: str) -> str:
         text = format(val, "f")
         if "." in text:
             text = text.rstrip("0").rstrip(".")
-        return f" @n{text} "
+        return f" @n{text}{'%' if mo.group(4) else ''} "
 
     return _NUMBER.sub(num, s)
 
@@ -170,16 +170,35 @@ def normalize_value(value: str | None) -> tuple[str, ...]:
     return tuple(tokens)
 
 
+def _is_amount(tok: str) -> bool:
+    """A plain number or money token (not a percentage, not a date)."""
+    return tok.startswith("@n") and not tok.endswith("%")
+
+
+def _equal_or_unit_suffixed(p: tuple[str, ...], t: tuple[str, ...]) -> bool:
+    """``p`` equals ``t``, or ``t`` is one plain amount and ``p`` is that same
+    amount followed only by words (``$10,000 per occurrence`` vs ``$10,000``).
+    A second number, a date or a percent sign in the trailing part does not
+    qualify, and ``25`` never matches ``25%``."""
+    if p == t:
+        return True
+    if len(t) != 1 or not _is_amount(t[0]) or len(p) < 2 or p[0] != t[0]:
+        return False
+    return not any(tok.startswith("@") for tok in p[1:])
+
+
 def values_match(predicted: str | None, truth: str | None,
                  accepted: Iterable[str] = ()) -> bool:
     """True when ``predicted`` equals truth (or an accepted alias) after
-    normalization. Two nulls match; null against a value does not."""
+    normalization, allowing a trailing unit or qualifier after a single
+    amount. Two nulls match; null against a value does not."""
     if predicted is None or truth is None:
         return predicted is None and truth is None
     p = normalize_value(predicted)
     if not p:
         return False
-    return p == normalize_value(truth) or any(p == normalize_value(a) for a in accepted)
+    return (_equal_or_unit_suffixed(p, normalize_value(truth))
+            or any(_equal_or_unit_suffixed(p, normalize_value(a)) for a in accepted))
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +324,11 @@ def score_document(truth: Mapping, result: DocResult) -> DocScore:
 
     predicted = _dedupe(result.facts)
     truth_facts: Mapping = truth.get("facts", {}) or {}
-    fields = list(truth_facts) + [f for f in predicted if f not in truth_facts]
+    # Only the eval's scored fields count. A predicted field the truth does not
+    # list (subjectivities, key_exclusions, ... exist in the backend and in the
+    # PDFs but have no truth here) is ignored: not a hard fail, absent violation
+    # or hallucination.
+    fields = list(truth_facts)
 
     for fname in fields:
         t = truth_facts.get(fname)

@@ -31,9 +31,16 @@ def by_file(truths):
     return {t["file"]: fid for fid, t in truths.items()}
 
 
+# Fixtures deliberately not in LIVE_RUNS. over_cap_pages is 81 pages, under the
+# 300-page cap, so it no longer exercises the cap; long_301 (generated with
+# --include-oversize, not committed) is the over-cap case now.
+OBSOLETE_FIXTURES = {"over_cap_pages": "obsolete: over_cap_pages"}
+
+
 def test_live_runs_cover_every_fixture_within_doc_cap(truths):
     ids = [i for run in LIVE_RUNS.values() for i in run]
-    assert sorted(ids) == sorted(truths)
+    assert "over_cap_pages" not in ids
+    assert sorted(ids + list(OBSOLETE_FIXTURES)) == sorted(truths)
     assert all(len(run) <= 8 for run in LIVE_RUNS.values())  # D3: 8 documents per run
 
 

@@ -64,6 +64,8 @@ def load_adapter(spec: str | None = None) -> Callable[[list[str]], dict]:
 
 
 # Runs used by the live eval: each is one Compare Quotes run (<= 8 documents).
+# over_cap_pages (81 pages) is obsolete: it is under the 300-page cap. The
+# over-cap case is long_301 (generate with --include-oversize).
 LIVE_RUNS: dict[str, list[str]] = {
     "clean": ["carrier_a_clean", "carrier_b_clean", "carrier_c_clean", "carrier_d_clean"],
     "multi_column": ["carrier_a_multicol", "carrier_b_multicol", "carrier_c_multicol",
@@ -73,7 +75,7 @@ LIVE_RUNS: dict[str, list[str]] = {
     "adversarial": ["multi_option", "conflicting_endorsement", "injection"],
     "long": ["long_120", "long_300"],
     "parse": ["parse_sparse", "parse_mixed", "password_protected", "corrupt_garbage",
-              "corrupt_truncated", "not_a_pdf", "over_cap_pages"],
+              "corrupt_truncated", "not_a_pdf"],
 }
 
 
