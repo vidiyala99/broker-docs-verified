@@ -49,8 +49,11 @@ export function Outline({
   onFilter,
   scrollRoot,
   focusFirstCount,
+  hideTrust = false,
 }: {
   artifact: Artifact;
+  /** Proposal Preview: the trust counts are hidden (the outline stays). */
+  hideTrust?: boolean;
   filter: TrustFilter | null;
   onFilter: (f: TrustFilter | null) => void;
   scrollRoot: HTMLElement | null;
@@ -107,6 +110,7 @@ export function Outline({
 
   return (
     <nav className="outline" aria-label="Report outline">
+      {!hideTrust && (
       <div className="trust" role="group" aria-label="Evidence in the tables. Choose one to mark matching cells">
         {shown.map((c, i) => {
           const n = countOf(artifact, c.key);
@@ -127,6 +131,7 @@ export function Outline({
           );
         })}
       </div>
+      )}
       <ol className="outline__list">
         {artifact.content.sections.map((s) => (
           <li key={s.id} className={`outline__item level-${s.level}`}>

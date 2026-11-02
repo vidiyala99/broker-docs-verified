@@ -15,6 +15,8 @@ export interface Draft {
   outline: OutlineBlock[];
   /** True once the user changed the outline copy (reorder, edit, add, delete). */
   outlineEdited: boolean;
+  /** Ids of the step 3 sections open for editing; kept here so they survive step navigation. */
+  openIds: string[];
   docs: DocumentInfo[];
   client_name: string;
   broker_name: string;
@@ -30,6 +32,7 @@ export const EMPTY_DRAFT: Draft = {
   outlineFrom: null,
   outline: [],
   outlineEdited: false,
+  openIds: [],
   docs: [],
   client_name: "",
   broker_name: "",

@@ -120,7 +120,7 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
   // Copy the template's blocks into the draft when a template is chosen (or the outline came from another one).
   useEffect(() => {
     if (!tpl || draft.outlineFrom === tpl.slug) return;
-    setDraft((d) => ({ ...d, outline: copyBlocks(tpl.blocks), outlineFrom: tpl.slug, outlineEdited: false }));
+    setDraft((d) => ({ ...d, outline: copyBlocks(tpl.blocks), outlineFrom: tpl.slug, outlineEdited: false, openIds: [] }));
   }, [tpl, draft.outlineFrom]);
 
   const chooseTemplate = (slug: string) => {
@@ -261,8 +261,10 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
                 tpl={tpl}
                 outline={draft.outline}
                 edited={draft.outlineEdited}
+                openIds={draft.openIds}
+                setOpenIds={(fn) => setDraft((d) => ({ ...d, openIds: fn(d.openIds) }))}
                 setOutline={setOutline}
-                onReset={() => setDraft((d) => ({ ...d, outline: copyBlocks(tpl.blocks), outlineEdited: false }))}
+                onReset={() => setDraft((d) => ({ ...d, outline: copyBlocks(tpl.blocks), outlineEdited: false, openIds: [] }))}
                 errors={errors}
                 onFocusField={focusField}
                 focusKey={focusKey}

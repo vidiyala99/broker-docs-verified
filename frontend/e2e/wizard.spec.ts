@@ -85,8 +85,20 @@ test("proposal wizard: template, details, outline edit, generate, open, export",
   await page.getByLabel(/Brokerage name/).fill("Ruiz and Partners");
   await page.getByLabel(/Additional context/).fill("Renewal; the client wants a lower retention.");
   await expect(page.locator("#c-additional_context")).toHaveText(/^\d+ \/ 4,000$/);
+  // Duplicate uploads of one file (same sha256) collapse to the newest copy in the picker.
+  await page.route("**/api/documents", async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    const res = await route.fetch();
+    const body = (await res.json()) as { documents: Array<{ id: number; created_at: string }> };
+    const first = body.documents[0]!;
+    const older = { ...first, id: first.id + 1000, created_at: "2000-01-01T00:00:00+00:00" };
+    await route.fulfill({ response: res, json: { documents: [...body.documents, older] } });
+  });
   await page.getByRole("button", { name: "Choose from uploaded files" }).click();
   await expect(page.locator(".picker__row").first()).toBeVisible();
+  const pickerNames = await page.locator(".picker__name").allTextContents();
+  expect(new Set(pickerNames).size, "no duplicate files in the picker").toBe(pickerNames.length);
+  await page.unroute("**/api/documents");
   await shot(page, "1440-step2-details");
   await axe(page, "step 2 at 1440");
 
@@ -174,6 +186,14 @@ test("proposal wizard: template, details, outline edit, generate, open, export",
   await page.locator("#f-executive_summary-title").fill("Summary");
   await expect(page.locator(".blocks .block__title", { hasText: "Summary" }).first()).toBeVisible();
   await expect(page.locator(".error-summary")).toHaveCount(0);
+  // Open sections survive leaving step 3 and coming back.
+  await expect(page.locator("#f-executive_summary-title")).toBeVisible();
+  await page.locator(".stepper").getByRole("button", { name: /Details/ }).click();
+  await expect(page.locator(".stepper [aria-current=step]")).toContainText("Details");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(".stepper [aria-current=step]")).toContainText("Outline");
+  await expect(page.locator("#f-executive_summary-title")).toBeVisible();
+  await expect(page.locator('[data-focus="executive_summary:edit"]')).toHaveAttribute("aria-expanded", "true");
   const openEditors = page.locator(".block.is-open [aria-expanded=true]");
   while ((await openEditors.count()) > 0) await openEditors.first().click();
   await shot(page, "1440-step3-outline");
@@ -225,6 +245,8 @@ test("proposal wizard: template, details, outline edit, generate, open, export",
   await page.getByRole("button", { name: "Generate proposal" }).click();
   await expect(page).toHaveURL(/#\/runs\/\d+/);
   await expect(page.locator(".doc-row")).toHaveCount(2);
+  // Chat empty state is workflow-aware while there is no report yet.
+  await expect(page.locator(".chat__empty")).toContainText("Generate a proposal to ask questions about its sources.");
   // The new run is a proposal right away: Proposals rail item and crumbs, not Compare Quotes.
   await expect(page.locator(".crumbs")).toContainText("Proposals");
   await expect(page.getByRole("link", { name: "Proposals, new proposal" })).toHaveAttribute("aria-current", "page");
@@ -246,9 +268,13 @@ test("proposal wizard: template, details, outline edit, generate, open, export",
   await previewBtn.click();
   await expect(previewBtn).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".report .chip").first()).toBeHidden();
+  // Preview also hides the trust counts; the outline itself stays.
+  await expect(page.locator(".outline .trust")).toHaveCount(0);
+  await expect(page.locator(".outline__list")).toBeVisible();
   await shot(page, "1440-report-preview");
   await previewBtn.click();
   await expect(page.locator(".report .chip").first()).toBeVisible();
+  await expect(page.locator(".outline .trust")).toBeVisible();
 
   // Export: DOCX (new) and PDF.
   const [docx] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export DOCX, Word document" }).click()]);

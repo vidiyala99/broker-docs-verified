@@ -347,7 +347,7 @@ export function RunView({
   const isProposal = run?.workflow_name === PROPOSAL_WORKFLOW;
 
   const reportBody = (
-    <div className="report-scroll" ref={setScrollRoot} data-filter={filter ?? undefined} data-preview={isProposal && preview ? "" : undefined}>
+    <div className="report-scroll" ref={setScrollRoot} data-filter={(isProposal && preview ? undefined : filter) ?? undefined} data-preview={isProposal && preview ? "" : undefined}>
       {artifact && actions ? (
         <Report artifact={artifact} actions={actions} />
       ) : (
@@ -385,7 +385,7 @@ export function RunView({
             <Plus size={16} aria-hidden /> {isProposal ? "New proposal" : "New comparison"}
           </a>
         </div>
-        {run && <Chat runId={run.id} artifact={artifact} onOpen={openSource} onEdited={(r) => afterEdit(r, "Edit applied")} />}
+        {run && <Chat runId={run.id} artifact={artifact} proposal={isProposal} onOpen={openSource} onEdited={(r) => afterEdit(r, "Edit applied")} />}
       </LeftPanel>
 
       <main className="pane" id="main" tabIndex={-1} aria-labelledby="pane-title">
@@ -529,7 +529,7 @@ export function RunView({
             <div className="report-area">
               {reportBody}
               {artifact && !split && (outlineOpen ? (
-                <Outline artifact={artifact} filter={filter} onFilter={setFilter} scrollRoot={scrollRoot} focusFirstCount={focusCount} />
+                <Outline artifact={artifact} hideTrust={isProposal && preview} filter={filter} onFilter={setFilter} scrollRoot={scrollRoot} focusFirstCount={focusCount} />
               ) : (
                 <Tip text={summary ? `Outline. ${summary}` : "Outline"} side="bottom">
                   <button
