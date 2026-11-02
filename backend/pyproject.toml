@@ -1,0 +1,33 @@
+[project]
+name = "broker-docs-verified-backend"
+version = "0.1.0"
+description = "Local backend for the BrokerDocs (slice 1: Compare Quotes)."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115,<0.200",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "sqlalchemy>=2.0.35,<2.1",
+    # PyMuPDF 2.0 segfaults on import on the owner's Windows machine (probe,
+    # 2026-11-01); stay on the 1.x line the spec was probed against.
+    "pymupdf>=1.24,<2",
+    "pydantic>=2.7,<3",
+    "openai>=1.40",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3"]
+
+# The backend is imported as the `backend` package from the repository root
+# (broker-docs-verified/), so this project installs dependencies only.
+[tool.setuptools]
+packages = []
+py-modules = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".."]
+addopts = "-ra --strict-markers"
+markers = [
+    "live: needs OPENAI_API_KEY and spends tokens; run with pytest -m live",
+]
