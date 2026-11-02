@@ -46,3 +46,33 @@ def truths(manifest: dict) -> dict[str, dict]:
         e["fixture_id"]: json.loads((FIXTURE_DIR / e["truth"]).read_text(encoding="utf-8"))
         for e in manifest["fixtures"]
     }
+
+
+# Proposal Builder fixtures (slice 2, T1): their own folder and manifest.
+PROPOSAL_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "proposals"
+
+
+@pytest.fixture(scope="session")
+def proposal_dir() -> Path:
+    return PROPOSAL_DIR
+
+
+@pytest.fixture(scope="session")
+def proposal_manifest() -> dict:
+    return json.loads((PROPOSAL_DIR / "manifest.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def proposals(proposal_manifest: dict) -> dict[str, dict]:
+    return {
+        e["proposal_id"]: json.loads((PROPOSAL_DIR / e["truth"]).read_text(encoding="utf-8"))
+        for e in proposal_manifest["proposals"]
+    }
+
+
+@pytest.fixture(scope="session")
+def proposal_doc_truths(proposal_manifest: dict) -> dict[str, dict]:
+    return {
+        e["fixture_id"]: json.loads((PROPOSAL_DIR / e["truth"]).read_text(encoding="utf-8"))
+        for e in proposal_manifest["documents"]
+    }
