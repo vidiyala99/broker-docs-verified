@@ -1,0 +1,149 @@
+/*
+ * BrokerDocs design tokens (T12, DG8). Single source of truth: components
+ * use these variables only, never raw hex. Values and their sources are in
+ * DESIGN.md. Light theme only (dark mode is out of scope for slice 1).
+ */
+
+:root {
+  /* ---------- Type ---------- */
+  --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+
+  --text-xs: 12px;   /* legal, chip numerals, captions */
+  --text-sm: 14px;   /* labels, table cells, body in panels */
+  --text-md: 16px;   /* buttons, body prose in the report */
+  --text-lg: 20px;   /* section headings in the report */
+  --text-xl: 36px;   /* page title (sign-in H2 measured 36px) */
+
+  --leading-xs: 16px;
+  --leading-sm: 20px;
+  --leading-md: 24px;
+  --leading-lg: 28px;
+  --leading-xl: 44px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;   /* labels, buttons */
+  --weight-semibold: 600; /* headings */
+
+  --tracking-xl: -0.02em; /* 36px titles only */
+
+  /* Apply on tables, counts, page numbers, money. */
+  --numeric-table: tabular-nums;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---------- Shape ---------- */
+  --radius-control: 6px;  /* inputs, buttons, links, rail items, tabs */
+  --radius-chip: 4px;     /* citation chips, tags */
+  --radius-round: 9999px; /* avatar, spinner only */
+
+  --border-width: 1px;    /* reference renders 0.8px; 1px is the CSS floor we ship */
+
+  /* ---------- Sizes ---------- */
+  --size-button: 44px;
+  --size-input: 48px;     /* includes DG12 inline cell edit */
+  --size-hit-min: 44px;   /* minimum hit area, chips extend via ::before */
+  --size-chip: 20px;      /* visual chip height */
+  --size-icon: 16px;
+  --size-icon-rail: 20px;
+  --size-rail: 56px;
+  --size-left-panel: 300px;
+  --size-topbar: 56px;
+
+  /* ---------- Surfaces ---------- */
+  --color-surface: #FFFFFF;        /* panels, report, inputs */
+  --color-canvas: #F3F4F6;         /* app background behind panels */
+  --color-hairline: #E5E7EB;       /* dividers, secondary button border; decoration only */
+  --color-overlay-selection: #C3BDFF66; /* table selection fill */
+
+  /* ---------- Text ---------- */
+  --color-text: #35383B;           /* primary text */
+  --color-text-muted: #4B5563;     /* lightest allowed body/secondary text */
+  --color-text-placeholder: #6B7280; /* placeholders only, measured live */
+  --color-text-on-primary: #FFFFFF;
+  /* Never as text: #9CA3AF, #F97066, #3CCB7F (all under 3:1 on white). */
+
+  /* ---------- Brand / action ---------- */
+  --color-primary: #6356F0;        /* buttons, links, active step, focus */
+  --color-primary-tint: #EEECFD;   /* active rail item, selected row */
+  --color-primary-hover: #5245E0;  /* derived, not measured */
+
+  /* ---------- Borders ---------- */
+  --color-border-input-ref: #CED5DE; /* measured reference; 1.48:1, do not use for inputs */
+  --color-border-input: #848D99;     /* shipped input border, 3.36:1 on white, 3.05:1 on canvas */
+  --color-border-button: #E5E7EB;    /* secondary button, label carries identity */
+
+  /* ---------- Document hues (DG11: 5 cycling, plus letter A to H) ---------- */
+  --doc-1-bg: #EEECFD; --doc-1-fg: #4F42D8; --doc-1-mark: #A99CF7; /* violet */
+  --doc-2-bg: #FEECEA; --doc-2-fg: #B42318; --doc-2-mark: #F97066; /* coral */
+  --doc-3-bg: #E6F7EE; --doc-3-fg: #067647; --doc-3-mark: #3CCB7F; /* green */
+  --doc-4-bg: #E6F2FE; --doc-4-fg: #0459A8; --doc-4-mark: #0188FB; /* blue */
+  --doc-5-bg: #FFEFE5; --doc-5-fg: #9C3410; --doc-5-mark: #FF9C66; /* orange */
+  /* -mark is decoration only (column header rule, PDF tab underline), never text. */
+
+  /* ---------- Evidence states (DG3: silhouette first, color second) ---------- */
+  --evidence-verified-border: transparent;           /* solid tint chip, no border */
+  --evidence-scan-border-style: dashed;              /* dashed 1px in the doc -fg color */
+  --evidence-scan-border-width: 1px;
+  --evidence-unverified-fg: #4B5563;                 /* "Couldn't verify" + triangle glyph */
+  --evidence-failed-fg: #35383B;                     /* "Extraction failed" + refresh glyph + Retry */
+  --evidence-edited-fg: #35383B;                     /* value + pencil glyph */
+  --pdf-highlight-border: 2px dashed #6356F0;        /* passage box in the source viewer */
+  --pdf-highlight-fill: #6356F01A;
+
+  /* ---------- Status ---------- */
+  --color-danger-fg: #B42318;      /* inline errors ("Couldn't save. Retry") */
+  --color-stale-bg: #FFFAEB;       /* "May be out of date" tag */
+  --color-stale-fg: #93370D;
+  --color-stale-border: #FBBF24;   /* decoration only */
+  --color-tooltip-bg: #35383B;
+  --color-tooltip-fg: #FFFFFF;
+
+  /* ---------- Focus (DG10) ---------- */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: #6356F0;
+  --focus-ring: var(--focus-ring-width) solid var(--focus-ring-color);
+
+  /* ---------- Disabled ---------- */
+  --disabled-opacity: 0.5;          /* measured on the reference "Log in" button */
+  --rail-disabled-icon: #9CA3AF;    /* icon only, exempt from contrast as inactive UI */
+  --rail-disabled-cursor: not-allowed;
+
+  /* ---------- Motion ---------- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-press: 120ms;     /* button :active scale */
+  --dur-fast: 150ms;      /* hover color, tooltip */
+  --dur-base: 200ms;      /* tabs, accordion, side-by-side panel */
+  --dur-toast: 250ms;     /* toast enter; exit uses --dur-fast */
+  --dur-max: 300ms;       /* ceiling for any UI transition */
+  --dur-spin: 700ms;      /* spinner revolution, linear */
+  --press-scale: 0.97;
+  --toast-hold: 6000ms;   /* DG12 "Edited. Undo" */
+
+  /* ---------- Layers ---------- */
+  --z-sticky: 10;   /* sticky first column, table header */
+  --z-panel: 20;    /* side-by-side PDF over report under 1280px */
+  --z-popover: 30;  /* tooltips, menus */
+  --z-toast: 40;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --press-scale: 1;
+    --dur-base: 0ms;
+    --dur-toast: 0ms;
+    --dur-spin: 1500ms; /* spinner keeps turning, slower; it carries state */
+  }
+}
