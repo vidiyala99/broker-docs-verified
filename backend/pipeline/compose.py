@@ -830,9 +830,91 @@ def template_report(inp: ComposeInput, *, reason: str = "") -> ArtifactContent:
     return _assemble(inp, prose, tables, notices)
 
 
+PLAIN_LEADS = {
+    BlockKind.CLIENT_DETAILS: "Client and carrier details as stated in each quote.",
+    BlockKind.LINE_COMPARISON: "Coverage terms as stated in each quote, side by side.",
+    BlockKind.PREMIUM_COMPARISON: "Premium terms as stated in each quote, side by side.",
+    BlockKind.SUBJECTIVITIES: "Conditions each carrier sets for binding, as stated in each quote.",
+}
+
+
+def _plain_items(inp: ComposeInput, section_id: str) -> list[list[Segment]]:
+    """Per document: the section's verified values, each with its own chips. A user edit
+    replaces the value (no chip); conflicting values are all named, none picked."""
+    scope = inp.field_scope(section_id)
+    fields = [f for f in inp.fields if scope is None or f.key in scope]
+    if not fields:
+        return []
+    by_cell = {(f.column_key, f.field): f for f in inp.facts}
+    edits = {(e.column_key, e.field): e for e in inp.edits}
+    items: list[list[Segment]] = []
+    for c in inp.columns:
+        head = f"{c.key} ({c.label})"
+        if c.failed:
+            items.append([Segment(text=f"{head}: {c.warning}.")])
+            continue
+        parts: list[Segment] = []
+        for fdef in fields:
+            edit, fact = edits.get((c.key, fdef.key)), by_cell.get((c.key, fdef.key))
+            if edit is not None:
+                parts.append(Segment(text=f"{fdef.label} {edit.value or 'Not specified'} (edited by the user)"))
+            elif fact is not None and fact.cited:
+                scan = " (read from scan, unverified)" if EvidenceState(fact.state) == EvidenceState.SCAN_READ else ""
+                parts.append(Segment(text=f"{fdef.label} {fact.value}{scan}", passage_ids=fact.passage_ids))
+            elif fact is not None and fact.conflicting:
+                values = " and ".join(f"{v} (page {p})" if p is not None else f"{v}"
+                                      for v, p, _ in fact.conflict_entries)
+                parts.append(Segment(text=f"{fdef.label}: conflicting values {values}",
+                                     passage_ids=fact.conflict_passage_ids))
+        if not parts:
+            items.append([Segment(text=f"{head}: no verified values for this section.")])
+            continue
+        segs = [Segment(text=f"{head}: ")]
+        for i, part in enumerate(parts):
+            if i:
+                segs.append(Segment(text="; "))
+            segs.append(part)
+        segs.append(Segment(text="."))
+        items.append(segs)
+    return items
+
+
+def render_plain(inp: ComposeInput) -> ArtifactContent:
+    """No-AI-prose mode (D5): plain per-kind text from the verified facts, no model call.
+
+    Deterministic: the same facts, edits and outline give byte-identical content. It is a
+    successful report, not a failure, so it carries no compose_fallback notice. Its prose
+    obeys the same rules as model prose (own-block facts only, values copied, chips on
+    every value), so `validate_draft` accepts it.
+    """
+    tables = build_tables(inp)
+    noun = "quote" if len(inp.columns) == 1 else "quotes"
+    names = ", ".join(f"{c.key} ({c.label})" for c in inp.columns)
+    presents = f"This proposal presents {len(inp.columns)} {noun}: {names}."
+    prose: dict[str, list] = {}
+    narratives = 0
+    for s in inp.prose_sections():
+        b = inp.block(s.id)
+        kind = b.kind if b is not None else BlockKind.NARRATIVE
+        items = _plain_items(inp, s.id)
+        if kind in PLAIN_LEADS:
+            blocks: list = [ParagraphBlock(id=f"{s.id}-p1", segments=[Segment(text=PLAIN_LEADS[kind])])]
+        else:
+            lead = presents if narratives == 0 or not items else "As stated in each quote:"
+            narratives += 1
+            blocks = [ParagraphBlock(id=f"{s.id}-p1", segments=[Segment(text=lead)])]
+            if items:
+                blocks.append(ListBlock(id=f"{s.id}-facts", items=items))
+        prose[s.id] = blocks
+    return _assemble(inp, prose, tables, list(inp.notices))
+
+
 async def compose_report(provider: Provider, budget: RunBudget, inp: ComposeInput,
                          *, label: str = "compose") -> ComposeResult:
-    """Write the report. Never raises a ProviderError: every failure ends in the template (R1)."""
+    """Write the report. Never raises a ProviderError: every failure ends in the template (R1).
+    A proposal in no-AI-prose mode (D5) is rendered in code, with no model call."""
+    if inp.brief is not None and inp.brief.no_ai_prose:
+        return ComposeResult(render_plain(inp), False, 0)
     tables = build_tables(inp)
     schema = _draft_schema([s.id for s in inp.prose_sections()])
     messages = build_compose_messages(inp)
