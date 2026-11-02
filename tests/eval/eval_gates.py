@@ -187,18 +187,46 @@ def _equal_or_unit_suffixed(p: tuple[str, ...], t: tuple[str, ...]) -> bool:
     return not any(tok.startswith("@") for tok in p[1:])
 
 
+# Last word of a short qualifier that may precede a date ("Valid until", "Expires on",
+# "Effective", "Good through", "Must be bound by"). Matched on normalized tokens.
+_DATE_QUALIFIER_END = frozenset({
+    "until", "till", "on", "through", "thru", "by", "to", "from", "as", "at",
+    "effective", "expires", "expiring", "expiration", "expiry", "dated", "date",
+})
+_DATE_QUALIFIER_MAX_WORDS = 3
+
+
+def _date_with_qualifier(p: tuple[str, ...], t: tuple[str, ...]) -> bool:
+    """``t`` is exactly one date and ``p`` is that same date (compared as
+    parsed dates) preceded by at most three plain words, the last of which is a
+    qualifier or connector (``Valid until 12/15/2026`` vs ``December 15, 2026``).
+    Nothing may follow the date, and no number, date or percent may appear in
+    the leading words. Non-date truth never gets this tolerance."""
+    if len(t) != 1 or not t[0].startswith("@d") or len(p) < 2 or p[-1] != t[0]:
+        return False
+    lead = p[:-1]
+    return (len(lead) <= _DATE_QUALIFIER_MAX_WORDS
+            and not any(tok.startswith("@") for tok in lead)
+            and lead[-1] in _DATE_QUALIFIER_END)
+
+
+def _close_enough(p: tuple[str, ...], t: tuple[str, ...]) -> bool:
+    return _equal_or_unit_suffixed(p, t) or _date_with_qualifier(p, t)
+
+
 def values_match(predicted: str | None, truth: str | None,
                  accepted: Iterable[str] = ()) -> bool:
     """True when ``predicted`` equals truth (or an accepted alias) after
     normalization, allowing a trailing unit or qualifier after a single
-    amount. Two nulls match; null against a value does not."""
+    amount, or a short leading qualifier before a single date. Two nulls
+    match; null against a value does not."""
     if predicted is None or truth is None:
         return predicted is None and truth is None
     p = normalize_value(predicted)
     if not p:
         return False
-    return (_equal_or_unit_suffixed(p, normalize_value(truth))
-            or any(_equal_or_unit_suffixed(p, normalize_value(a)) for a in accepted))
+    return (_close_enough(p, normalize_value(truth))
+            or any(_close_enough(p, normalize_value(a)) for a in accepted))
 
 
 # ---------------------------------------------------------------------------

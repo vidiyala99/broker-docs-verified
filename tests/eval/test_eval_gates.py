@@ -96,6 +96,46 @@ def test_unit_suffix_applies_to_accepted_aliases():
     assert g.values_match("$7,500 per claim", "$10,000", ["$7,500"])
 
 
+@pytest.mark.parametrize("pred,truth", [
+    ("Valid until 12/15/2026", "12/15/2026"),  # live run 3: carrier_a_multicol.quote_expiration
+    ("Valid until December 15, 2026", "December 15, 2026"),  # live run 3: carrier_b_multicol
+    ("Valid until December 15, 2026", "12/15/2026"),  # dates compared by value, not by string
+    ("Expires on 2026-12-15", "December 15, 2026"),
+    ("Effective 01/01/2027", "January 1, 2027"),
+    ("Good through 12/15/2026", "12/15/2026"),
+    ("Quote valid until: 12/15/2026", "12/15/2026"),
+    ("Bind by 12/15/2026", "12/15/2026"),
+])
+def test_short_qualifier_before_an_equal_date_matches(pred, truth):
+    assert g.values_match(pred, truth), (g.normalize_value(pred), g.normalize_value(truth))
+
+
+@pytest.mark.parametrize("pred,truth", [
+    ("Valid until 12/16/2026", "12/15/2026"),  # a different date
+    ("Valid until December 16, 2026", "December 15, 2026"),
+    ("Valid 30 days until 12/15/2026", "12/15/2026"),  # extra number in the qualifier
+    ("Valid until 12/15/2026 11:59 PM", "12/15/2026"),  # extra numbers after the date
+    ("Valid until 12/15/2026 or 30 days", "12/15/2026"),
+    ("12/01/2026 until 12/15/2026", "12/15/2026"),  # a second date
+    ("This quote remains valid until 12/15/2026", "12/15/2026"),  # more than 3 leading words
+    ("Must be bound by 12/15/2026", "12/15/2026"),  # 4 leading words
+    ("Harborline 12/15/2026", "12/15/2026"),  # leading word that is not a qualifier
+    ("Valid until 12/15/2026", "Valid until 12/16/2026"),  # truth is not a plain date
+    ("Limit $10,000", "$10,000"),  # leading words never tolerated for non-dates
+    ("Valid until $10,000", "$10,000"),
+    ("Deductible of $10,000", "$10,000"),
+    ("Insured Ashford Kitchen Group LLC", "Ashford Kitchen Group LLC"),
+    ("Effective Harborline Specialty", "Harborline Specialty"),
+    ("Valid until 25%", "25%"),
+])
+def test_date_qualifier_rule_is_strict(pred, truth):
+    assert not g.values_match(pred, truth)
+
+
+def test_date_qualifier_applies_to_accepted_aliases():
+    assert g.values_match("Valid until 12/20/2026", "12/15/2026", ["12/20/2026"])
+
+
 def test_percent_values_still_match_each_other():
     assert g.values_match("25 %", "25%")
 

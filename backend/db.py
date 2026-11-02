@@ -110,7 +110,11 @@ _FIELDS = [
     FactField(key="producer", label="Producer", section="common_declarations",
               description="Producing broker or agent named on the quote."),
     FactField(key="policy_form", label="Policy Form", section="common_declarations",
-              description="Policy form name or form number, for example occurrence or claims-made."),
+              description=("The coverage form number and edition date followed by the form title, exactly as "
+                           "printed in the policy, for example 'CG 00 01 04 13 Commercial General Liability "
+                           "Coverage Form (Occurrence)'. Not a running page header and not the policy's "
+                           "generic title (such as 'Commercial General Liability Policy'). If no form number "
+                           "or edition is printed on the pages read, return null.")),
     FactField(key="rate", label="Rate", section="rate",
               description="Rate as stated, for example per $1,000 of exposure."),
     FactField(key="total_premium", label="Total Premium", section="premium",
