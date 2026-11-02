@@ -193,3 +193,17 @@ each wizard step at the two design widths; phone width for step 3.
 - Whether cover page and TOC need a dedicated block type (decide in planning).
 - Slice numbering: slice 1's spec says "slice 3 (custom workflows)", the evidence
   doc orders Policy Check next. A slice map is not drafted.
+
+## Engineering review (plan-eng-review, 2026-11-02)
+
+Scope record: feature answers: D1 (defer extraction cache to slice 2c); structure: A, original arrangement (D2); accepted scope: spec as written minus the extraction cache (spec sections 2.5 and the cache tests move to slice 2c); pending remedies: Scope Challenge findings S1 to S6 below.
+
+Owner feedback logged during review (not slice 2): the left panel (Upload, Input parameters, Recent runs, New comparison, chat) is chunky and the chat cannot collapse. Handle with the open design call "collapse Upload when a run is Done" as one bounded design fix through the design stack.
+
+### Scope Challenge findings (evidence: existing code)
+- S1 [P1] (confidence 9/10) backend/pipeline/compose.py:313: `sid = fdef.section if fdef.section in known_sections else fallback_section`. With a per-run outline, a deleted block's facts would be placed into the first section instead of being dropped.
+- S2 [P1] (9/10) backend/pipeline/runner.py:319 and :646 both read `wf.section_plan`; retry, regenerate and chat go through `compose_input_for_run` (:646). The outline override must be one shared helper used at both sites.
+- S3 [P2] (8/10) `build_tables` (compose.py:302) already builds tables in code from the fact grid; the spec's "new block builder" should extend it, not add a second builder.
+- S4 [P2] (8/10) backend/pyproject.toml lists openpyxl and reportlab but not python-docx; DOCX needs a new dependency, and footnotes need raw XML (spike first, fallback: superscript numbers plus a Sources list).
+- S5 [P2] (7/10) backend/edits.py:125 `merge_edits` re-applies edits by block id; outline-derived table ids must be unique and stable under reorder, and cover/TOC blocks must survive a merge.
+- S6 [P3] (8/10) db.py seeds only if absent (HANDOFF open item 2); new templates and the `proposal-builder` workflow need an upsert.
