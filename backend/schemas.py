@@ -26,6 +26,11 @@ class EvidenceState(StrEnum):
                quote, is not in the document: shown as "Couldn't verify"
     absent     model returned no value: shown as "Not specified", no chip
     failed     extraction for the document failed: "Extraction failed", retry
+    conflicting long documents only (pipeline.merge): the document states two or
+               more different values, each verified, and no endorsement rule
+               picks one. Shown as "Conflicting values" with a chip per value
+               and a conflicting_values notice; never counted as verified
+               (the eval reports it as not_found)
     """
 
     PENDING = "pending"
@@ -34,6 +39,7 @@ class EvidenceState(StrEnum):
     NOT_FOUND = "not_found"
     ABSENT = "absent"
     FAILED = "failed"
+    CONFLICTING = "conflicting"
 
 
 CITED_STATES = frozenset({EvidenceState.VERIFIED, EvidenceState.SCAN_READ})
@@ -122,13 +128,21 @@ class Notice(BaseModel):
 
     conflicting_values (T14, cell-level): one document states different values
     for the field and no rule picks one; the message names every value and its
-    page, and the cell shows the earliest.
+    page. The cell's state is `conflicting` and no value is shown as verified.
     """
 
     kind: Literal["compose_fallback", "budget_exhausted", "documents_failed", "info", "conflicting_values"]
     message: str
     retryable: bool = False
     dismissible: bool = False
+
+
+class ConflictValue(BaseModel):
+    """One of the different values a long document states for a field (T14)."""
+
+    value: str | None
+    page_no: int | None = None
+    passage_id: int | None = None  # its chip; also listed in Cell.passage_ids
 
 
 class Cell(BaseModel):
@@ -143,6 +157,8 @@ class Cell(BaseModel):
     original_passage_ids: list[int] = Field(default_factory=list)
     # T14: cell-level warning, for example conflicting_values in a long document.
     notice: Notice | None = None
+    # T14: state `conflicting` only: every value the document states, earliest page first.
+    conflicts: list[ConflictValue] = Field(default_factory=list)
 
 
 class Column(BaseModel):

@@ -17,7 +17,9 @@ Decision order for one document:
         │
     extract every window with the same strict call (R3 wording, a fresh
     random data-block boundary per window, the [page N] tags are absolute
-    document pages); windows run concurrently through the Provider's own
+    document pages); the user message opens with extract.WINDOW_NOTE (part
+    k of n, pages a to b, null for every field these pages do not state,
+    never a heading or label as the value); windows run concurrently through the Provider's own
     semaphore (4 calls, M6), and at most that many windows of one document
     hold a budget reservation at a time; each finished window reports
     progress (done, total) to the caller on the event loop
@@ -155,6 +157,12 @@ def _window_pages(pages: Sequence[extract.TextPage], window: Window) -> list[ext
     return [p for p in pages if int(p.page_no) in window]
 
 
+def window_part(window: Window, windows: Sequence[Window], page_count: int) -> extract.DocumentPart:
+    """What the window's prompt says about its place in the document (extract.WINDOW_NOTE)."""
+    return extract.DocumentPart(index=list(windows).index(window) + 1, total=len(windows), first=window.first,
+                                last=window.last, page_count=page_count)
+
+
 def precheck_tokens(provider: Provider, fields, pages, windows, *, document_name: str, instructions: str = "",
                     schema=None) -> int:
     """Tokens the windows of one document are planned to need, checked before any call (D3).
@@ -169,7 +177,8 @@ def precheck_tokens(provider: Provider, fields, pages, windows, *, document_name
     est = 0
     for w in windows:
         msgs = extract.build_extraction_messages(fields, _window_pages(pages, w), document_name=document_name,
-                                                 instructions=instructions)
+                                                 instructions=instructions,
+                                                 part=window_part(w, windows, len(pages)))
         est += provider.estimate_input_tokens(msgs, schema)
     max_out = cfg.max_output_tokens[CallRole.EXTRACT]
     expected = min(max_out, cfg.expected_output_tokens.get(CallRole.EXTRACT, max_out))
@@ -220,7 +229,8 @@ async def extract_windows(
         async with gate:
             res = await extract.extract_document(
                 provider, budget, fields, _window_pages(pages, w), document_name=document_name,
-                instructions=instructions, label=f"{label}:w{w.index}/{len(windows)}")
+                instructions=instructions, label=f"{label}:w{w.index}/{len(windows)}",
+                part=window_part(w, windows, len(pages)))
         results[i] = WindowResult(w, res)
         done += 1
         if on_progress is not None:
@@ -305,4 +315,4 @@ def verify_document(
 
 __all__ = ["DEFAULT_WINDOWS", "Window", "WindowConfig", "WindowResult", "WindowedExtraction", "extract_document",
            "extract_windows", "needs_windows", "plan_windows", "precheck_tokens", "select_windows",
-           "verify_document"]
+           "verify_document", "window_part"]

@@ -5,9 +5,15 @@ field can come back several times. Every candidate has already been verified
 against the FULL document (pipeline.verify). This module picks what the cell
 shows, per field:
 
-    candidates ──► tier: VERIFIED if any, else SCAN_READ (lower tier, D5)
+    candidates ──► plausibility filter (below): a value that is only the
+        │            field's label, a heading or a table-of-contents entry is
+        │            dropped (kept in `dropped`, logged)
+        ▼
+    tier: VERIFIED if any, else SCAN_READ (lower tier, D5)
         │            none cited ──► NOT_FOUND if any candidate had a value
-        │                           ("Couldn't verify", M1), else ABSENT
+        │                           ("Couldn't verify", M1; reason
+        │                           implausible_value when only dropped ones
+        │                           were left), else ABSENT
         ▼
     group the tier by normalized value (verify's tokens; numbers by value,
     so "$10,000" equals "10000", but "$10,000 per occurrence" does not)
@@ -19,10 +25,32 @@ shows, per field:
               endorsement rule (below) picks one ──► that value; the others
               │                                       are kept as `superseded`
               │                                       (logged, not shown)
-              └─ ambiguous ──► earliest value, and every other value is kept
-                               in `conflicts`; compose puts a
-                               conflicting_values notice on the cell that
-                               names all of them (never picked silently)
+              └─ ambiguous ──► state CONFLICTING, no value: every value is
+                               kept in `conflicts` (earliest page first) with
+                               its own verified evidence; compose shows
+                               "Conflicting values", a chip per value and a
+                               conflicting_values notice. Nothing is picked
+                               (owner decision 2026-11-02: the old rule showed
+                               the earliest as verified, which let a running
+                               header or heading on page 1 beat the real value)
+
+Plausibility filter (implausible_reason, deliberately tiny). A candidate is
+dropped when its value:
+1. is made only of the field label's words plus generic label and heading
+   words (GENERIC_LABEL_WORDS: of, record, name, section, policy, coverage,
+   definitions, continued, ...) and contains every word of the label, for
+   example "Producer", "Producer of record", "Coverage Territory";
+2. ends with "Definition(s)" (a definitions heading);
+3. ends with a dot leader and a page number (a table-of-contents entry);
+4. is shorter than 4 characters, has no digit and is not an upper-case code
+   (so "A-", "A++" and "USA" pass, "of" and "Ab" do not).
+False-positive risk: a real value that is literally the label's words (for
+example a producer whose registered name is "Producer Of Record") is
+dropped; every word of the label must be present, so one-word values such
+as "Admitted" for Admitted Status still pass. A short lower-case value such
+as "No" is dropped, and so is a real value that ends with "Definitions".
+The filter runs on windowed (long) documents only; a single-call quote
+never reaches merge.
 
 Endorsement rule (kept simple on purpose):
 1. A candidate "amends" when its quote or matched source text contains
@@ -64,10 +92,45 @@ class MergedFact(verify.VerifyResult):
     """The fact a cell shows, plus what the other windows found for the field."""
 
     extras: tuple[verify.VerifyResult, ...] = ()  # same value on other pages (extra passages)
-    conflicts: tuple[verify.VerifyResult, ...] = ()  # other values, unresolved (conflicting_values)
+    # state CONFLICTING: every value the document states, earliest page first (conflicting_values)
+    conflicts: tuple[verify.VerifyResult, ...] = ()
     superseded: tuple[verify.VerifyResult, ...] = ()  # other values an endorsement replaced
+    dropped: tuple[verify.VerifyResult, ...] = ()  # candidates the plausibility filter removed
     resolution: str = "single"  # absent | not_found | single | same_value | endorsement | ambiguous
     candidates: int = 0  # how many window candidates had a value
+
+
+GENERIC_LABEL_WORDS = frozenset({
+    "a", "an", "and", "the", "of", "or", "for", "to", "in", "on", "per", "see",
+    "record", "name", "names", "info", "information", "detail", "details", "item", "items",
+    "section", "schedule", "summary", "page", "continued", "conditions", "provisions",
+    "definition", "definitions", "policy", "coverage", "form", "forms", "limit", "limits",
+})
+_DEFINITIONS_RE = re.compile(r"\bdefinitions?\W*$", re.I)
+_TOC_RE = re.compile(r"(?:\.\s*){4,}\d+\s*$")
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def implausible_reason(fdef: FactField | str, value: str | None) -> str | None:
+    """Why a value cannot be the field's real value (a label, heading or TOC entry), else None."""
+    v = (value or "").strip()
+    if not v:
+        return None
+    label = fdef.label if isinstance(fdef, FactField) else str(fdef).replace("_", " ")
+    label_words = set(_words(label))
+    words = set(_words(v))
+    if label_words and label_words <= words <= label_words | GENERIC_LABEL_WORDS:
+        return "label_text"
+    if _DEFINITIONS_RE.search(v):
+        return "definitions_heading"
+    if _TOC_RE.search(v):
+        return "table_of_contents"
+    if len(v) < 4 and not any(ch.isdigit() for ch in v) and v != v.upper():
+        return "too_short"
+    return None
 
 
 def value_key(value: str | None) -> tuple[str, ...]:
@@ -116,13 +179,26 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
     page_text = page_text or {}
     valued = [c for c in candidates if c.value is not None and str(c.value).strip()]
     n = len(valued)
-    tier = [c for c in valued if c.state == EvidenceState.VERIFIED] or \
-        [c for c in valued if c.state == EvidenceState.SCAN_READ]
+    plausible, dropped = [], []
+    for c in valued:
+        (dropped if implausible_reason(fdef, c.value) else plausible).append(c)
+    if dropped:
+        log.info("merge: %s dropped implausible values %s", key,
+                 [(r.value, r.page_no or r.cited_page, implausible_reason(fdef, r.value)) for r in dropped])
+    dropped_t = tuple(dropped)
+    tier = [c for c in plausible if c.state == EvidenceState.VERIFIED] or \
+        [c for c in plausible if c.state == EvidenceState.SCAN_READ]
     if not tier:
-        rejected = [c for c in valued if c.state == EvidenceState.NOT_FOUND]
+        rejected = [c for c in plausible if c.state == EvidenceState.NOT_FOUND]
         if rejected:
             return _from(min(rejected, key=lambda c: (c.cited_page or 10**9)), resolution="not_found",
-                         candidates=n)
+                         candidates=n, dropped=dropped_t)
+        if dropped:  # only labels or headings came back: "Couldn't verify", no passage
+            first = min(dropped, key=lambda c: (c.cited_page or c.page_no or 10**9))
+            return _from(first, state=EvidenceState.NOT_FOUND, page_no=None, matched_text=None, method=None,
+                         score=0.0, rects=[], repointed_from=None, reason="implausible_value",
+                         cited_page=first.cited_page if first.cited_page is not None else first.page_no,
+                         resolution="not_found", candidates=n, dropped=dropped_t)
         return MergedFact(field=key, value=None, state=EvidenceState.ABSENT, cited_page=None, page_no=None,
                           quote=None, matched_text=None, method=None, score=0.0, reason="no_value",
                           resolution="absent", candidates=n)
@@ -139,7 +215,8 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
                 seen.add(r.page_no)
                 extras.append(r)
         resolution = kw.pop("resolution", "same_value" if extras else "single")
-        return _from(primary, extras=tuple(extras), resolution=resolution, candidates=n, **kw)
+        return _from(primary, extras=tuple(extras), resolution=resolution, candidates=n, dropped=dropped_t,
+                     **kw)
 
     if len(ordered) == 1:
         return with_extras(ordered[0])
@@ -149,10 +226,13 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
         log.info("merge: %s endorsement on page %s replaces %s", key, ordered[win][0].page_no,
                  [(r.value, r.page_no) for r in others])
         return with_extras(ordered[win], superseded=others, resolution="endorsement")
-    conflicts = tuple(g[0] for g in ordered[1:])
-    log.info("merge: %s has conflicting values %s; showing the earliest", key,
-             [(r.value, r.page_no) for r in (ordered[0][0], *conflicts)])
-    return with_extras(ordered[0], conflicts=conflicts, resolution="ambiguous")
+    conflicts = tuple(g[0] for g in ordered)
+    log.info("merge: %s has conflicting values %s; none is picked", key,
+             [(r.value, r.page_no) for r in conflicts])
+    return MergedFact(field=key, value=None, state=EvidenceState.CONFLICTING, cited_page=None, page_no=None,
+                      quote=None, matched_text=None, method=None, score=0.0, rects=[],
+                      reason="conflicting_values", conflicts=conflicts, dropped=dropped_t,
+                      resolution="ambiguous", candidates=n)
 
 
 def merge_document(fields: Sequence[FactField | str], candidates: Iterable[verify.VerifyResult],
@@ -169,14 +249,21 @@ def merge_document(fields: Sequence[FactField | str], candidates: Iterable[verif
 
 
 def conflict_message(label: str, shown: tuple[str | None, int | None],
-                     conflicts: Sequence[tuple[str | None, int | None]]) -> str:
-    """Text of the conflicting_values notice: every (value, page), the shown (earliest) one first."""
+                     conflicts: Sequence[tuple[str | None, int | None]], *, none_shown: bool = False) -> str:
+    """Text of the conflicting_values notice: every (value, page), earliest first.
+
+    none_shown: the cell is in state CONFLICTING (no value picked, `shown` is
+    just the first value); otherwise `shown` is the value the cell shows
+    (facts stored before 2026-11-02).
+    """
     def one(v, p):
         return f"{v} (page {p})" if p is not None else f"{v}"
     values = [one(*shown), *(one(v, p) for v, p in conflicts)]
     listed = ", ".join(values[:-1]) + f" and {values[-1]}"
-    return (f"This document states different values for {label}: {listed}. "
-            "The earliest is shown; check which one applies.")
+    tail = ("No value is shown as verified; check which one applies." if none_shown
+            else "The earliest is shown; check which one applies.")
+    return f"This document states different values for {label}: {listed}. {tail}"
 
 
-__all__ = ["AMEND_RE", "MergedFact", "conflict_message", "merge_document", "merge_field", "value_key"]
+__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "MergedFact", "conflict_message", "implausible_reason",
+           "merge_document", "merge_field", "value_key"]

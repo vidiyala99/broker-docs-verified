@@ -31,9 +31,13 @@ Claim-level checks (who is cheaper) are a TODO (R10).
 
 Long documents (T14, pipeline.merge): a cited fact may carry extra passages
 (the same value on other pages: more chips on the cell, also allowed in
-prose) and conflicting values (the document states other values too: the
-cell gets a conflicting_values notice naming every value and page, the prose
-is told about them, and their numbers are allowed in the prose).
+prose). A fact in state CONFLICTING (the document states different values
+and no endorsement picks one) has no value: its cell shows "Conflicting
+values" with a chip per value, `conflicts` listing each (value, page,
+passage), and a conflicting_values notice; the prose gets it under
+conflicting_fields and may cite those passages and state those values.
+Facts stored before 2026-11-02 may still be cited with `conflicts` (the
+earliest shown); they keep the old notice.
 """
 
 from __future__ import annotations
@@ -62,6 +66,7 @@ from backend.schemas import (
     ArtifactContent,
     Cell,
     Column,
+    ConflictValue,
     EvidenceState,
     FactField,
     ListBlock,
@@ -112,7 +117,9 @@ class ComposeFact:
     page_no: int | None = None
     fact_id: int | None = None
     extra_passage_ids: tuple[int, ...] = ()  # T14: same value on other pages
-    conflicts: tuple[tuple[str | None, int | None], ...] = ()  # T14: (other value, page)
+    # T14: (value, page) or (value, page, passage_id). A cited fact: the other values
+    # (stored before 2026-11-02). State CONFLICTING: every value, earliest first.
+    conflicts: tuple[tuple, ...] = ()
 
     @property
     def passage_ids(self) -> list[int]:
@@ -123,6 +130,20 @@ class ComposeFact:
     @property
     def cited(self) -> bool:
         return EvidenceState(self.state) in CITED_STATES and self.value is not None and self.passage_id is not None
+
+    @property
+    def conflict_entries(self) -> list[tuple[str | None, int | None, int | None]]:
+        """(value, page, passage_id) per conflicting value."""
+        return [(c[0], c[1] if len(c) > 1 else None, c[2] if len(c) > 2 else None) for c in self.conflicts]
+
+    @property
+    def conflicting(self) -> bool:
+        """T14: the document states different values and none was picked."""
+        return EvidenceState(self.state) == EvidenceState.CONFLICTING and bool(self.conflicts)
+
+    @property
+    def conflict_passage_ids(self) -> list[int]:
+        return list(dict.fromkeys(pid for _, _, pid in self.conflict_entries if pid is not None))
 
 
 @dataclass(frozen=True)
@@ -153,14 +174,21 @@ class ComposeInput:
     def cited_facts(self) -> list[ComposeFact]:
         return [f for f in self.facts if f.cited]
 
+    def conflicting_facts(self) -> list[ComposeFact]:
+        failed = {c.key for c in self.columns if c.failed}
+        return [f for f in self.facts if f.conflicting and f.column_key not in failed]
+
     def allowed_passage_ids(self) -> set[int]:
-        return {pid for f in self.cited_facts() for pid in f.passage_ids}
+        """Passages prose may cite: cited facts' passages and each conflicting value's passage (T14)."""
+        return ({pid for f in self.cited_facts() for pid in f.passage_ids}
+                | {pid for f in self.conflicting_facts() for pid in f.conflict_passage_ids})
 
     def allowed_values(self) -> list[str | None]:
-        """Values whose numbers prose may state: cited fact values, their conflicting values (T14),
+        """Values whose numbers prose may state: cited fact values, conflicting values (T14),
         and user edits (D9)."""
         cited = [v for f in self.cited_facts() for v in (f.value, *(c[0] for c in f.conflicts))]
-        return cited + [e.value for e in self.edits]
+        conflicting = [v for f in self.conflicting_facts() for v, _, _ in f.conflict_entries]
+        return cited + conflicting + [e.value for e in self.edits]
 
 
 @dataclass(frozen=True)
@@ -298,16 +326,28 @@ def build_tables(inp: ComposeInput) -> dict[str, TableBlock]:
             cited = fact is not None and fact.cited and not col.failed
             if state in CITED_STATES and not cited:
                 state = EvidenceState.ABSENT  # a cited state without a value or passage shows nothing
-            notice = None
-            if cited and fact.conflicts:
+            label = labels.get(fdef.key, fdef.key)
+            notice, conflicts, passage_ids = None, [], fact.passage_ids if cited else []
+            if state == EvidenceState.CONFLICTING:
+                entries = fact.conflict_entries
+                if entries:
+                    # T14: no value is picked; a chip per stated value, all of them on the notice
+                    notice = Notice(kind="conflicting_values", message=conflict_message(
+                        label, entries[0][:2], [e[:2] for e in entries[1:]], none_shown=True))
+                    conflicts = [ConflictValue(value=v, page_no=p, passage_id=pid) for v, p, pid in entries]
+                    passage_ids = fact.conflict_passage_ids
+                else:
+                    state = EvidenceState.NOT_FOUND  # no values to show: plain "Couldn't verify"
+            elif cited and fact.conflicts:
                 notice = Notice(kind="conflicting_values", message=conflict_message(
-                    labels.get(fdef.key, fdef.key), (fact.value, fact.page_no), fact.conflicts))
+                    label, (fact.value, fact.page_no), [e[:2] for e in fact.conflict_entries]))
             cells[col.key] = Cell(
                 value=display_value(state, fact.value if cited else None),
-                passage_ids=fact.passage_ids if cited else [],
+                passage_ids=passage_ids,
                 fact_ids=[fact.fact_id] if fact is not None and fact.fact_id is not None else [],
                 state=state,
                 notice=notice,
+                conflicts=conflicts,
             )
         table.rows.append(Row(key=fdef.key, label=fdef.label, cells=cells))
     return tables
@@ -375,8 +415,9 @@ value: say so plainly and never guess the value.
 Mention a column warning (such as a multi-option document) where it matters.
 6. Keep it brief and factual: one or two short paragraphs per section, and skip a \
 section rather than pad it.
-7. A fact with conflicting_values: the document states more than one value for that \
-field. Say so and name the values; do not choose one.
+7. A fact with conflicting_values, or a field listed in conflicting_fields: the document \
+states more than one value for that field. Say so and name the values, citing each \
+value's passage_id where one is given; do not choose one.
 """
 
 
@@ -384,7 +425,7 @@ def _facts_payload(inp: ComposeInput) -> dict[str, Any]:
     labels = {f.key: f.label for f in inp.fields}
     columns = [{"document": c.key, "label": c.label, "file": c.filename,
                 **({"warning": c.warning} if c.warning else {})} for c in inp.columns]
-    cited, missing = [], []
+    cited, missing, conflicting = [], [], []
     for f in inp.facts:
         col_failed = any(c.key == f.column_key and c.failed for c in inp.columns)
         if col_failed:
@@ -396,16 +437,23 @@ def _facts_payload(inp: ComposeInput) -> dict[str, Any]:
                     "label": labels.get(f.field, f.field), "value": f.value, "page": f.page_no,
                     "evidence": evidence}
             if f.conflicts:
-                item["conflicting_values"] = [{"value": v, "page": p} for v, p in f.conflicts]
+                item["conflicting_values"] = [{"value": v, "page": p} for v, p, _ in f.conflict_entries]
             cited.append(item)
+        elif f.conflicting:
+            conflicting.append({"document": f.column_key, "field": f.field, "label": labels.get(f.field, f.field),
+                                "status": "conflicting values, none verified as the value",
+                                "conflicting_values": [{"value": v, "page": p, "passage_id": pid}
+                                                       for v, p, pid in f.conflict_entries]})
         else:
-            status = "could not be verified" if EvidenceState(f.state) == EvidenceState.NOT_FOUND \
-                else "not specified"
+            status = "could not be verified" if EvidenceState(f.state) in (
+                EvidenceState.NOT_FOUND, EvidenceState.CONFLICTING) else "not specified"
             missing.append({"document": f.column_key, "field": f.field,
                             "label": labels.get(f.field, f.field), "status": status})
     failed = [{"document": c.key, "status": "extraction failed"} for c in inp.columns if c.failed]
     out: dict[str, Any] = {"documents": columns, "facts": cited, "fields_without_value": missing,
                            "failed_documents": failed}
+    if conflicting:
+        out["conflicting_fields"] = conflicting
     if inp.edits:
         out["user_edits"] = [{"document": e.column_key, "field": e.field, "label": labels.get(e.field, e.field),
                               "value": e.value, "original_value": e.original_value} for e in inp.edits]
@@ -517,11 +565,15 @@ def template_report(inp: ComposeInput, *, reason: str = "") -> ArtifactContent:
         facts = by_col.get(c.key, [])
         verified = [f for f in facts if f.cited and EvidenceState(f.state) == EvidenceState.VERIFIED]
         scanned = [f for f in facts if f.cited and EvidenceState(f.state) == EvidenceState.SCAN_READ]
-        unverified = sum(1 for f in facts if EvidenceState(f.state) == EvidenceState.NOT_FOUND)
-        unspecified = len(inp.fields) - len(verified) - len(scanned) - unverified
-        pids = sorted({pid for f in verified + scanned for pid in f.passage_ids})
+        conflicting = [f for f in facts if f.conflicting]
+        unverified = sum(1 for f in facts if EvidenceState(f.state) == EvidenceState.NOT_FOUND
+                         or (EvidenceState(f.state) == EvidenceState.CONFLICTING and not f.conflicting))
+        unspecified = len(inp.fields) - len(verified) - len(scanned) - unverified - len(conflicting)
+        pids = sorted({pid for f in verified + scanned for pid in f.passage_ids}
+                      | {pid for f in conflicting for pid in f.conflict_passage_ids})
+        both = f", {len(conflicting)} with conflicting values" if conflicting else ""
         text = (f"{c.key}, {c.label}: {len(verified)} fields verified, {len(scanned)} read from scan, "
-                f"{unverified} could not be verified, {unspecified} not specified.")
+                f"{unverified} could not be verified{both}, {unspecified} not specified.")
         if c.warning:
             text += f" {c.warning}."
         items.append([Segment(text=text, passage_ids=pids)])

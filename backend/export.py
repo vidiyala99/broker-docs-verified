@@ -69,6 +69,12 @@ def _source_note(data: ExportData, ids: list[int]) -> str:
     return "; ".join(parts)
 
 
+def _conflict_list(cell: Cell) -> str:
+    """'$5,000 (page 20); $7,500 (page 90)' for a T14 conflicting cell."""
+    return "; ".join(f"{c.value} (page {c.page_no})" if c.page_no is not None else f"{c.value}"
+                     for c in cell.conflicts)
+
+
 def cell_note(data: ExportData, cell: Cell) -> str:
     notes = []
     if cell.edited:
@@ -80,6 +86,8 @@ def cell_note(data: ExportData, cell: Cell) -> str:
         notes.append("Read from scan, unverified")
     elif cell.state == EvidenceState.NOT_FOUND:
         notes.append("Couldn't verify: the model's value was not found in the document")
+    elif cell.state == EvidenceState.CONFLICTING:
+        notes.append("Conflicting values: " + _conflict_list(cell) + ". None is shown as verified")
     if cell.passage_ids:
         notes.append("Source " + _source_note(data, cell.passage_ids))
     return "\n".join(notes)
@@ -181,6 +189,8 @@ def _cell_markup(data: ExportData, cell: Cell) -> str:
         tags.append(f"edited; original: {escape(orig)}")
     elif cell.state == EvidenceState.SCAN_READ:
         tags.append("read from scan, unverified")
+    elif cell.state == EvidenceState.CONFLICTING:
+        tags.append("conflicting values: " + escape(_conflict_list(cell)))
     labels = _labels(data, cell.passage_ids or cell.original_passage_ids)
     chip = f' <font color="#6356F0" size="6">[{", ".join(labels)}]</font>' if labels else ""
     tag = f'<br/><font color="#4B5563" size="6">({"; ".join(tags)})</font>' if tags else ""

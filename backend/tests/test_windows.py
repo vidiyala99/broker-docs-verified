@@ -178,6 +178,90 @@ def test_option_count_is_the_largest_any_window_reports():
     assert (ex.option_count, ex.option_label) == (2, "Option 1 (Primary)")
 
 
+# --------------------------------------------------------------------- headings and labels as values
+
+HEADER = "Policy No. LG-1 Commercial General Liability Policy"
+REAL_FORM = "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)"
+REAL_PRODUCER = "Lantern Insurance Brokerage Inc."
+
+
+def decoy_doc(n: int = 40) -> list[P]:
+    """Real values on page 2 only; every page has a running header, later pages have headings and labels."""
+    body = {2: f"Producer: {REAL_PRODUCER}\nPolicy Form: {REAL_FORM}",
+            20: "76. Policy Territory Definitions\nThe Producer of record must send the Carrier copies.",
+            35: "The Producer of record shall cooperate with the Carrier.",
+            40: "Coverage territory: all locations within the State of Ohio and goods in transit."}
+    return [P(i, f"{HEADER}\nPolicy wording page {i}.\n{body.get(i, '')}".strip()) for i in range(1, n + 1)]
+
+
+def _lazy_model(req):
+    """Like the live model on long documents: fills fields from nearby headings and labels."""
+    text = user_text(req)
+    reply = extraction_reply(text)
+    have = {f["field"] for f in reply["facts"]}
+    first = page_tags(req)[0]
+    if "producer" not in have and "Producer of record" in text:
+        page = 20 if 20 in page_tags(req) else 35
+        reply["facts"].append({"field": "producer", "value": "Producer of record", "page": page,
+                               "quote": "The Producer of record"})
+    if "territory" not in have and "Policy Territory Definitions" in text:
+        reply["facts"].append({"field": "territory", "value": "Policy Territory Definitions", "page": 20,
+                               "quote": "76. Policy Territory Definitions"})
+    if "policy_form" not in have:  # the running header, on the window's first page
+        reply["facts"].append({"field": "policy_form", "value": "Commercial General Liability Policy",
+                               "page": first, "quote": HEADER})
+    return reply
+
+
+def _careful_model(req):
+    """Follows the null-if-absent rule: a window without the value returns nothing for the field."""
+    return extraction_reply(user_text(req))
+
+
+def test_window_calls_carry_the_null_if_absent_note_and_single_calls_do_not():
+    fake = FakeProvider(smart_responder())
+    run(windows.extract_windows(fake, RunBudget(), FIELDS, decoy_doc(), document_name="x.pdf"))
+    reqs = [r for r in fake.requests if r.role is CallRole.EXTRACT]
+    assert len(reqs) == 3
+    for k, r in enumerate(reqs, start=1):
+        u = user_text(r)
+        assert u.startswith(f"IMPORTANT: this is part {k} of 3")
+        assert "return value, page and quote as null" in u[:u.index("<<<DOCUMENT")]
+        assert "actual stated value" in r.messages[0].parts()[0].text
+    single = FakeProvider(smart_responder())
+    run(windows.extract_document(single, RunBudget(), FIELDS, decoy_doc(15), document_name="q.pdf"))
+    assert "IMPORTANT: this is part" not in user_text(single.requests[0])
+
+
+def test_label_values_from_other_windows_lose_to_the_one_real_value():
+    pages = decoy_doc()
+    ex = run(windows.extract_windows(FakeProvider(_lazy_model), RunBudget(), FIELDS, pages, document_name="x.pdf"))
+    assert sum(1 for c in ex.candidates() if c.value == "Producer of record") >= 2
+    merged = {m.field: m for m in windows.verify_document(ex, pages)}
+    prod = merged["producer"]
+    assert (prod.value, prod.page_no, prod.state, prod.resolution) == (REAL_PRODUCER, 2, EvidenceState.VERIFIED,
+                                                                       "single")
+    assert {d.value for d in prod.dropped} == {"Producer of record"}
+    # a heading is dropped; with no real value left the cell is "Couldn't verify", never verified
+    terr = merged["territory"]
+    assert terr.state == EvidenceState.NOT_FOUND and terr.reason == "implausible_value" and terr.page_no is None
+    # the running header (windows 2 and 3) passes the filter but conflicts with the real form
+    # (window 1): shown as a conflict with both values, never a verified pick
+    form = merged["policy_form"]
+    assert form.state == EvidenceState.CONFLICTING and form.value is None
+    assert [(c.value, c.page_no) for c in form.conflicts] == [(REAL_FORM, 2),
+                                                              ("Commercial General Liability Policy", 14)]
+
+
+def test_prompt_compliant_null_windows_leave_the_real_value_alone():
+    pages = decoy_doc()
+    ex = run(windows.extract_windows(FakeProvider(_careful_model), RunBudget(), FIELDS, pages, document_name="x.pdf"))
+    merged = {m.field: m for m in windows.verify_document(ex, pages)}
+    assert (merged["producer"].value, merged["producer"].state) == (REAL_PRODUCER, EvidenceState.VERIFIED)
+    assert (merged["policy_form"].value, merged["policy_form"].state) == (REAL_FORM, EvidenceState.VERIFIED)
+    assert merged["policy_form"].resolution == "single" and merged["producer"].dropped == ()
+
+
 # --------------------------------------------------------------------- single call unchanged
 
 
