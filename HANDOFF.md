@@ -15,9 +15,14 @@ Repo: `broker-docs-verified` is now a git repo (`main`). `.env` (OpenAI key) is 
 - Evidence for later slices: `docs/reference/brokerdocs-workflows-evidence.md` (ranking: Proposal Builder, data-only pack,
   Policy Check, COI, Loss Run, Assistant, Market Search, ACORD).
 
-## Verified live
-Key works; `gpt-5.4-mini` (extract/vision), `gpt-5.5` (compose/chat), `gpt-5.4-nano` (suggest) all answered a tiny call.
-The full live eval (`pytest -m live`, via `backend/eval_hook.py`) has NOT been run. Prices in `providers/config.py` are stand-ins.
+## Live eval (run 2, 2026-11-02, final pipeline)
+Key works; models `gpt-5.4-mini` (extract/vision), `gpt-5.5` (compose/chat), `gpt-5.4-nano` (suggest).
+Result: clean 1.000, multi-column 0.883, scanned 1.000, report-only 1.000 (all gates pass), injection canaries 0,
+citation verification 0.971, 423k input tokens total. FAILS only the `long` gate: accuracy 0.833 (needs 0.85), 4 hard fails:
+long_120.policy_form, long_300.policy_form ("Commercial General Liability Policy" instead of the form line),
+long_300.territory ("Policy Territory Definitions", a heading), long_300.producer ("Producer of record", a label).
+Cause: windows without the real value return a heading/label as the value; verify accepts it (it is on the page) and merge
+keeps it. Prices in `providers/config.py` are still stand-ins. Report: scratchpad `live_eval_report2.json`.
 
 ## Decisions made this session (do not re-ask)
 Input border `#848D99` (DG10 3:1) kept; collapsed-outline warning mark = triangle glyph on the handle;
@@ -26,22 +31,21 @@ failed extraction shows "Extraction failed" + Retry (M1), budget exhaustion not 
 long docs: 300 pages, windows + merge, conflicting values shown with a notice (never silently picked), page-scoring skip pass OFF.
 
 ## Open items
-1. **Known security gap (2 strict xfails in `backend/tests/test_api_security.py`)**: verify can mark an injected
-   value verified if the model's quote fuzzy-matches the injection sentence itself (e.g. AM Best A++). Fix in
-   `pipeline/verify.py`: tighten fuzzy matching when the matched span does not start with the field label.
-   Claim-level validation is TODO R10. Recommend fixing before any live eval.
-2. `tests/fixtures/quotes/over_cap_pages.pdf` (81 pp) is now under the cap; the live parse group still lists it
-   and will report a mismatch (ungated). `long_301` (generated with `--include-oversize`) is the real over-cap test.
-3. No DB migrations: delete any local `data/brokerdocs.db` created before today (new columns on `fact`, `message`, `run_document`).
-4. Pyright in the editor flags `backend.*` imports; harmless (code runs from `broker-docs-verified/` with pythonpath).
-5. Rotate the OpenAI key if transcript exposure matters (it appeared in an earlier session transcript).
+1. **Long-document hard fails (above).** Proposed: (a) extract prompt: return null unless the window states the actual
+   value, never a heading or label; (b) merge: a non-amendment conflict should not verify an arbitrary earliest value
+   (decision for owner: show "Conflicting values" with both and no pick, vs. keep earliest + notice as built).
+   Then re-run live eval once. Review rounds cap at 3.
+2. The verify injection gap is FIXED (directive_text guard, merged). Residual bypasses: a note to the AI followed by a
+   separate declarative sentence; imperatives outside the verb list. Claim-level checks remain TODO R10.
+3. `over_cap_pages.pdf` is obsolete (kept on disk); `long_301` (--include-oversize) is the over-cap test.
+4. No DB migrations: delete any local `data/brokerdocs.db` created before 2026-11-01.
+5. Editor Pyright flags `backend.*` imports; harmless.
+6. Rotate the OpenAI key if transcript exposure matters.
 
 ## Next, in order
-1. Fix the verify injection gap (small, Opus).
-2. Run the live eval once on the final pipeline (spends real tokens; owner approved live calls).
-3. T10 frontend from `backend/API.md` + `DESIGN.md`: shell, report view, chips, PDF viewer, all states in the spec state
-   table, axe in the Playwright flow; use Playwright MCP on the built app. Design stack must be loaded (see global rules).
-4. Then `/design-review` on the live app, and the slice 2 spec (owner picks first workflow from the evidence ranking).
+1. Long-document fix (item 1), re-run live eval once.
+2. T10 frontend from `backend/API.md` + `DESIGN.md` (design stack must be loaded; Playwright MCP on the built app).
+3. `/design-review` on the live app, then the slice 2 spec (owner picks the first workflow from the evidence ranking).
 
 ## Gotchas
 - Test env: no shared venv in the repo. Create `backend/.venv` (Python 3.12) from `backend/pyproject.toml`;
