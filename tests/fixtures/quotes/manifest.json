@@ -12,7 +12,7 @@
     "territory": "Coverage territory",
     "producer": "Producer or broker of record",
     "policy_form": "Policy form name and number",
-    "total_premium": "Annual premium before taxes and fees",
+    "total_premium": "Total premium payable, including taxes and fees (printed as Total Payable)",
     "taxes_and_fees": "Taxes and fees",
     "each_occurrence_limit": "Each occurrence limit",
     "aggregate_limit": "General aggregate limit",

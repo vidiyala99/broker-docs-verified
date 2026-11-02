@@ -68,6 +68,53 @@ def test_accepted_aliases():
     assert not g.values_match("Surplus Lines", "Non-Admitted")
 
 
+@pytest.mark.parametrize("pred,truth", [
+    ("$10,000 per occurrence", "$10,000"),
+    ("$1,000,000 each occurrence", "$1,000,000"),
+    ("$2,000,000 general aggregate", "$2,000,000"),
+    ("10000 per claim", "$10,000.00"),
+])
+def test_trailing_unit_after_equal_amount_matches(pred, truth):
+    assert g.values_match(pred, truth)
+
+
+@pytest.mark.parametrize("pred,truth", [
+    ("$20,000 per occurrence", "$10,000"),
+    ("$10,000 per occurrence, $20,000 aggregate", "$10,000"),
+    ("per occurrence $10,000", "$10,000"),
+    ("25%", "25"),
+    ("25", "25%"),
+    ("25 percent", "25%"),
+    ("25% per claim", "25"),
+    ("$10,000 per occurrence", "$10,000 per claim"),
+])
+def test_unit_suffix_rule_is_strict(pred, truth):
+    assert not g.values_match(pred, truth)
+
+
+def test_unit_suffix_applies_to_accepted_aliases():
+    assert g.values_match("$7,500 per claim", "$10,000", ["$7,500"])
+
+
+def test_percent_values_still_match_each_other():
+    assert g.values_match("25 %", "25%")
+
+
+def test_predicted_fields_outside_scored_fields_are_ignored():
+    r = DocResult("t1", [
+        F("carrier_name", "Harborline Specialty Insurance Company", 1, "q", "verified"),
+        F("subjectivities", "Signed application", 3, "q", "verified"),
+        F("key_exclusions", "Pollution", 3, "q", "scan_read"),
+        F("key_endorsements", "CG 20 10", 3, "q", "not_found"),
+        F("minimum_earned_premium", "25%", 2, "q", "verified"),
+    ])
+    s = g.score_document(_truth(), r)
+    assert s.hard_fails == 0 and s.absent_violations == 0
+    assert s.displayed == 1 and s.displayed_wrong == 0
+    assert (s.verified, s.rejected, s.scan_read) == (1, 0, 0)
+    assert {o.field for o in s.outcomes} == {"total_premium", "carrier_name", "territory"}
+
+
 def test_date_tokens_are_not_reparsed_as_numbers():
     toks = g.normalize_value("01/01/2027")
     assert toks == ("@d20270101",)
@@ -136,10 +183,10 @@ def test_verified_value_for_absent_field_is_hard_fail_and_violation():
     assert s.outcomes[-1].outcome == "absent_violation"
 
 
-def test_field_not_in_truth_schema_with_verified_value_is_hard_fail():
+def test_field_not_in_truth_schema_is_ignored():
     r = DocResult("t1", [F("brand_new_field", "x", 1, "q", "verified")])
     s = g.score_document(_truth(), r)
-    assert s.hard_fails == 1 and s.absent_violations == 1
+    assert s.hard_fails == 0 and s.absent_violations == 0 and s.displayed == 0
 
 
 def test_scan_read_wrong_value_is_not_hard_fail_but_counts_against_accuracy():

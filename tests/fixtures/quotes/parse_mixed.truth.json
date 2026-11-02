@@ -76,16 +76,7 @@
       "accepted_values": []
     },
     "policy_form": null,
-    "total_premium": {
-      "value": "$12,300",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Annual Premium: $12,300",
-      "source": "image",
-      "accepted_values": []
-    },
+    "total_premium": null,
     "taxes_and_fees": null,
     "each_occurrence_limit": {
       "value": "$1,000,000",
