@@ -1,49 +1,53 @@
 # Handoff: BrokerDocs, slice 1
 
-Date: 2026-11-01. State: spec approved, engineering review DONE (Codex outside voice completed).
-Design review STARTED, NOT finished. No code written yet.
+Date: 2026-11-01 (late). State: backend COMPLETE and merged to `main`; frontend (T10) NOT started.
+Repo: `broker-docs-verified` is now a git repo (`main`). `.env` (OpenAI key) is gitignored.
 
-## Where everything is
-- Spec + decision ledger + tasks + eng review report: `docs/specs/2026-11-01-brokerdocs-core-design.md`
-  (Decision ledger R1 to R11 = D2 to D12; Carried mechanics M1 to M8; Implementation Tasks T1 to T11).
-- **UI ground truth: `docs/reference/brokerdocs-ui-reference.md`** (exact tokens from the live app's sign-in
-  DOM, plus shell, chip, state and per-workflow notes from the demo videos). Screenshot: `docs/reference/app-signin-1440.png`.
-- TODOS: `TODOS.md`. QA test plan: `C:\Users\aakas\.gstack\projects\aakas\aakas-nogit-eng-review-test-plan-20261101-210500.md`.
-- Raw evidence: `../BrokerDocs-REA-Teardown.md`, `../rea-out/` (six demo videos + frames) and
-  `../rea-out/yt-reference/watch-eg5_xfp8/` (official "BrokerDocs Overview" YouTube video, 38 frames).
+## What is built (all merged, 608 backend tests + 153 eval tests pass offline)
+- T1 data model, T3 parse (OCR triggers, caps), T4 verify, T2 providers + budget, T5 extract/compose,
+  T6 runner (SSE, reconcile, idempotent), T13 cancel, T7 security baseline, T8 routes/edit/undo/stale/chat/export,
+  T9 synthetic PDFs + eval gates, T12 DESIGN.md + tokens.css, eval hook.
+- T14 long documents (up to 300 pages / 50 MB): 15-page windows with 2 overlap, deterministic merge
+  (`pipeline/windows.py`, `merge.py`), per-document budget (400k) inside a 1.5M run budget,
+  new `conflicting_values` notice. Long fixtures `long_120`, `long_300` + `long` gate (0 hard fails, accuracy >= 0.85).
+- **API contract for the frontend: `backend/API.md`.** Design contract: `DESIGN.md`, `frontend/src/styles/tokens.css`,
+  spec section "Design review" (DG1 to DG12).
+- Evidence for later slices: `docs/reference/brokerdocs-workflows-evidence.md` (ranking: Proposal Builder, data-only pack,
+  Policy Check, COI, Loss Run, Assistant, Market Search, ACORD).
 
-## Design review status (/plan-design-review)
-- Done: design stack loaded; design completeness rated 4/10; Playwright read of the live sign-in page;
-  frames mined; UI reference written; D1 (review mode) and D2 (fidelity) answered.
-- D2 answer: match the reference product's real tokens (Inter, #6356F0, #35383B, 6px radius, 44px buttons, 48px inputs),
-  own logo, name and copy, no copied images or code. Spec section 5 updated.
-- Image mockups were CANCELLED (owner: clone from the real UI, not invented mockups). Do not generate them.
-- NOT done: the 7 design passes (information architecture, states, journey, AI-slop, design system,
-  responsive and a11y, unresolved decisions), the design review report, review log.
-- The new states we must design ourselves (not in any frame): evidence-state chips (verified, scan-read,
-  couldn't verify, failed), stale-section banner, failed-column state, run progress, multi-option warning,
-  budget-exhausted partial report. Shape and label as well as color.
+## Verified live
+Key works; `gpt-5.4-mini` (extract/vision), `gpt-5.5` (compose/chat), `gpt-5.4-nano` (suggest) all answered a tiny call.
+The full live eval (`pytest -m live`, via `backend/eval_hook.py`) has NOT been run. Prices in `providers/config.py` are stand-ins.
 
-## UPDATE 2026-11-01 (later): design review DONE
-Design review finished: 12 decisions DG1 to DG12, scores 2 to 8, recorded in the spec section "Design review"
-(state table, journey, tasks T12 DESIGN.md and T13 run Cancel). One open item: collapsed-outline warning mark.
-Name stays "BrokerDocs" (config constant). Next: write DESIGN.md (T12), start backend lanes A/B/C, then T10.
-The "NOT done" list above is superseded.
+## Decisions made this session (do not re-ask)
+Input border `#848D99` (DG10 3:1) kept; collapsed-outline warning mark = triangle glyph on the handle;
+lane C: amended endorsement value is truth, cited-wrong-page counts as hard fail, canary `verified` = hard fail;
+failed extraction shows "Extraction failed" + Retry (M1), budget exhaustion not sticky, all-docs-failed = FAILED run;
+long docs: 300 pages, windows + merge, conflicting values shown with a notice (never silently picked), page-scoring skip pass OFF.
 
-## Decisions (do not re-ask)
-D1 to D12 eng review (see spec). Design D2: real tokens, own logo.
+## Open items
+1. **Known security gap (2 strict xfails in `backend/tests/test_api_security.py`)**: verify can mark an injected
+   value verified if the model's quote fuzzy-matches the injection sentence itself (e.g. AM Best A++). Fix in
+   `pipeline/verify.py`: tighten fuzzy matching when the matched span does not start with the field label.
+   Claim-level validation is TODO R10. Recommend fixing before any live eval.
+2. `tests/fixtures/quotes/over_cap_pages.pdf` (81 pp) is now under the cap; the live parse group still lists it
+   and will report a mismatch (ungated). `long_301` (generated with `--include-oversize`) is the real over-cap test.
+3. No DB migrations: delete any local `data/brokerdocs.db` created before today (new columns on `fact`, `message`, `run_document`).
+4. Pyright in the editor flags `backend.*` imports; harmless (code runs from `broker-docs-verified/` with pythonpath).
+5. Rotate the OpenAI key if transcript exposure matters (it appeared in an earlier session transcript).
 
 ## Next, in order
-1. Finish `/plan-design-review` against the UI reference (text-only passes, no image generation).
-2. Backend lanes can start in parallel (spec "Worktree parallelization strategy"): A: T1,T3,T4,T5,T6; B: T2; C: T9.
-3. Frontend (T10) after the design review. Use the Playwright MCP on the built app, not on BrokerDocs (no login).
+1. Fix the verify injection gap (small, Opus).
+2. Run the live eval once on the final pipeline (spends real tokens; owner approved live calls).
+3. T10 frontend from `backend/API.md` + `DESIGN.md`: shell, report view, chips, PDF viewer, all states in the spec state
+   table, axe in the Playwright flow; use Playwright MCP on the built app. Design stack must be loaded (see global rules).
+4. Then `/design-review` on the live app, and the slice 2 spec (owner picks first workflow from the evidence ranking).
 
 ## Gotchas
-- Not a git repo (offer `git init`).
-- No login to app.brokerdocs.ai: only the sign-in page and the videos are available.
-- The key is in `broker-docs-verified/.env` (gitignored once a repo exists); it also appeared in the session
-  transcript, so rotate it if that matters. It was NOT used for mockups.
-- This machine's `yt-dlp` on PATH is a stale Python 3.10 launcher. I installed yt-dlp for Python 3.12
-  (`pip install --user`); to use it put `C:\Users\aakas\AppData\Roaming\Python\Python312\Scripts` first on PATH.
-- Do not rewrite markdown with Python open(...,"w") on Windows (CRLF breaks gstack-plan-reality).
-- Tesseract is not installed (only matters for the local-OCR TODO).
+- Test env: no shared venv in the repo. Create `backend/.venv` (Python 3.12) from `backend/pyproject.toml`;
+  `pymupdf` must stay `<2` (2.0 segfaults here) and PyMuPDF 1.28.0 is needed for fixture byte-identity.
+- Eval venv: `tests/.venv_c`. Run backend tests from `backend/`, eval tests from the repo root.
+- Not for rewriting markdown with Python open(...,"w") on Windows without preserving CRLF.
+- Tesseract not installed (only matters for the local-OCR TODO). `yt-dlp` PATH quirk: see earlier note (Python312 Scripts first).
+- Agent worktrees live under `.claude/worktrees/` (gitignored); they can be deleted.
+- Fresh session recommended: this one has a long context.
