@@ -31,8 +31,8 @@
       "source": "text",
       "accepted_values": []
     },
-    "mailing_address": null,
-    "carrier": {
+    "address": null,
+    "carrier_name": {
       "value": "Fairhaven General Insurance Company",
       "page": 1,
       "pages": [
@@ -44,7 +44,7 @@
     },
     "admitted_status": null,
     "am_best_rating": null,
-    "policy_period": {
+    "policy_term": {
       "value": "01/01/2027 - 01/01/2028",
       "page": 1,
       "pages": [
@@ -57,7 +57,7 @@
     "territory": null,
     "producer": null,
     "policy_form": null,
-    "premium": {
+    "total_premium": {
       "value": "$12,300",
       "page": 2,
       "pages": [
@@ -68,21 +68,11 @@
       "accepted_values": []
     },
     "taxes_and_fees": null,
-    "total_cost": {
-      "value": "$12,450.00",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Total Payable: $12,450.00",
-      "source": "image",
-      "accepted_values": []
-    },
     "each_occurrence_limit": null,
     "aggregate_limit": null,
-    "deductible": null,
+    "retention": null,
     "rate": null,
-    "quote_valid_until": null
+    "quote_expiration": null
   },
   "decoys": [],
   "injection": null,

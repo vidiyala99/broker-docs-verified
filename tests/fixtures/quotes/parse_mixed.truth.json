@@ -30,8 +30,8 @@
       "source": "text",
       "accepted_values": []
     },
-    "mailing_address": null,
-    "carrier": {
+    "address": null,
+    "carrier_name": {
       "value": "Fairhaven General Insurance Company",
       "page": 1,
       "pages": [
@@ -63,7 +63,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "policy_period": null,
+    "policy_term": null,
     "territory": null,
     "producer": {
       "value": "Meridian Risk Partners LLC",
@@ -76,7 +76,7 @@
       "accepted_values": []
     },
     "policy_form": null,
-    "premium": {
+    "total_premium": {
       "value": "$12,300",
       "page": 2,
       "pages": [
@@ -87,7 +87,6 @@
       "accepted_values": []
     },
     "taxes_and_fees": null,
-    "total_cost": null,
     "each_occurrence_limit": {
       "value": "$1,000,000",
       "page": 2,
@@ -108,7 +107,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "deductible": {
+    "retention": {
       "value": "$10,000",
       "page": 2,
       "pages": [
@@ -119,7 +118,7 @@
       "accepted_values": []
     },
     "rate": null,
-    "quote_valid_until": {
+    "quote_expiration": {
       "value": "12/15/2026",
       "page": 3,
       "pages": [

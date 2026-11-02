@@ -28,7 +28,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "mailing_address": {
+    "address": {
       "value": "305 Orchard Lane, Asheville, NC 28801",
       "page": 1,
       "pages": [
@@ -38,7 +38,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "carrier": {
+    "carrier_name": {
       "value": "Stonegate Assurance Company",
       "page": 1,
       "pages": [
@@ -70,7 +70,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "policy_period": {
+    "policy_term": {
       "value": "January 1, 2027 to January 1, 2028",
       "page": 1,
       "pages": [
@@ -110,7 +110,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "premium": {
+    "total_premium": {
       "value": "$14,375",
       "page": 2,
       "pages": [
@@ -127,16 +127,6 @@
         2
       ],
       "quote": "Taxes and Fees: $150.00",
-      "source": "text",
-      "accepted_values": []
-    },
-    "total_cost": {
-      "value": "$14,525.00",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Total Payable: $14,525.00",
       "source": "text",
       "accepted_values": []
     },
@@ -160,7 +150,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "deductible": {
+    "retention": {
       "value": "$10,000",
       "page": 3,
       "pages": [
@@ -180,7 +170,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "quote_valid_until": {
+    "quote_expiration": {
       "value": "December 15, 2026",
       "page": 3,
       "pages": [
@@ -193,7 +183,7 @@
   },
   "decoys": [
     {
-      "field": "deductible",
+      "field": "retention",
       "value": "$5,000",
       "kind": "superseded",
       "pages": [

@@ -136,7 +136,7 @@ def test_absent_fields_per_carrier(truths):
 
 
 def test_policy_period_formats_vary_across_carriers(truths):
-    periods = {truths[f"carrier_{c}_clean"]["facts"]["policy_period"]["value"] for c in "abcd"}
+    periods = {truths[f"carrier_{c}_clean"]["facts"]["policy_term"]["value"] for c in "abcd"}
     assert len(periods) == 4
 
 
@@ -262,7 +262,7 @@ def test_multi_option_fixture(truths, fixture_dir):
 
 def test_conflicting_endorsement_fixture(truths):
     t = truths["conflicting_endorsement"]
-    ded = t["facts"]["deductible"]
+    ded = t["facts"]["retention"]
     (decoy,) = t["decoys"]
     assert ded["value"] == "$10,000" and ded["page"] == 3
     assert decoy["value"] == "$5,000" and decoy["kind"] == "superseded" and decoy["pages"] == [2]

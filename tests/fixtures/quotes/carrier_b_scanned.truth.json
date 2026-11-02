@@ -32,7 +32,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "mailing_address": {
+    "address": {
       "value": "305 Orchard Lane, Asheville, NC 28801",
       "page": 1,
       "pages": [
@@ -42,7 +42,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "carrier": {
+    "carrier_name": {
       "value": "Ridgecrest Mutual Casualty Company",
       "page": 1,
       "pages": [
@@ -74,7 +74,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "policy_period": {
+    "policy_term": {
       "value": "January 1, 2027 to January 1, 2028",
       "page": 1,
       "pages": [
@@ -105,7 +105,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "premium": {
+    "total_premium": {
       "value": "$29,325",
       "page": 2,
       "pages": [
@@ -122,16 +122,6 @@
         2
       ],
       "quote": "Taxes and Fees: $350.00",
-      "source": "image",
-      "accepted_values": []
-    },
-    "total_cost": {
-      "value": "$29,675.00",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Total Payable: $29,675.00",
       "source": "image",
       "accepted_values": []
     },
@@ -155,7 +145,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "deductible": {
+    "retention": {
       "value": "$5,000",
       "page": 2,
       "pages": [
@@ -175,7 +165,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "quote_valid_until": {
+    "quote_expiration": {
       "value": "December 15, 2026",
       "page": 3,
       "pages": [

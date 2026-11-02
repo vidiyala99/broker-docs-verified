@@ -25,7 +25,9 @@ Contract::
     }
 
 One call is one Compare Quotes run (at most 8 documents, D3). Field names
-are the keys of ``quote_generator.FIELDS``.
+are the keys of ``quote_generator.FIELDS``, a subset of the backend's canonical
+FactField keys (carrier_name, address, policy_term, total_premium, retention,
+quote_expiration, ...), so no key mapping is needed between backend and eval.
 """
 
 from __future__ import annotations

@@ -4,22 +4,21 @@
   "pymupdf_version": "1.28.0",
   "fields": {
     "named_insured": "Named insured on the quote",
-    "mailing_address": "Named insured mailing address",
-    "carrier": "Issuing carrier legal name",
+    "address": "Named insured mailing address",
+    "carrier_name": "Issuing carrier legal name",
     "admitted_status": "Admitted or non-admitted (surplus lines)",
     "am_best_rating": "AM Best financial strength rating",
-    "policy_period": "Policy term, effective to expiration",
+    "policy_term": "Policy term, effective to expiration",
     "territory": "Coverage territory",
     "producer": "Producer or broker of record",
     "policy_form": "Policy form name and number",
-    "premium": "Annual premium before taxes and fees",
+    "total_premium": "Annual premium before taxes and fees",
     "taxes_and_fees": "Taxes and fees",
-    "total_cost": "Total payable (premium plus taxes and fees)",
     "each_occurrence_limit": "Each occurrence limit",
     "aggregate_limit": "General aggregate limit",
-    "deductible": "Deductible or retention",
+    "retention": "Deductible or retention",
     "rate": "Rate basis",
-    "quote_valid_until": "Date the quote expires"
+    "quote_expiration": "Date the quote expires"
   },
   "fixtures": [
     {
@@ -120,7 +119,7 @@
       "gate_bucket": "clean",
       "sha256": "623fa104ebd43fc74fe9b3a31e3e28a2edbb47a3b58113fdc0697c324e6befd6",
       "deterministic_bytes": true,
-      "description": "Clean digital 3-page quote from Copperfield Surplus Lines Insurance Company. Absent fields (must return null): deductible, rate."
+      "description": "Clean digital 3-page quote from Copperfield Surplus Lines Insurance Company. Absent fields (must return null): retention, rate."
     },
     {
       "fixture_id": "carrier_d_multicol",
@@ -130,7 +129,7 @@
       "gate_bucket": "multi_column",
       "sha256": "0adc8466bc419cda076b30d0d9f7903ddc34da2ded7522ffba58e89148a913a7",
       "deterministic_bytes": true,
-      "description": "Two-column layout of the same Copperfield Surplus Lines Insurance Company quote; premium table values precede labels in extraction order. Absent fields (must return null): deductible, rate."
+      "description": "Two-column layout of the same Copperfield Surplus Lines Insurance Company quote; premium table values precede labels in extraction order. Absent fields (must return null): retention, rate."
     },
     {
       "fixture_id": "carrier_d_scanned",
@@ -140,7 +139,7 @@
       "gate_bucket": "scanned",
       "sha256": "51d7e693b3a1fd86e46027f891b78bf2c84d061c911b0ae4847059dbccf23beb",
       "deterministic_bytes": true,
-      "description": "Image-only (scan-like, noisy JPEG) pages of the Copperfield Surplus Lines Insurance Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): deductible, rate."
+      "description": "Image-only (scan-like, noisy JPEG) pages of the Copperfield Surplus Lines Insurance Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): retention, rate."
     },
     {
       "fixture_id": "multi_option",
