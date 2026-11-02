@@ -36,12 +36,19 @@ def _backend_keys() -> set[str]:
 
 def _keys_from_source() -> set[str] | None:
     """Fallback when backend deps are not installed: read the FactField(key=...)
-    literals out of backend/db.py without importing it."""
+    literals of the Compare Quotes ``_FIELDS`` list out of backend/db.py without
+    importing it (the proposal-builder fields live in other lists)."""
     src = REPO_ROOT / "backend" / "db.py"
     if not src.is_file():
         return None
+    tree = ast.parse(src.read_text(encoding="utf-8"))
+    fields = next((n.value for n in tree.body if isinstance(n, (ast.Assign, ast.AnnAssign))
+                   and any(getattr(t, "id", None) == "_FIELDS"
+                           for t in (n.targets if isinstance(n, ast.Assign) else [n.target]))), None)
+    if fields is None:
+        return None
     keys = set()
-    for node in ast.walk(ast.parse(src.read_text(encoding="utf-8"))):
+    for node in ast.walk(fields):
         if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "FactField":
             for kw in node.keywords:
                 if kw.arg == "key" and isinstance(kw.value, ast.Constant):

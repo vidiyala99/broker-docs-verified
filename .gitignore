@@ -3,6 +3,7 @@ data/
 .gstack/
 __pycache__/
 .venv/
+.venv_c/
 node_modules/
 .claude/
 
