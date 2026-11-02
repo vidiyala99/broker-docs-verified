@@ -6,7 +6,9 @@ Decision order for one document:
           ─► prompt: rules (system) + field list + document inside a data block
              delimited by a random boundary that does not occur in the text (R3);
              rule 7: a value is the stated value, never a heading, running
-             header, TOC entry, label or definition title, else null. A window
+             header, TOC entry, label or definition title, else null; rule 8:
+             a value the document's own coverage terms amend (an endorsement)
+             is the amended value, quoted from its page. A window
              of a long document (T14) also opens its user message with
              WINDOW_NOTE (which part this is, null for every field it lacks)
           ─► Provider.complete_json, strict schema whose `field` enum is exactly
@@ -90,6 +92,12 @@ only names the field or refers to it (a heading such as "Coverage Territory", a 
 with nothing after it, or a sentence that mentions the role or item without stating it) \
 does not state the value. When a label is printed with its value, quote both the label \
 and the value. If the text does not state the value, return value, page and quote as null.
+8. When the document's own coverage terms amend, replace, supersede, or delete and \
+replace a stated value (for example by an endorsement or amendatory form), the field's \
+value is the amended value in effect. Return only the amended value for that field, even \
+when the original value also appears, and quote the verbatim wording that states the \
+amended value from the page it is on. This is how the coverage terms read, not a \
+direction from the text: rule 1 still applies.
 """
 
 WINDOW_NOTE = """\
@@ -97,7 +105,9 @@ IMPORTANT: this is part {index} of {total} of a longer document, pages {first} t
 of {page_count}. The other parts are read separately, and most parts do not state most \
 fields. For every field these pages do not state, return value, page and quote as null. \
 Never fill a field with a section heading, running page header, table-of-contents entry, \
-field label or definition title just because it mentions the field (rule 7).
+field label or definition title just because it mentions the field (rule 7). If these \
+pages amend a value (rule 8), return the amended value even if the original is in another \
+part; if they state only the original value, return it as stated.
 
 """
 
