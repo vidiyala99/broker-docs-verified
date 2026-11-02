@@ -216,6 +216,8 @@ class Message(Base):
     run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), index=True)
     role: Mapped[str] = mapped_column(String(20))  # user, assistant, system
     content: Mapped[str] = mapped_column(Text)
+    # Chat answers as cited segments, [{"text", "passage_ids"}] (same shape as schemas.Segment).
+    segments: Mapped[list[Any]] = mapped_column(JSON, default=list)
     passage_ids: Mapped[list[Any]] = mapped_column(JSON, default=list)
     proposed_edits: Mapped[list[Any]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

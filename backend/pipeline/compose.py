@@ -126,6 +126,20 @@ class ComposeFact:
 
 
 @dataclass(frozen=True)
+class ComposeEdit:
+    """A table cell the user edited (D9). Used when prose is regenerated after edits.
+
+    The edited value overrides the extracted one in the prose; it has no source
+    passage, so it can never be cited, but its numbers may be stated.
+    """
+
+    column_key: str
+    field: str
+    value: str | None
+    original_value: str | None = None
+
+
+@dataclass(frozen=True)
 class ComposeInput:
     title: str
     fields: Sequence[FactField]
@@ -134,6 +148,7 @@ class ComposeInput:
     facts: Sequence[ComposeFact]
     instructions: str = ""
     notices: Sequence[Notice] = ()
+    edits: Sequence[ComposeEdit] = ()
 
     def cited_facts(self) -> list[ComposeFact]:
         return [f for f in self.facts if f.cited]
@@ -144,6 +159,10 @@ class ComposeInput:
     def allowed_values(self) -> list[str | None]:
         """Values whose numbers the prose may state: cited values and their conflicting values."""
         return [v for f in self.cited_facts() for v in (f.value, *(c[0] for c in f.conflicts))]
+
+    def allowed_values(self) -> list[str | None]:
+        """Values whose numbers prose may state: cited fact values, plus user edits (D9)."""
+        return [f.value for f in self.cited_facts()] + [e.value for e in self.edits]
 
 
 @dataclass(frozen=True)
@@ -387,8 +406,20 @@ def _facts_payload(inp: ComposeInput) -> dict[str, Any]:
             missing.append({"document": f.column_key, "field": f.field,
                             "label": labels.get(f.field, f.field), "status": status})
     failed = [{"document": c.key, "status": "extraction failed"} for c in inp.columns if c.failed]
-    return {"documents": columns, "facts": cited, "fields_without_value": missing,
-            "failed_documents": failed}
+    out: dict[str, Any] = {"documents": columns, "facts": cited, "fields_without_value": missing,
+                           "failed_documents": failed}
+    if inp.edits:
+        out["user_edits"] = [{"document": e.column_key, "field": e.field, "label": labels.get(e.field, e.field),
+                              "value": e.value, "original_value": e.original_value} for e in inp.edits]
+    return out
+
+
+EDITS_NOTE = (
+    "The user corrected some table values by hand (user_edits). A user edit overrides the "
+    "extracted value for that document and field: use the edited value, say it was edited by "
+    "the user, and do not cite a passage for it. You may mention the original extracted value "
+    "for reference, citing its passage_id.\n\n"
+)
 
 
 def build_compose_messages(inp: ComposeInput, *, boundary: str | None = None) -> list[Message]:
@@ -400,6 +431,8 @@ def build_compose_messages(inp: ComposeInput, *, boundary: str | None = None) ->
     plan = "\n".join(f"- {s.id}: {s.number} {s.title}" + (f" ({s.guidance})" if s.guidance else "")
                      for s in inp.sections)
     task = f"Workflow instructions: {inp.instructions.strip()}\n\n" if inp.instructions.strip() else ""
+    if inp.edits:
+        task += EDITS_NOTE
     user = (f"{task}Report title: {inp.title}\n\nSection plan (use these section_id values):\n{plan}\n\n"
             f"<<<FACTS {boundary}\n{payload}\nFACTS {boundary}>>>\n\n"
             "Write the prose now as JSON, following the rules in the system message.")
