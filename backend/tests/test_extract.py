@@ -48,6 +48,20 @@ def test_schema_enumerates_exactly_the_field_keys():
     assert set(schema.json_schema["required"]) == {"facts", "options_detected", "option_compared"}
 
 
+def test_policy_form_description_asks_for_the_printed_form_number_and_reaches_the_prompt():
+    """Live eval run 3: long documents returned the running header ("Commercial General
+    Liability Policy") as the policy form. The seeded description asks for the form number,
+    edition and title as printed, and null when no form number is printed."""
+    fields = [FactField.model_validate(f) for f in COMPARE_QUOTES["fact_schema"]]
+    desc = next(f.description for f in fields if f.key == "policy_form")
+    low = desc.lower()
+    assert "form number" in low and "edition" in low and "title" in low
+    assert "CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)" in desc
+    assert "running page header" in low and "null" in low
+    user = extract.build_extraction_messages(fields, PAGES, document_name="a.pdf", boundary="ZZ12")[1].content
+    assert f"- policy_form (Policy Form): {desc}" in user
+
+
 def test_prompt_puts_document_in_a_delimited_data_block_with_page_tags():
     msgs = extract.build_extraction_messages(FIELDS, PAGES, document_name="a.pdf", boundary="ZZ12")
     system, user = msgs[0].content, msgs[1].content

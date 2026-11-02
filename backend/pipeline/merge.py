@@ -52,12 +52,28 @@ as "No" is dropped, and so is a real value that ends with "Definitions".
 The filter runs on windowed (long) documents only; a single-call quote
 never reaches merge.
 
+Running header rule (RUNNING_HEADER_FIELDS, only policy_form for now). A
+candidate whose value is a whole line on 3 or more pages (page numbering such
+as "Page 40 of 120" and spacing ignored) is a running page header and is
+dropped (reason running_header), but only when the field has another cited
+candidate left; a header that is the only value is kept. Live eval run 3:
+long_120 windows returned the header "Commercial General Liability Policy"
+as the policy form. False-positive risk: a real value printed as its own line
+on every page is dropped when some other value also came back. That is why
+identity fields (carrier, insured, producer, address), which legitimately
+sit in page headers, are not in the set. A substring rule (drop a value
+contained in a longer candidate) was considered and not used: the live
+header is not a substring of the real form line.
+
 Endorsement rule (kept simple on purpose):
 1. A candidate "amends" when its quote or matched source text contains
    endorsement wording (AMEND_RE: endorsement, amend / amended / amendment /
    amendatory, deleted and replaced, replaced with / by, supersedes). If no
-   candidate amends by its own quote, the page text is used instead (the
-   page carries an endorsement heading).
+   candidate amends by its own quote, the lines of its page that state it
+   plus the one line directly above (an endorsement heading over the changed
+   line) are used instead, never the whole page: a later page that merely
+   mentions an endorsement somewhere does not make an unrelated candidate
+   (a running header, live eval run 3) an amendment.
 2. The amending candidates must all state one value, and that value must
    first appear on a later page than every other value (an endorsement comes
    after the declarations it changes).
@@ -150,6 +166,53 @@ def _amends_by_quote(r: verify.VerifyResult) -> bool:
     return any(AMEND_RE.search(t) for t in (r.quote, r.matched_text) if t)
 
 
+def _match_context(r: verify.VerifyResult, page_text: Mapping[int, str]) -> str | None:
+    """The page lines that state the candidate (its matched text, quote or value) plus the
+    line directly above them (an endorsement heading over the changed line), or None when
+    the candidate cannot be located on its page."""
+    text = page_text.get(r.page_no, "") if r.page_no is not None else ""
+    if not text:
+        return None
+    for needle in (r.matched_text, r.quote, r.value):
+        words = (needle or "").split()
+        if not words:
+            continue
+        mo = re.search(r"\s+".join(re.escape(w) for w in words), text, re.I)
+        if mo:
+            start = text.rfind("\n", 0, mo.start())  # start of the first matched line, minus 1
+            start = text.rfind("\n", 0, start) + 1 if start > 0 else 0  # one line above
+            end = text.find("\n", mo.end())
+            return text[start:end if end != -1 else len(text)]
+    return None
+
+
+def _amends_near_match(r: verify.VerifyResult, page_text: Mapping[int, str]) -> bool:
+    ctx = _match_context(r, page_text)
+    return bool(ctx and AMEND_RE.search(ctx))
+
+
+# Fields whose value is not expected to repeat on many pages; a value that is a whole
+# running page header line there is a decoy (live eval run 3, long_120.policy_form).
+# Identity fields (carrier, insured, producer, address) legitimately sit in headers.
+RUNNING_HEADER_FIELDS = frozenset({"policy_form"})
+RUNNING_HEADER_MIN_PAGES = 3
+_PAGE_NUMBER_RE = re.compile(r"\bpage\s+\d+(?:\s+of\s+\d+)?\b", re.I)
+
+
+def _header_line_key(line: str) -> str:
+    return " ".join(_PAGE_NUMBER_RE.sub(" ", line).lower().split())
+
+
+def running_header_pages(value: str | None, page_text: Mapping[int, str]) -> list[int]:
+    """Pages with a line that is exactly ``value`` once page numbering ("Page 4 of 120")
+    and spacing are ignored. Three or more such pages mark a running header."""
+    key = _header_line_key(value or "")
+    if not key:
+        return []
+    return sorted(p for p, text in page_text.items()
+                  if any(_header_line_key(ln) == key for ln in (text or "").splitlines()))
+
+
 def _from(r: verify.VerifyResult, **kw) -> MergedFact:
     base = {f: getattr(r, f) for f in verify.VerifyResult.__dataclass_fields__}
     base.update(kw)
@@ -160,9 +223,8 @@ def _resolve_endorsement(groups: list[list[verify.VerifyResult]],
                          page_text: Mapping[int, str]) -> int | None:
     """Index of the group an endorsement makes effective, or None when ambiguous."""
     amending = [i for i, g in enumerate(groups) if any(_amends_by_quote(r) for r in g)]
-    if not amending:
-        amending = [i for i, g in enumerate(groups)
-                    if any(r.page_no is not None and AMEND_RE.search(page_text.get(r.page_no, "")) for r in g)]
+    if not amending:  # an endorsement heading on, or just above, the line that states the value
+        amending = [i for i, g in enumerate(groups) if any(_amends_near_match(r, page_text) for r in g)]
     if len(amending) != 1:
         return None
     win = amending[0]
@@ -180,11 +242,24 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
     valued = [c for c in candidates if c.value is not None and str(c.value).strip()]
     n = len(valued)
     plausible, dropped = [], []
+    reasons: dict[int, str] = {}
     for c in valued:
-        (dropped if implausible_reason(fdef, c.value) else plausible).append(c)
+        why = implausible_reason(fdef, c.value)
+        if why:
+            reasons[id(c)] = why
+        (dropped if why else plausible).append(c)
+    if key in RUNNING_HEADER_FIELDS and page_text:
+        headers = [c for c in plausible
+                   if len(running_header_pages(c.value, page_text)) >= RUNNING_HEADER_MIN_PAGES]
+        header_ids = {id(c) for c in headers}
+        rest = [c for c in plausible if id(c) not in header_ids]
+        if headers and any(c.state in (EvidenceState.VERIFIED, EvidenceState.SCAN_READ) for c in rest):
+            for c in headers:
+                reasons[id(c)] = "running_header"
+            plausible, dropped = rest, dropped + headers
     if dropped:
         log.info("merge: %s dropped implausible values %s", key,
-                 [(r.value, r.page_no or r.cited_page, implausible_reason(fdef, r.value)) for r in dropped])
+                 [(r.value, r.page_no or r.cited_page, reasons[id(r)]) for r in dropped])
     dropped_t = tuple(dropped)
     tier = [c for c in plausible if c.state == EvidenceState.VERIFIED] or \
         [c for c in plausible if c.state == EvidenceState.SCAN_READ]
@@ -265,5 +340,5 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
     return f"This document states different values for {label}: {listed}. {tail}"
 
 
-__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "MergedFact", "conflict_message", "implausible_reason",
-           "merge_document", "merge_field", "value_key"]
+__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "RUNNING_HEADER_FIELDS", "MergedFact", "conflict_message",
+           "implausible_reason", "merge_document", "merge_field", "running_header_pages", "value_key"]

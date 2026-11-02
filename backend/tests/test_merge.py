@@ -97,6 +97,105 @@ def test_endorsement_found_through_the_page_text_when_the_quote_has_no_wording()
     assert (m.value, m.resolution) == ("$10,000", "endorsement")
 
 
+def test_endorsement_wording_far_from_the_matched_line_does_not_amend():
+    # the page mentions an endorsement, but not on or just above the line that states the value
+    body = "\n".join(f"Policy wording line {k}." for k in range(12))
+    cands = [vr("$5,000", 2), vr("$10,000", 9, quote="Deductible: $10,000")]
+    pages = {2: "Declarations\nDeductible: $5,000", 9: f"Deductible: $10,000\n{body}\nSee Endorsement No. 4"}
+    m = merge.merge_field("retention", cands, pages)
+    assert m.state == C and m.resolution == "ambiguous"
+
+
+LONG_120 = FIXTURE.parent / "long_120.pdf"
+LONG_FORM = "CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)"
+LONG_HEADER = "Commercial General Liability Policy"
+
+
+@pytest.fixture(scope="module")
+def long_120_pages():
+    return parse.parse_pdf(LONG_120.read_bytes()).pages
+
+
+def _long_120_form_candidates(pages):
+    """Live diagnostic, run 3: window 1-15 found the real form on page 2; windows 40-54 and
+    92-106 returned the running header from their first page (page 92 carries an
+    'Endorsement No. 5' heading right under the header line)."""
+    cands = [CandidateFact("policy_form", LONG_FORM, 2, f"Policy Form: {LONG_FORM}"),
+             CandidateFact("policy_form", LONG_HEADER, 40, LONG_HEADER),
+             CandidateFact("policy_form", LONG_HEADER, 92, LONG_HEADER)]
+    checked = verify.verify_facts(cands, pages)
+    assert [c.state for c in checked] == [V, V, V]
+    return checked
+
+
+def test_long_120_running_header_never_wins_as_an_endorsement(long_120_pages):
+    checked = _long_120_form_candidates(long_120_pages)
+    text = {p.page_no: p.text for p in long_120_pages}
+    m = merge.merge_field(_field("policy_form"), checked, text)
+    assert m.resolution != "endorsement"
+    assert not (m.value == LONG_HEADER and m.state == V)
+    assert (m.value, m.page_no, m.state) == (LONG_FORM, 2, V)
+    assert {d.value for d in m.dropped} == {LONG_HEADER}
+
+
+def test_long_120_header_without_the_header_detector_is_a_conflict(long_120_pages):
+    # only the two header pages are known, so the header is not seen on 3 pages: the
+    # amendment fix alone must leave a conflict, not an endorsement pick
+    checked = _long_120_form_candidates(long_120_pages)
+    text = {p.page_no: p.text for p in long_120_pages if p.page_no in (40, 92)}
+    assert merge.running_header_pages(LONG_HEADER, text) == [40, 92]
+    assert any(merge.AMEND_RE.search(t) for t in text.values())  # page 92: "Endorsement No. 5"
+    m = merge.merge_field(_field("policy_form"), checked, text)
+    assert (m.state, m.resolution) == (C, "ambiguous")
+    assert [(c.value, c.page_no) for c in m.conflicts] == [(LONG_FORM, 2), (LONG_HEADER, 40)]
+
+
+def test_long_120_amended_deductible_still_wins(long_120_pages):
+    cands = [CandidateFact("retention", "$5,000", 3, "Deductible (per Declarations): $5,000 per occurrence"),
+             CandidateFact("retention", "$10,000", 104, "Amended Deductible: $10,000 per occurrence")]
+    checked = verify.verify_facts(cands, long_120_pages)
+    assert [c.state for c in checked] == [V, V]
+    text = {p.page_no: p.text for p in long_120_pages}
+    m = merge.merge_field(_field("retention"), checked, text)
+    assert (m.value, m.page_no, m.state, m.resolution) == ("$10,000", 104, V, "endorsement")
+    assert [s.value for s in m.superseded] == ["$5,000"]
+
+
+def _header_pages(n=6, header=LONG_HEADER):
+    return {i: f"Policy No. LG-1\n{header}    Page {i} of {n}\nPolicy wording page {i}." for i in range(1, n + 1)}
+
+
+def test_running_header_value_is_dropped_when_a_real_value_exists():
+    pages = _header_pages()
+    pages[2] += f"\nPolicy Form: {LONG_FORM}"
+    real = vr(LONG_FORM, 2, field="policy_form", quote=f"Policy Form: {LONG_FORM}")
+    header = vr(LONG_HEADER, 4, field="policy_form", quote=LONG_HEADER)
+    m = merge.merge_field(_field("policy_form"), [header, real], pages)
+    assert (m.value, m.page_no, m.state, m.resolution) == (LONG_FORM, 2, V, "single")
+    assert [d.value for d in m.dropped] == [LONG_HEADER]
+    assert merge.running_header_pages(LONG_HEADER, pages) == [1, 2, 3, 4, 5, 6]
+
+
+def test_running_header_is_kept_when_it_is_the_only_value_or_on_fewer_than_3_pages():
+    only = merge.merge_field(_field("policy_form"), [vr(LONG_HEADER, 4, field="policy_form", quote=LONG_HEADER)],
+                             _header_pages())
+    assert (only.value, only.state) == (LONG_HEADER, V)
+    two = _header_pages(2)
+    two[2] += f"\nPolicy Form: {LONG_FORM}"
+    m = merge.merge_field(_field("policy_form"), [vr(LONG_FORM, 2, field="policy_form"),
+                                                  vr(LONG_HEADER, 1, field="policy_form", quote=LONG_HEADER)], two)
+    assert m.state == C
+
+
+def test_running_header_rule_skips_fields_that_legitimately_repeat():
+    # a carrier name in every page header is the real value, not a decoy
+    pages = _header_pages(header="Harborline Specialty Insurance Company")
+    cands = [vr("Harborline Specialty Insurance Company", 1, field="carrier_name"),
+             vr("Harborline Specialty", 5, field="carrier_name")]
+    m = merge.merge_field(_field("carrier_name"), cands, pages)
+    assert m.dropped == () and m.state == C
+
+
 @pytest.mark.parametrize("cands, pages", [
     # no endorsement wording anywhere
     ([vr("$5,000", 20), vr("$7,500", 90)], {}),
