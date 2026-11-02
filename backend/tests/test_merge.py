@@ -228,6 +228,35 @@ def test_long_300_page_footer_is_not_a_policy_term(long_300_pages):
     assert [d.value for d in m.dropped] == ["Page 27 of 300"]
 
 
+def test_long_300_definition_body_is_not_a_policy_term(long_300_pages):
+    """Fix-lane live run 1 (2026-11-02): policy_term conflicted between page 1 and the body of the
+    '"Policy period" means ...' definition on page 171."""
+    term = "January 1, 2027 to January 1, 2028"
+    body = "period of time stated in the Declarations unless it is ended earlier by cancellation."
+    cands = [CandidateFact("policy_term", term, 1, f"Policy Period: {term}"),
+             CandidateFact("policy_term", body, 171, f'"Policy period" means the {body}')]
+    checked = verify.verify_facts(cands, long_300_pages)
+    assert [c.state for c in checked] == [V, V]
+    text = {p.page_no: p.text for p in long_300_pages}
+    assert merge.definition_body(checked[1], text) and not merge.definition_body(checked[0], text)
+    m = merge.merge_field(_field("policy_term"), checked, text)
+    assert (m.value, m.page_no, m.state) == (term, 1, V)
+    assert [d.value for d in m.dropped] == [body]
+
+
+def test_definition_body_is_kept_when_it_is_the_only_value():
+    pages = {3: 'Definitions\n"Coverage territory" means the United States of America.'}
+    only = vr("the United States of America", 3, field="territory",
+              quote='"Coverage territory" means the United States of America.')
+    m = merge.merge_field(_field("territory"), [only], pages)
+    assert (m.value, m.state, m.dropped) == ("the United States of America", V, ())
+    # a value stated by label beside it wins, the definition body is dropped
+    pages[1] = "Coverage territory: Worldwide"
+    m2 = merge.merge_field(_field("territory"), [only, vr("Worldwide", 1, field="territory",
+                                                          quote="Coverage territory: Worldwide")], pages)
+    assert (m2.value, m2.state, [d.value for d in m2.dropped]) == ("Worldwide", V, ["the United States of America"])
+
+
 def _header_pages(n=6, header=LONG_HEADER):
     return {i: f"Policy No. LG-1\n{header}    Page {i} of {n}\nPolicy wording page {i}." for i in range(1, n + 1)}
 

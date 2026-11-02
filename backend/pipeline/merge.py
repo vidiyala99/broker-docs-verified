@@ -78,6 +78,15 @@ insurance provided under the Commercial General Liability Coverage Part.",
 a formula line on every endorsement page. Such a boilerplate line also never
 counts as an amendment (endorsement rule, any field).
 
+Definition rule (definition_body, any field). A candidate whose value directly
+follows a quoted defined term and "means" / "includes" / "is defined as"
+('"Policy period" means the period of time stated in the Declarations ...')
+is the body of a definition, not a stated value; it is dropped (reason
+definition_body) only when another cited, non-definition candidate is left,
+so a value the document gives only as a definition is still shown. Live eval
+2026-11-02 (fix lane run 1): long_300.policy_term conflicted between the real
+period on page 1 and that definition on page 171.
+
 Containment rule (contained_in, after the endorsement rule). Live eval, 3
 runs, long_120 and long_300 policy_form: page 2 states "CG 00 01 04 13
 Commercial General Liability Coverage Form (Occurrence)", later boilerplate
@@ -296,6 +305,23 @@ def repeated_line_pages(r: verify.VerifyResult, page_text: Mapping[int, str]) ->
                   if keys <= {_header_line_key(ln) for ln in (text or "").splitlines()})
 
 
+_DEFINED_TERM_RE = re.compile(r"[\"“”']\s*[^\"“”\n]{1,60}?\s*[\"“”']\s+(?:means|includes|is\s+defined\s+as)(?:\s+(?:the|a|an|any|all))?\s*$", re.I)
+
+
+def definition_body(r: verify.VerifyResult, page_text: Mapping[int, str]) -> bool:
+    """True when the candidate's value is the body of a definition ('"Policy period" means
+    <value>'): the document defines a term there, it does not state the field's value."""
+    text = page_text.get(r.page_no, "") if r.page_no is not None else ""
+    words = (r.value or "").split()
+    if not text or not words:
+        return False
+    for mo in re.finditer(r"\s+".join(re.escape(w) for w in words), text, re.I):
+        before = " ".join(text[max(0, mo.start() - 120):mo.start()].split())
+        if _DEFINED_TERM_RE.search(before + " "):
+            return True
+    return False
+
+
 def _boilerplate(r: verify.VerifyResult, page_text: Mapping[int, str]) -> bool:
     return (len(running_header_pages(r.value, page_text)) >= RUNNING_HEADER_MIN_PAGES
             or len(repeated_line_pages(r, page_text)) >= RUNNING_HEADER_MIN_PAGES)
@@ -399,6 +425,14 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
             for c in headers:
                 reasons[id(c)] = "running_header"
             plausible, dropped = rest, dropped + headers
+    if page_text:  # any field: a definition body loses to a value the document states
+        defs = [c for c in plausible if definition_body(c, page_text)]
+        def_ids = {id(c) for c in defs}
+        rest = [c for c in plausible if id(c) not in def_ids]
+        if defs and any(c.state in (EvidenceState.VERIFIED, EvidenceState.SCAN_READ) for c in rest):
+            for c in defs:
+                reasons[id(c)] = "definition_body"
+            plausible, dropped = rest, dropped + defs
     if dropped:
         log.info("merge: %s dropped implausible values %s", key,
                  [(r.value, r.page_no or r.cited_page, reasons[id(r)]) for r in dropped])
@@ -490,5 +524,5 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
 
 
 __all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "MergedFact",
-           "conflict_message", "contained_in", "implausible_reason", "merge_document", "merge_field",
+           "conflict_message", "contained_in", "definition_body", "implausible_reason", "merge_document", "merge_field",
            "repeated_line_pages", "running_header_pages", "value_key"]
