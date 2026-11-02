@@ -1,4 +1,5 @@
-"""Database setup: SQLite via SQLAlchemy, plus the seeded Compare Quotes workflow.
+"""Database setup: SQLite via SQLAlchemy, plus the seeded workflows (Compare Quotes,
+Proposal Builder) and proposal templates (Standard, Premier).
 
 The database lives in `broker-docs-verified/data/` (gitignored) unless
 BROKERDOCS_DATA_DIR points elsewhere. Tests use in-memory SQLite.
@@ -87,6 +88,8 @@ def seed(session: Session) -> None:
         session.flush()
     for spec in (COMPARE_QUOTES, PROPOSAL_BUILDER):
         _upsert(session, models.Workflow, spec, workspace_id=DEFAULT_WORKSPACE_ID)
+    for spec in PROPOSAL_TEMPLATES:
+        _upsert(session, models.ProposalTemplate, spec, workspace_id=DEFAULT_WORKSPACE_ID)
 
 
 def _upsert(session: Session, model: type, spec: dict, **extra) -> None:

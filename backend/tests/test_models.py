@@ -145,6 +145,23 @@ def test_seed_upserts_changed_workflow_definitions_keeping_ids():
     engine.dispose()
 
 
+def test_seed_upserts_proposal_templates():
+    engine = db.make_engine("sqlite://")
+    db.init_db(engine)
+    factory = db.make_session_factory(engine)
+    with db.session_scope(factory) as s:
+        rows = s.scalars(select(models.ProposalTemplate).order_by(models.ProposalTemplate.id)).all()
+        assert [t.slug for t in rows] == ["standard", "premier"]
+        rows[0].blocks, rows[0].theme = [], {}
+        ids = [t.id for t in rows]
+    db.init_db(engine)
+    with factory() as s:
+        rows = s.scalars(select(models.ProposalTemplate).order_by(models.ProposalTemplate.id)).all()
+        assert [t.id for t in rows] == ids and len(rows) == 2
+        assert rows[0].blocks == db.PROPOSAL_TEMPLATES[0]["blocks"] and rows[0].theme["font_family"]
+    engine.dispose()
+
+
 def test_sqlite_enforces_foreign_keys(session):
     session.add(models.Page(document_id=9999, page_no=1, text="x", words=[]))
     with pytest.raises(IntegrityError):

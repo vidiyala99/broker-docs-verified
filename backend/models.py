@@ -1,7 +1,8 @@
 """SQLAlchemy ORM models (spec section 3 data model, M1 and M7).
 
-Tables: workspace, workflow, document, page, run, run_document, model_call,
-message, fact, passage, artifact, artifact_version, feedback.
+Tables: workspace, workflow, proposal_template, document, page, run,
+run_document, model_call, message, fact, passage, artifact, artifact_version,
+feedback.
 
 Key rules:
 - `fact` is persisted (M7); each fact carries an EvidenceState (M1).
@@ -76,6 +77,23 @@ class Workflow(Base):
     instructions: Mapped[str] = mapped_column(Text, default="")
     section_plan: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [SectionPlanItem]
     fact_schema: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [FactField]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProposalTemplate(Base):
+    """A proposal template (slice 2), seeded as data. A run copies the resolved template
+    into run.parameters at creation (D6), so later template changes never alter a run."""
+
+    __tablename__ = "proposal_template"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"), index=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    blocks: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [OutlineBlock]
+    theme: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # applied at export only
+    variables: Mapped[list[Any]] = mapped_column(JSON, default=list)  # allowed variable names
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
