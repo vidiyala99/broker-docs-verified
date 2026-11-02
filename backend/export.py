@@ -8,7 +8,11 @@ Document-derived strings are always written as text, never as formulas
 (a value starting with "=" would otherwise run as a formula in Excel).
 
 PDF holds the full report: notices, sections (with the "may be out of date"
-tag), prose with chip labels, tables, and a Sources appendix.
+tag), prose with chip labels, tables, and a Sources appendix. A proposal with
+cover and TOC blocks (front_matter) gets a cover page and a contents page with
+page numbers; reports without them render exactly as in slice 1.
+
+DOCX lives in backend/export_docx.py and reuses cell_note and _source_note.
 
 Both functions take plain data (`ExportData`), so they run in a worker thread.
 """
@@ -297,21 +301,38 @@ def to_pdf(data: ExportData) -> bytes:
     head3 = ParagraphStyle("h3", parent=head2, fontSize=10.5)
     notice = ParagraphStyle("notice", parent=body, backColor=colors.HexColor("#F3F4F6"), borderPadding=4)
 
+    class _Doc(SimpleDocTemplate):
+        def afterFlowable(self, flowable):  # feeds the contents page (proposals only)
+            entry = getattr(flowable, "_toc_entry", None)
+            if entry is not None:
+                self.notify("TOCEntry", (entry[0], entry[1], self.page))
+
+    def toc_mark(flowable, level: int, text: str):
+        if fm.toc is not None:
+            flowable._toc_entry = (level, escape(text))
+        return flowable
+
+    fm = front_matter(data.content)
     pagesize = landscape(letter)
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=pagesize, leftMargin=0.6 * inch, rightMargin=0.6 * inch,
-                            topMargin=0.6 * inch, bottomMargin=0.6 * inch, title=data.title,
-                            author="BrokerDocs (local)")
+    doc = _Doc(buf, pagesize=pagesize, leftMargin=0.6 * inch, rightMargin=0.6 * inch,
+               topMargin=0.6 * inch, bottomMargin=0.6 * inch, title=data.title,
+               author="BrokerDocs (local)")
     width = pagesize[0] - 1.2 * inch
-    story: list[Any] = [Paragraph(escape(data.title), head1),
-                        Paragraph(f"Run {data.run_id}, version {data.version}", small), Spacer(1, 6)]
+    if fm.cover is None and fm.toc is None:  # slice 1 reports: unchanged
+        story: list[Any] = [Paragraph(escape(data.title), head1),
+                            Paragraph(f"Run {data.run_id}, version {data.version}", small), Spacer(1, 6)]
+    else:
+        story = _pdf_front_pages(data, fm, styles, body, small, head1)
     for n in data.content.notices:
         story += [Paragraph("Notice: " + escape(n.message), notice), Spacer(1, 4)]
-    for section in data.content.sections:
+    for section in fm.body:
+        plain = f"{section.number} {section.title}".strip()
         title = f"{escape(section.number)} {escape(section.title)}"
         if section.stale:
             title += ' <font color="#4B5563" size="8">(may be out of date)</font>'
-        story.append(Paragraph(title, head2 if section.level <= 1 else head3))
+        story.append(toc_mark(Paragraph(title, head2 if section.level <= 1 else head3),
+                              0 if section.level <= 1 else 1, plain))
         for block in section.blocks:
             if isinstance(block, HeadingBlock):
                 story.append(Paragraph(escape(block.text), head3))
@@ -348,7 +369,7 @@ def to_pdf(data: ExportData) -> bytes:
                 ]))
                 story += [Spacer(1, 4), t, Spacer(1, 6)]
     if data.chips:
-        story.append(Paragraph("Sources", head2))
+        story.append(toc_mark(Paragraph("Sources", head2), 0, "Sources"))
         rows = [[Paragraph(f"<b>{h}</b>", small) for h in ("Chip", "File", "Page", "Evidence")]]
         for c in sorted(data.chips.values(), key=lambda c: (c["letter"], c["page_no"])):
             rows.append([Paragraph(escape(c["label"]), small), Paragraph(escape(c["filename"]), small),
@@ -359,12 +380,62 @@ def to_pdf(data: ExportData) -> bytes:
         t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E5E7EB")),
                                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F3F4F6"))]))
         story.append(t)
-    doc.build(story)
+    if fm.toc is not None:
+        doc.multiBuild(story)  # a second pass fills in the contents page numbers
+    else:
+        doc.build(story)
     return buf.getvalue()
+
+
+def _pdf_front_pages(data: ExportData, fm: FrontMatter, styles, body, small, head1) -> list[Any]:
+    """Cover page and contents page for a proposal (spec section 5)."""
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import PageBreak, Paragraph, Spacer
+    from reportlab.platypus.tableofcontents import TableOfContents
+
+    ink = colors.HexColor("#35383B")
+    title_style = ParagraphStyle("cover_title", parent=head1, fontSize=26, leading=32, alignment=TA_CENTER)
+    sub_style = ParagraphStyle("cover_sub", parent=body, fontSize=13, leading=17, alignment=TA_CENTER)
+    line_style = ParagraphStyle("cover_line", parent=body, fontSize=11, leading=15, alignment=TA_CENTER)
+    meta_style = ParagraphStyle("cover_meta", parent=small, alignment=TA_CENTER)
+    story: list[Any] = []
+    if fm.cover is not None:
+        title = first_heading(fm.cover) or data.title
+        story += [Spacer(1, 1.6 * inch), Paragraph(escape(title), title_style), Spacer(1, 18)]
+        used_title = False
+        for block in fm.cover.blocks:
+            if isinstance(block, HeadingBlock):
+                if not used_title and block.text == title:
+                    used_title = True
+                    continue
+                story.append(Paragraph(escape(block.text), sub_style))
+            elif isinstance(block, ParagraphBlock):
+                story.append(Paragraph(_seg_markup(data, block.segments), line_style))
+            elif isinstance(block, ListBlock):
+                story += [Paragraph(_seg_markup(data, item), line_style) for item in block.items]
+        story += [Spacer(1, 24), Paragraph(f"Run {data.run_id}, version {data.version}", meta_style), PageBreak()]
+    else:
+        story += [Paragraph(escape(data.title), head1),
+                  Paragraph(f"Run {data.run_id}, version {data.version}", small), Spacer(1, 6)]
+    if fm.toc is not None:
+        toc = TableOfContents()
+        toc.levelStyles = [
+            ParagraphStyle("toc0", parent=body, fontSize=10.5, leading=16, textColor=ink),
+            ParagraphStyle("toc1", parent=body, fontSize=9.5, leading=14, leftIndent=18, textColor=ink),
+        ]
+        toc.dotsMinLevel = 0
+        heading = first_heading(fm.toc) or fm.toc.title or "Contents"
+        story += [Paragraph(escape(heading), head1), Spacer(1, 8), toc, PageBreak()]
+    return story
 
 
 def table_count(content: ArtifactContent) -> int:
     return sum(1 for _, b in content.iter_blocks() if isinstance(b, TableBlock))
 
 
-__all__ = ["ExportData", "PDF_MIME", "XLSX_MIME", "cell_note", "filename", "table_count", "to_pdf", "to_xlsx"]
+__all__ = ["COVER_ID", "TEMPLATE_SNAPSHOT_KEYS", "TOC_ID", "ExportData", "FrontMatter", "PDF_MIME", "XLSX_MIME",
+           "cell_note", "filename", "first_heading", "front_matter", "table_count", "theme_from_parameters",
+           "to_pdf", "to_xlsx"]

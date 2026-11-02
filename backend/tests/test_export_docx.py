@@ -419,6 +419,44 @@ def test_front_matter_finds_cover_and_toc_by_section_or_block_id_only():
     assert none.cover is None and none.toc is None and len(none.body) == 2
 
 
+# --------------------------------------------------------------------- PDF cover and TOC
+
+
+def pdf_pages(blob: bytes) -> list[str]:
+    import fitz
+    return [p.get_text() for p in fitz.open(stream=blob, filetype="pdf")]
+
+
+def test_pdf_starts_with_cover_page_then_contents_with_page_numbers():
+    pages = pdf_pages(export.to_pdf(data_for(proposal_content())))
+    cover, contents, body = pages[0], pages[1], "\n".join(pages[2:])
+    assert "Insurance Proposal for Cedar Hollow LLC" in cover and "Prepared by Dana Broker" in cover
+    assert "Run 7, version 2" in cover and "Executive Summary" not in cover
+    assert "Table of Contents" in contents
+    lines = [x.strip() for x in contents.splitlines() if x.strip()]
+    assert "1 Executive Summary" in lines and "3.2 Premium" in lines and "Sources" in lines
+    leader = lines[lines.index("1 Executive Summary") + 1]
+    assert leader.startswith(".") and leader.split()[-1] == "3"  # dot leader, then its page number
+    assert "Executive Summary" in body and "Harborline" in body and "Sources" in body
+    assert "Cover Page" not in "\n".join(pages)  # front-matter sections are not body sections
+
+
+def test_pdf_with_a_cover_but_no_toc_has_no_contents_page():
+    c = proposal_content()
+    c = ArtifactContent(notices=c.notices, sections=[c.sections[0], *c.sections[2:]])
+    pages = pdf_pages(export.to_pdf(data_for(c)))
+    assert "Insurance Proposal for Cedar Hollow LLC" in pages[0] and "Executive Summary" not in pages[0]
+    assert "Table of Contents" not in "\n".join(pages)
+    assert "Executive Summary" in pages[1]
+
+
+def test_pdf_of_a_slice1_report_is_unchanged_single_flow():
+    pages = pdf_pages(export.to_pdf(data_for(slice1_content())))
+    first = [x for x in pages[0].splitlines() if x.strip()]
+    assert first[:2] == ["Compare Quotes", "Run 7, version 2"]
+    assert "Executive Summary" in pages[0] and "Contents" not in "\n".join(pages)
+
+
 # --------------------------------------------------------------------- API
 
 
