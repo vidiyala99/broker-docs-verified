@@ -55,7 +55,7 @@ export function RunView({
   const [tab, setTab] = useState<Tab>("report");
   const [split, setSplit] = useState(false);
   const [splitAnim, setSplitAnim] = useState(false);
-  const [outlineOpen, setOutlineOpen] = useState(viewport !== "narrow");
+  const [outlineOpen, setOutlineOpen] = useState(viewport === "wide");
   const [focusCount, setFocusCount] = useState(0);
   const [filter, setFilter] = useState<TrustFilter | null>(null);
   const [regenerating, setRegenerating] = useState(false);

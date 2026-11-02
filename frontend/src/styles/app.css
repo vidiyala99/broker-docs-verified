@@ -1637,11 +1637,33 @@ kbd {
   border-radius: var(--radius-control);
 }
 
+/* Scroll cue: fade the right edge while more columns are hidden. Static mask driven by
+   scroll position (no time-based motion); the fade is 0 when the table fits or is scrolled to the end. */
+@property --table-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@supports (animation-timeline: scroll()) {
+  .table-scroll {
+    mask-image: linear-gradient(to right, #000 calc(100% - var(--table-fade)), transparent);
+    animation: table-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+
+  @keyframes table-fade {
+    from { --table-fade: 64px; }
+    90%  { --table-fade: 64px; }
+    to   { --table-fade: 0px; }
+  }
+}
+
 .report-table {
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
-  min-width: 640px;
+  min-width: 600px;
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
   font-variant-numeric: var(--numeric-table);
@@ -1671,8 +1693,8 @@ kbd {
   z-index: var(--z-sticky);
   background: var(--color-surface);
   border-right: var(--border-width) solid var(--color-hairline);
-  width: 180px;
-  min-width: 140px;
+  width: 150px;
+  min-width: 120px;
 }
 
 .row-head {
@@ -1681,7 +1703,7 @@ kbd {
 }
 
 .col-head {
-  min-width: 160px;
+  min-width: 128px;
   font-weight: var(--weight-semibold);
   box-shadow: inset 0 -2px 0 var(--hue-mark);
 }
@@ -1715,7 +1737,7 @@ kbd {
 }
 
 .cell {
-  min-width: 150px;
+  min-width: 128px;
   transition: background-color var(--dur-fast) ease;
 }
 
