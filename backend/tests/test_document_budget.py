@@ -8,11 +8,11 @@ from backend.providers import BudgetExhausted, DocumentBudget, DocumentBudgetExh
 from backend.providers.types import CallRecord, CallRole
 
 
-def test_defaults_are_1_5m_per_run_and_400k_per_document():
+def test_defaults_are_1_5m_per_run_and_500k_per_document():
     assert RunBudget().limit == 1_500_000
-    assert RunBudget().child().limit == 400_000
+    assert RunBudget().child().limit == 500_000
     cfg = ProviderConfig()
-    assert (cfg.run_token_budget, cfg.document_token_budget) == (1_500_000, 400_000)
+    assert (cfg.run_token_budget, cfg.document_token_budget) == (1_500_000, 500_000)
     env = ProviderConfig.from_env({"BROKERDOCS_DOCUMENT_TOKEN_BUDGET": "123"})
     assert env.document_token_budget == 123
 

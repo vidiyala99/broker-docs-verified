@@ -9,9 +9,11 @@ Decision order for one document:
     plan windows: 15 pages each, 2 pages of overlap (step 13), absolute page
     numbers; the last window ends on the last page
         │
-    budget pre-check: estimated input of every window plus one reserved
-    output must fit what the document may still spend (D3: checked before
-    any model call), else BudgetExhausted and nothing is sent
+    budget pre-check (precheck_tokens): estimated input of every window,
+    plus the full reserved output of the windows that can be in flight at
+    once (max_concurrency) and the expected output of the rest, must fit
+    what the document may still spend (D3: checked before any model call),
+    else BudgetExhausted and nothing is sent
         │
     extract every window with the same strict call (R3 wording, a fresh
     random data-block boundary per window, the [page N] tags are absolute
@@ -153,14 +155,32 @@ def _window_pages(pages: Sequence[extract.TextPage], window: Window) -> list[ext
     return [p for p in pages if int(p.page_no) in window]
 
 
-def _precheck(provider: Provider, budget, fields, pages, windows, *, document_name, instructions, label):
-    schema = extract.build_extraction_schema(fields)
+def precheck_tokens(provider: Provider, fields, pages, windows, *, document_name: str, instructions: str = "",
+                    schema=None) -> int:
+    """Tokens the windows of one document are planned to need, checked before any call (D3).
+
+    Every window's estimated input (its own system prompt, field list and
+    schema, counted once per call because each call sends them), plus output:
+    the last `max_concurrency` windows can each hold a full reserved output at
+    the peak, the earlier ones have settled to about their expected output.
+    """
+    schema = schema or extract.build_extraction_schema(fields)
+    cfg = provider.config
     est = 0
     for w in windows:
         msgs = extract.build_extraction_messages(fields, _window_pages(pages, w), document_name=document_name,
                                                  instructions=instructions)
         est += provider.estimate_input_tokens(msgs, schema)
-    need = est + provider.config.max_output_tokens[CallRole.EXTRACT]
+    max_out = cfg.max_output_tokens[CallRole.EXTRACT]
+    expected = min(max_out, cfg.expected_output_tokens.get(CallRole.EXTRACT, max_out))
+    in_flight = min(len(windows), max(1, cfg.max_concurrency))
+    return est + (len(windows) - in_flight) * expected + in_flight * max_out
+
+
+def _precheck(provider: Provider, budget, fields, pages, windows, *, document_name, instructions, label):
+    schema = extract.build_extraction_schema(fields)
+    need = precheck_tokens(provider, fields, pages, windows, document_name=document_name,
+                           instructions=instructions, schema=schema)
     if isinstance(budget, DocumentBudget):
         own = max(0, budget.limit - budget.used - budget.reserved)
         if need > own:
@@ -284,4 +304,5 @@ def verify_document(
 
 
 __all__ = ["DEFAULT_WINDOWS", "Window", "WindowConfig", "WindowResult", "WindowedExtraction", "extract_document",
-           "extract_windows", "needs_windows", "plan_windows", "select_windows", "verify_document"]
+           "extract_windows", "needs_windows", "plan_windows", "precheck_tokens", "select_windows",
+           "verify_document"]

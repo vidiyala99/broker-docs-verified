@@ -31,7 +31,7 @@ def _record(**kw) -> CallRecord:
 
 
 def test_default_limit_is_1_5m():
-    # T14 raised the run budget from 600k (D3) to 1.5M; per-document ceiling 400k
+    # T14 raised the run budget from 600k (D3) to 1.5M; per-document ceiling 500k
     assert RunBudget().limit == 1_500_000
 
 
