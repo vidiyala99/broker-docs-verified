@@ -275,6 +275,57 @@ def test_words_from_json_lists_are_accepted():
     assert r.rects == [[72.0, 72.0, 180.0, 84.0]]
 
 
+# ---------------------------------------------------------------- table columns (visual row order)
+
+MULTICOL_PDF = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "quotes" / "carrier_a_multicol.pdf"
+
+
+def _two_column_page():
+    """Labels in one text block, values in another: the text layer lists every value first."""
+    labels = ["Total Payable", "Deductible"]
+    values = ["$26,391.14", "$2,500"]
+    words, text = [], []
+    for b, col in enumerate((values, labels)):
+        x = 330 if col is values else 72
+        for ln, s in enumerate(col):
+            y = 140 + 16 * ln
+            for wn, w in enumerate(s.split()):
+                words.append([x + 50 * wn, y, x + 50 * wn + 45, y + 12, w, b, ln, wn])
+            text.append(s)
+    return ParsedPage(page_no=1, text="\n".join(text), width=612, height=792, char_count=40,
+                      image_ratio=0.0, needs_ocr=False, ocr_reason=None, words=words)
+
+
+def test_label_and_value_on_one_printed_row_verify_across_table_columns():
+    page = _two_column_page()
+    r = verify_fact(CandidateFact("total_premium", "$26,391.14", 1, "Total Payable: $26,391.14"), [page])
+    assert r.state == EvidenceState.VERIFIED and r.method == "normalized"
+    assert r.rects == [[72.0, 140.0, 375.0, 152.0]]  # one box over the printed row
+    assert verify_fact(CandidateFact("retention", "$2,500", 1, "Deductible $2,500"), [page]).cited
+
+
+def test_row_order_never_pairs_a_label_with_another_rows_value():
+    page = _two_column_page()
+    r = verify_fact(CandidateFact("total_premium", "$2,500", 1, "Total Payable $2,500"), [page])
+    assert not r.cited and r.reason == "quote_not_found"
+
+
+@pytest.mark.parametrize("field_, value, quote", [
+    ("total_premium", "$26,391.14", "Total Payable $26,391.14"),
+    ("taxes_and_fees", "$1,316.14", "Taxes and Fees: $1,316.14"),
+    ("each_occurrence_limit", "$1,000,000", "Each Occurrence Limit $1,000,000"),
+    ("aggregate_limit", "$2,000,000", "General Aggregate Limit $2,000,000"),
+    ("retention", "$2,500", "Deductible $2,500"),
+    ("total_premium", "$26,391.14", "$26,391.14"),  # value-only quotes still verify too
+])
+def test_carrier_a_multicol_label_value_quotes_verify(field_, value, quote):
+    """Live eval 2026-11-02 11:37: these five came back with the right values and label-and-value
+    quotes, and were rejected because the text layer reads the value column before the labels."""
+    pages = parse.parse_pdf(MULTICOL_PDF.read_bytes()).pages
+    r = verify_fact(CandidateFact(field_, value, 2, quote), pages)
+    assert r.state == EvidenceState.VERIFIED and r.page_no == 2, r
+
+
 # ---------------------------------------------------------------- batch + injection
 
 

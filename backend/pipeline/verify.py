@@ -11,7 +11,10 @@ Decision order for one candidate fact {field, value, page, quote}:
     for layer in (digital text layer, model-OCR text):        D5: digital first
       for tier in (strict, fuzzy):                            strict anywhere beats fuzzy
         for page in (cited page, then others nearest first):  D6: re-point, tie -> earlier page
-          quote match on page?            strict: token sequence equal after
+          quote match on page?            strict: token sequence equal (digital layer: in
+            │                             text-layer order, then in visual row order, so a
+            │                             label and its value on one printed row match
+            │                             across table columns, _stream_by_rows) after
             │yes                          normalization (case, whitespace, typographic
             ▼                             quotes and dashes, edge punctuation,
           value inside the MATCHED        line-break hyphens); fuzzy: difflib
@@ -208,11 +211,46 @@ def _stream_from_text(text: str) -> list[_Tok]:
     return _mark_joinable(toks)
 
 
+def _stream_by_rows(words: Iterable[Sequence[Any]]) -> list[_Tok] | None:
+    """The page's words in visual reading order: rows top to bottom (a word joins a row when
+    its vertical centre lies within half a word height of the row's), each row left to right.
+
+    The text layer follows the PDF's blocks. A two-column table (labels in one block, values
+    in another, live eval carrier_a_multicol) then reads "$26,391.14 ... Total Payable", so
+    a label-and-value quote ("Total Payable $26,391.14", which extract rule 7 asks for) is not
+    a token run of the text layer although both sit on one printed row. Matching on this
+    stream as well finds it. False-positive risk: two unrelated columns whose lines share a
+    baseline read across as one row; a quote still has to match strictly and hold the value.
+    Returns None when the order is the same as the text layer's (most pages)."""
+    items = []
+    for w in words:
+        norm = _norm_token(str(w[4]))
+        if norm:
+            x0, y0, x1, y1 = (float(w[0]), float(w[1]), float(w[2]), float(w[3]))
+            items.append((x0, y0, x1, y1, str(w[4]), norm))
+    rows: list[list[tuple]] = []
+    centres: list[float] = []
+    for it in sorted(items, key=lambda it: ((it[1] + it[3]) / 2, it[0])):
+        yc, h = (it[1] + it[3]) / 2, max(it[3] - it[1], 0.1)
+        if rows and abs(yc - centres[-1]) <= h / 2:
+            rows[-1].append(it)
+        else:
+            rows.append([it])
+            centres.append(yc)
+    toks = [_Tok(it[5], it[4], ("row", r), (it[0], it[1], it[2], it[3]))
+            for r, row in enumerate(rows) for it in sorted(row, key=lambda it: it[0])]
+    if [t.norm for t in toks] == [it[5] for it in items]:
+        return None
+    return _mark_joinable(toks)
+
+
 @dataclass
 class _Layer:
     state: EvidenceState
     raw_text: str
     toks: list[_Tok]
+    # the same words in visual row order, when that differs (digital layer only; strict tier only)
+    rows: _Layer | None = None
 
 
 @dataclass
@@ -227,7 +265,9 @@ def _index_page(page: PageLike) -> _PageIndex:
     words = getattr(page, "words", None)
     text = getattr(page, "text", "") or ""
     if words:
-        digital = _Layer(EvidenceState.VERIFIED, text, _stream_from_words(words))
+        row_toks = _stream_by_rows(words)
+        rows = _Layer(EvidenceState.VERIFIED, "", row_toks) if row_toks else None
+        digital = _Layer(EvidenceState.VERIFIED, text, _stream_from_words(words), rows)
     elif words is None and text.strip():
         # No word boxes (seam for a later local OCR, D12): still the document's own text.
         digital = _Layer(EvidenceState.VERIFIED, text, _stream_from_text(text))
@@ -468,15 +508,15 @@ def verify_fact(
     for layer_name in ("digital", "ocr"):
         for tier in ("strict", "fuzzy"):
             for page in ordered:
-                layer: _Layer | None = getattr(page, layer_name)
-                if layer is None or not layer.toks:
+                base: _Layer | None = getattr(page, layer_name)
+                if base is None or not base.toks:
                     continue
-                hits = (
-                    _strict_hits(layer, q, quote or "", v, page.page_no)
-                    if tier == "strict"
-                    else _fuzzy_hits(layer, q, v, page.page_no, config)
-                )
-                for hit in hits:
+                if tier == "strict":  # text-layer order first, then visual row order
+                    hits = ((lyr, h) for lyr in (base, base.rows) if lyr is not None
+                            for h in _strict_hits(lyr, q, quote or "", v, page.page_no))
+                else:
+                    hits = ((base, h) for h in _fuzzy_hits(base, q, v, page.page_no, config))
+                for layer, hit in hits:
                     if not hit.value_ok:
                         if first_value_miss is None:
                             first_value_miss = (hit, layer)

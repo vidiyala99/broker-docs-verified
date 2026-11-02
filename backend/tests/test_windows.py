@@ -245,12 +245,12 @@ def test_label_values_from_other_windows_lose_to_the_one_real_value():
     # a heading is dropped; with no real value left the cell is "Couldn't verify", never verified
     terr = merged["territory"]
     assert terr.state == EvidenceState.NOT_FOUND and terr.reason == "implausible_value" and terr.page_no is None
-    # the running header (windows 2 and 3) passes the filter but conflicts with the real form
-    # (window 1): shown as a conflict with both values, never a verified pick
+    # the running header (windows 2 and 3) is stated on a line printed on every page: dropped as
+    # boilerplate (merge.repeated_line_pages), so the real form (window 1) is the one value left
     form = merged["policy_form"]
-    assert form.state == EvidenceState.CONFLICTING and form.value is None
-    assert [(c.value, c.page_no) for c in form.conflicts] == [(REAL_FORM, 2),
-                                                              ("Commercial General Liability Policy", 14)]
+    assert (form.value, form.page_no, form.state) == (REAL_FORM, 2, EvidenceState.VERIFIED)
+    assert {d.value for d in form.dropped} == {"Commercial General Liability Policy"}
+    assert all(d.reason is None and d.cited for d in form.dropped)  # dropped by merge, not by verify
 
 
 def test_prompt_compliant_null_windows_leave_the_real_value_alone():

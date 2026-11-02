@@ -126,8 +126,12 @@ _FIELDS = [
               description=("The coverage form number and edition date followed by the form title, exactly as "
                            "printed in the policy, for example 'CG 00 01 04 13 Commercial General Liability "
                            "Coverage Form (Occurrence)'. Not a running page header and not the policy's "
-                           "generic title (such as 'Commercial General Liability Policy'). If no form number "
-                           "or edition is printed on the pages read, return null.")),
+                           "generic title (such as 'Commercial General Liability Policy'), and not the coverage "
+                           "part an endorsement says it modifies (such as 'Commercial General Liability "
+                           "Coverage Part' in 'This endorsement modifies insurance provided under the ...'): "
+                           "that sentence names the coverage the endorsement attaches to, it does not state or "
+                           "amend the policy form. If no form number or edition is printed on the pages read, "
+                           "return null.")),
     FactField(key="rate", label="Rate", section="rate",
               description="Rate as stated, for example per $1,000 of exposure. Null when only a premium amount is given (a premium is not a rate)."),
     FactField(key="total_premium", label="Total Premium", section="premium",
