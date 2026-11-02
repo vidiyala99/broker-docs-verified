@@ -79,8 +79,24 @@ LIVE_RUNS: dict[str, list[str]] = {
 }
 
 
+GROUPS_ENV = "BROKERDOCS_EVAL_GROUPS"
+
+
+def selected_groups(env: dict | None = None) -> list[str] | None:
+    """Group names from ``BROKERDOCS_EVAL_GROUPS`` (comma-separated), or None
+    when unset or blank. Unknown names raise ValueError."""
+    raw = (os.environ if env is None else env).get(GROUPS_ENV, "")
+    names = [n.strip() for n in raw.split(",") if n.strip()]
+    if not names:
+        return None
+    unknown = [n for n in names if n not in LIVE_RUNS]
+    if unknown:
+        raise ValueError(f"{GROUPS_ENV}: unknown group(s) {unknown}; known: {list(LIVE_RUNS)}")
+    return list(dict.fromkeys(names))
+
+
 def run_suite(adapter: Callable[[list[str]], dict], fixture_dir: Path, truths: dict,
-              runs: dict[str, list[str]] | None = None):
+              runs: dict[str, list[str]] | None = None, groups: list[str] | None = None):
     """Call ``adapter`` once per run, score every document, apply the gates.
 
     Returns ``(metrics, gate_report)``. A document missing from the adapter's
@@ -88,6 +104,10 @@ def run_suite(adapter: Callable[[list[str]], dict], fixture_dir: Path, truths: d
     """
     import eval_gates as g
 
+    if groups is None and runs is None:
+        groups = selected_groups()
+    if groups is not None and runs is None:
+        runs = {n: LIVE_RUNS[n] for n in groups}
     scores = []
     run_tokens = []
     for ids in (runs or LIVE_RUNS).values():
@@ -102,5 +122,10 @@ def run_suite(adapter: Callable[[list[str]], dict], fixture_dir: Path, truths: d
             scores.append(g.score_document(truths[fid], result))
     metrics = g.aggregate(scores, run_tokens)
     # The full suite must have data in every gated bucket (clean, multi-column, long).
-    required = tuple(g.GATED_BUCKETS) if runs is None else ("clean", "multi_column")
+    if groups is not None:
+        # Subset run: only gated buckets that actually ran are evaluated.
+        metrics.subset_groups = list(groups)
+        required = tuple(b for b in g.GATED_BUCKETS if b in metrics.buckets)
+    else:
+        required = tuple(g.GATED_BUCKETS) if runs is None else ("clean", "multi_column")
     return metrics, g.evaluate_gates(metrics, require_buckets=required)

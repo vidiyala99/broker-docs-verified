@@ -292,6 +292,7 @@ class FieldOutcome:
     outcome: str  # correct | wrong | missing | absent_ok | absent_violation
     hard_fail: str | None = None  # reason when a verified fact is wrong
     decoy_kind: str | None = None
+    miss_reason: str | None = None  # set for present fields that are not correct, see MISS_REASONS
 
 
 @dataclass
@@ -316,6 +317,27 @@ class DocScore:
     parse_ok: bool | None = None
     ocr_pages_ok: bool | None = None
     outcomes: list[FieldOutcome] = field(default_factory=list)
+
+
+MISS_REASONS = ("missing", "wrong_value", "rejected", "scan_read")
+
+
+def _miss_reason(p: PredictedFact | None) -> str:
+    """Why a field present in truth was not scored correct.
+
+    ``missing``: no fact, a null value, or a failed fact. ``rejected``: the
+    model proposed a value the verifier could not find (``not_found`` with a
+    value). ``scan_read``: a scan_read value that differs from truth.
+    ``wrong_value``: a verified value that differs from truth."""
+    if p is None or p.value is None:
+        return "missing"
+    if p.state == "not_found":
+        return "rejected"
+    if p.state == "scan_read":
+        return "scan_read"
+    if p.displayed:
+        return "wrong_value"
+    return "missing"
 
 
 def _dedupe(facts: Iterable[PredictedFact]) -> dict[str, PredictedFact]:
@@ -419,7 +441,8 @@ def score_document(truth: Mapping, result: DocResult) -> DocScore:
                 score.correct += 1
             outcome = "correct" if correct else ("wrong" if shown else "missing")
         score.outcomes.append(FieldOutcome(fname, t_val, p_val, state, p.page if p else None,
-                                           correct, outcome, hard, decoy_kind))
+                                           correct, outcome, hard, decoy_kind,
+                                           None if (t is None or correct) else _miss_reason(p)))
     return score
 
 
@@ -463,6 +486,10 @@ class SuiteMetrics:
     option_count_mismatches: list[str]
     max_run_input_tokens: int | None
     hard_fail_details: list[dict]
+    # One entry per field present in truth but not scored correct.
+    misses: list[dict] = field(default_factory=list)
+    # Set (to the group names that ran) when only a subset of the live runs executed.
+    subset_groups: list[str] | None = None
 
 
 def _bucket(name: str, scores: list[DocScore]) -> BucketMetrics:
@@ -503,6 +530,11 @@ def aggregate(scores: list[DocScore], run_input_tokens: Iterable[int] = ()) -> S
             {"fixture_id": sc.fixture_id, "field": o.field, "predicted": o.predicted,
              "truth": o.truth, "page": o.page, "reason": o.hard_fail}
             for sc in scores for o in sc.outcomes if o.hard_fail
+        ],
+        misses=[
+            {"fixture_id": sc.fixture_id, "field": o.field, "truth": o.truth,
+             "predicted": o.predicted, "state": o.state, "reason": o.miss_reason}
+            for sc in scores for o in sc.outcomes if o.miss_reason
         ],
     )
 
@@ -592,7 +624,8 @@ def _fmt(v: float | int | None) -> str:
 
 
 def format_report(m: SuiteMetrics, g: GateReport) -> str:
-    lines = ["Eval gates (R6)", "-" * 72]
+    lines = ["Eval gates (R6)" + (f"  [subset run: {', '.join(m.subset_groups)}]"
+                                   if m.subset_groups else ""), "-" * 72]
     for r in g.results:
         flag = ("PASS" if r.passed else "FAIL") if r.gated else "info"
         note = f"  ({r.note})" if r.note else ""
@@ -606,6 +639,12 @@ def format_report(m: SuiteMetrics, g: GateReport) -> str:
     for d in m.hard_fail_details:
         lines.append(f"HARD FAIL {d['fixture_id']}.{d['field']}: {d['reason']} "
                      f"(predicted {d['predicted']!r}, truth {d['truth']!r}, page {d['page']})")
+    for d in m.misses:
+        lines.append(f"MISS {d['fixture_id']}.{d['field']}: {d['reason']} "
+                     f"(predicted {d['predicted']!r}, truth {d['truth']!r}, state {d['state']})")
+    if m.subset_groups:
+        lines.append(f"subset run: only {', '.join(m.subset_groups)} executed; "
+                     "gates for buckets that did not run are not evaluated")
     lines.append(f"overall: {'PASS' if g.passed else 'FAIL'}")
     return "\n".join(lines)
 

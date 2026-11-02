@@ -3,6 +3,10 @@ and an ``OPENAI_API_KEY`` in the environment. Never reads ``.env``.
 
 Writes a JSON report to ``$BROKERDOCS_EVAL_REPORT`` when set, otherwise to
 pytest's temporary directory, and prints the gate table.
+
+Set ``BROKERDOCS_EVAL_GROUPS`` (comma-separated LIVE_RUNS names, e.g. ``long``) to
+run only those groups; gates for buckets that did not run are then skipped and
+the report is labeled a subset run. Unset runs the full suite.
 """
 
 from __future__ import annotations
