@@ -1,6 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
+  Eye,
+  FileDoc,
   FilePdf,
   FileXls,
   ListBullets,
@@ -13,7 +15,8 @@ import {
   ClockCounterClockwise,
   FileText,
 } from "@phosphor-icons/react";
-import { api, ApiError, downloadExport } from "../api/client";
+import { api, ApiError, downloadExport, type ExportFormat } from "../api/client";
+import { PROPOSAL_WORKFLOW } from "../config";
 import { useRunEvents } from "../api/useRunEvents";
 import type { Artifact, Chip, EditResult, Run, RunDocument, Workspace } from "../api/types";
 import { Accordion } from "../ui/Accordion";
@@ -59,7 +62,8 @@ export function RunView({
   const [focusCount, setFocusCount] = useState(0);
   const [filter, setFilter] = useState<TrustFilter | null>(null);
   const [regenerating, setRegenerating] = useState(false);
-  const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [preview, setPreview] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [reconnecting, setReconnecting] = useState(false);
   const [generation, setGeneration] = useState(0);
@@ -273,7 +277,7 @@ export function RunView({
     }
   };
 
-  const exportAs = async (format: "xlsx" | "pdf") => {
+  const exportAs = async (format: ExportFormat) => {
     if (!artifact) return;
     setExporting(format);
     try {
@@ -340,9 +344,10 @@ export function RunView({
   const showReport = tab === "report" || split;
   const summary = artifact ? warningSummary(artifact) : null;
   const running = Boolean(run?.active);
+  const isProposal = run?.workflow_name === PROPOSAL_WORKFLOW;
 
   const reportBody = (
-    <div className="report-scroll" ref={setScrollRoot} data-filter={filter ?? undefined}>
+    <div className="report-scroll" ref={setScrollRoot} data-filter={filter ?? undefined} data-preview={isProposal && preview ? "" : undefined}>
       {artifact && actions ? (
         <Report artifact={artifact} actions={actions} />
       ) : (
@@ -367,13 +372,17 @@ export function RunView({
             {reconnecting && <p className="hint" role="status">Reconnecting to the run...</p>}
           </Accordion>
           <Accordion title="Input parameters">
-            <p className="hint">Compare Quotes has no parameters. Column order follows the upload order.</p>
+            {isProposal && run ? (
+              <ProposalParams parameters={run.parameters} />
+            ) : (
+              <p className="hint">Compare Quotes has no parameters. Column order follows the upload order.</p>
+            )}
           </Accordion>
           <Accordion title="Recent runs" count={runs?.length}>
             {runs && <RecentRuns runs={runs} compact currentId={runId} />}
           </Accordion>
-          <a href="#/" className="btn btn--ghost btn--block new-run">
-            <Plus size={16} aria-hidden /> New comparison
+          <a href={isProposal ? "#/proposals/new" : "#/"} className="btn btn--ghost btn--block new-run">
+            <Plus size={16} aria-hidden /> {isProposal ? "New proposal" : "New comparison"}
           </a>
         </div>
         {run && <Chat runId={run.id} artifact={artifact} onOpen={openSource} onEdited={(r) => afterEdit(r, "Edit applied")} />}
@@ -423,7 +432,7 @@ export function RunView({
 
         <div className="toolbar">
           <h1 id="pane-title" className="toolbar__title">
-            Compare Quotes, run {runId}
+            {isProposal ? (artifact?.title ?? "Proposal") : "Compare Quotes"}, run {runId}
             {artifact && (
               <span className="toolbar__version">
                 Version {artifact.version}
@@ -453,12 +462,34 @@ export function RunView({
                 {exporting === "pdf" ? <span className="spinner spinner--sm" aria-hidden /> : <FilePdf size={18} aria-hidden />}
               </button>
             </Tip>
+            <Tip text="Export DOCX: Word document">
+              <button type="button" className="icon-btn" aria-label="Export DOCX, Word document" disabled={!artifact || exporting != null} onClick={() => void exportAs("docx")}>
+                {exporting === "docx" ? <span className="spinner spinner--sm" aria-hidden /> : <FileDoc size={18} aria-hidden />}
+              </button>
+            </Tip>
             <Tip text="Export XLSX: tables only">
               <button type="button" className="icon-btn" aria-label="Export XLSX, tables only" disabled={!artifact || exporting != null} onClick={() => void exportAs("xlsx")}>
                 {exporting === "xlsx" ? <span className="spinner spinner--sm" aria-hidden /> : <FileXls size={18} aria-hidden />}
               </button>
             </Tip>
             <span className="toolbar__sep" aria-hidden />
+            {isProposal && (
+              <Tip text={preview ? "Show citations" : "Preview without citations"}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Preview without citations"
+                  aria-pressed={preview}
+                  disabled={!artifact}
+                  onClick={() => {
+                    setPreview((p) => !p);
+                    setAnnounce(preview ? "Citations shown." : "Preview: citations hidden.");
+                  }}
+                >
+                  <Eye size={18} aria-hidden />
+                </button>
+              </Tip>
+            )}
             <Tip text={wide ? "Side by side" : "Side by side needs a wider window"}>
               <button
                 type="button"
@@ -537,6 +568,36 @@ export function RunView({
         </p>
       </main>
     </div>
+  );
+}
+
+/** Input parameters of a proposal run (the stored, validated `run.parameters`). */
+function ProposalParams({ parameters }: { parameters: Record<string, unknown> }) {
+  const p = parameters as {
+    client_name?: string;
+    broker_name?: string;
+    brokerage_name?: string;
+    no_ai_prose?: boolean;
+    outline?: { kind: string }[];
+    template?: { name?: string };
+  };
+  const sections = (p.outline ?? []).filter((b) => b.kind !== "cover_page" && b.kind !== "table_of_contents").length;
+  const rows: [string, string][] = [
+    ["Template", p.template?.name ?? "Unknown"],
+    ["Client", p.client_name || "Not set"],
+    ["Broker", [p.broker_name, p.brokerage_name].filter(Boolean).join(", ") || "Not set"],
+    ["Sections", String(sections)],
+    ["Writing", p.no_ai_prose ? "Plain text, no AI writing" : "AI prose, checked against the values"],
+  ];
+  return (
+    <dl className="params">
+      {rows.map(([k, v]) => (
+        <div key={k} className="params__row">
+          <dt>{k}</dt>
+          <dd>{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

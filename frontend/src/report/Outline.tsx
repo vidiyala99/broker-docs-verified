@@ -138,7 +138,8 @@ export function Outline({
                 go(s.id);
               }}
             >
-              {s.number}. {s.title}
+              {s.number ? `${s.number}. ` : ""}
+              {s.title}
               {s.stale && <span className="sr-only"> (may be out of date)</span>}
             </a>
           </li>

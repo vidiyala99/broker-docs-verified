@@ -127,6 +127,8 @@ def compose(text: str) -> dict[str, Any]:
     if any("compose_fail" in (d.get("file") or "") for d in payload["documents"]):
         return {"sections": [{"section_id": "executive_summary", "paragraphs": [
             {"segments": [{"text": "A quotes $1.", "passage_ids": [999999]}]}]}]}
+    if "facts" not in payload:  # proposal-builder: facts come grouped per outline section
+        return {"sections": [_proposal_section(s, labels) for s in payload["sections"]]}
     by_section: dict[str, list[dict]] = {}
     for f in payload["facts"]:
         by_section.setdefault(SECTION_OF.get(f["field"], "executive_summary"), []).append(f)
@@ -160,6 +162,17 @@ def compose(text: str) -> dict[str, Any]:
             {"text": "; ".join(f"{m['document']} {m['label'].lower()} could not be verified" for m in missing) + ".",
              "passage_ids": []}]}]})
     return {"sections": sections}
+
+
+def _proposal_section(sec: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
+    """Scripted prose for one proposal section, citing only that section's own facts."""
+    facts = [f for f in sec.get("facts", []) if not f.get("conflicting_values")]
+    if not facts:
+        segs = [{"text": f"This section covers {len(labels)} quotes; no values were found for it.", "passage_ids": []}]
+    else:
+        segs = [{"text": f"{f['document']} lists {f['label'].lower()} as {f['value']}. ",
+                 "passage_ids": [f["passage_id"]]} for f in facts[:3]]
+    return {"section_id": sec["section_id"], "paragraphs": [{"segments": segs}]}
 
 
 def chat(text: str) -> object:

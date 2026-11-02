@@ -222,6 +222,91 @@ export interface Message {
   created_at: string;
 }
 
+// ---------------------------------------------------------------- proposal templates (slice 2)
+
+export type BlockKind =
+  | "cover_page"
+  | "table_of_contents"
+  | "client_details"
+  | "line_comparison"
+  | "premium_comparison"
+  | "subjectivities"
+  | "narrative";
+
+export interface OutlineBlock {
+  id: string;
+  kind: BlockKind;
+  title: string;
+  description: string;
+  ai_instruction: string;
+  fact_sections: string[];
+  locked: boolean;
+}
+
+export interface TemplateSummary {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  block_count: number;
+}
+
+export interface TemplateKind {
+  kind: BlockKind;
+  title: string;
+  table: boolean;
+  description: string;
+  fact_sections: string[];
+}
+
+export interface FactSection {
+  id: string;
+  title: string;
+  fields: { key: string; label: string }[];
+}
+
+export interface TemplateLimits {
+  max_blocks: number;
+  max_title_chars: number;
+  max_description_chars: number;
+  max_instruction_chars: number;
+  max_fact_sections_per_block: number;
+  max_context_chars: number;
+  max_name_chars: number;
+}
+
+export interface Template extends TemplateSummary {
+  workflow: string;
+  blocks: OutlineBlock[];
+  theme: {
+    font_family: string;
+    body_size_pt: number;
+    heading_color: string;
+    heading_sizes_pt: Record<string, number>;
+    accent_color: string;
+  };
+  variables: string[];
+  kinds: TemplateKind[];
+  fact_sections: FactSection[];
+  limits: TemplateLimits;
+}
+
+export interface ProposalParameters {
+  template_id: string;
+  broker_name: string;
+  brokerage_name: string;
+  client_name: string;
+  additional_context: string;
+  no_ai_prose: boolean;
+  outline: Omit<OutlineBlock, "locked">[];
+}
+
+/** One `fields` entry of a 422 invalid_request. `loc` list indexes come as strings. */
+export interface FieldError {
+  loc: (string | number)[];
+  message: string;
+}
+
 export interface RunEvent {
   id?: number;
   run_id: number;

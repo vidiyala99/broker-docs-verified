@@ -148,7 +148,8 @@ function SectionView({ section, actions }: { section: Section; actions: ReportAc
     <section className={`report-section level-${section.level}`} id={`section-${section.id}`} aria-labelledby={`h-${section.id}`} data-section={section.id}>
       <div className="report-section__head">
         <Tag id={`h-${section.id}`} className="report-section__title" tabIndex={-1}>
-          {section.number}. {section.title}
+          {section.number ? `${section.number}. ` : ""}
+          {section.title}
         </Tag>
         {section.stale && (
           <span className="stale">

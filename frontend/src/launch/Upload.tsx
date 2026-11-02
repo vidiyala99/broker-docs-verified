@@ -29,11 +29,13 @@ export function DropZone({
   onFiles,
   large,
   disabled,
+  title = "Drop quote PDFs to compare",
 }: {
   limits: Limits;
   onFiles: (files: File[]) => void;
   large?: boolean;
   disabled?: boolean;
+  title?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -55,7 +57,7 @@ export function DropZone({
       onDrop={drop}
     >
       <UploadSimple size={large ? 28 : 20} aria-hidden className="dropzone__icon" />
-      <p className="dropzone__title">Drop quote PDFs to compare</p>
+      <p className="dropzone__title">{title}</p>
       <p className="dropzone__limits">{limitsText(limits)}</p>
       <button type="button" className="btn btn--primary" disabled={disabled} onClick={() => input.current?.click()}>
         Choose files

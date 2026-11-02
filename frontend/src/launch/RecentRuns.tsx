@@ -16,7 +16,7 @@ export function statusText(s: Run["status"]): string {
 }
 
 export function runTitle(run: Run): string {
-  return `Run ${run.id}`;
+  return run.workflow_name === "Proposal Builder" ? `Proposal, run ${run.id}` : `Run ${run.id}`;
 }
 
 export function formatWhen(iso: string): string {
