@@ -27,7 +27,9 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Drop quote PDFs to compare").first()).toBeVisible();
   await expect(page.getByText(/up to 300 pages and 50 MB each, 8 files per run/).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /Proposals, coming in a later slice/ })).toHaveAttribute("aria-disabled", "true");
+  // Slice 2: Proposals is live (the wizard); the rest of the rail still says "coming in a later slice".
+  await expect(page.getByRole("link", { name: "Proposals, new proposal" })).toHaveAttribute("href", "#/proposals/new");
+  await expect(page.getByRole("button", { name: /Policy check, coming in a later slice/ })).toHaveAttribute("aria-disabled", "true");
   await shot(page, "1440-01-launch");
   await axe(page, "launch");
 
@@ -131,7 +133,8 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
 });
 
 test("seeded states: failed, cancelled, budget, fallback, partial", async ({ page }) => {
-  const runs = (await (await page.request.get("http://127.0.0.1:8000/api/runs?limit=50")).json()).runs as { id: number; status: string; documents: { filename: string }[] }[];
+  const api = process.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
+  const runs = (await (await page.request.get(`${api}/api/runs?limit=50`)).json()).runs as { id: number; status: string; documents: { filename: string }[] }[];
   const find = (pred: (r: (typeof runs)[number]) => boolean) => runs.find(pred)!;
   const failed = find((r) => r.status === "failed");
   const cancelled = find((r) => r.status === "cancelled");

@@ -5,3 +5,6 @@ export const APP_NAME = "BrokerDocs";
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://127.0.0.1:8000";
 
 export const WORKFLOW_NAME = "Compare Quotes";
+
+/** `workflow_name` of slice 2 proposal runs (backend seed). */
+export const PROPOSAL_WORKFLOW = "Proposal Builder";

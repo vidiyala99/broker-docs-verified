@@ -3,13 +3,17 @@ import { api, ApiError } from "./api/client";
 import type { Run, Workspace } from "./api/types";
 import { LaunchView } from "./launch/LaunchView";
 import { RunView } from "./run/RunView";
-import { NarrowNotice, Rail, TopBar } from "./shell/Shell";
+import { NarrowNotice, Rail, TopBar, type Crumb } from "./shell/Shell";
+import { PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "./config";
 import { useViewport } from "./shell/layout";
 import { ToastProvider } from "./ui/Toast";
+import { ProposalWizard } from "./wizard/ProposalWizard";
 
-function parseRoute(hash: string): { runId: number | null } {
+type Route = { runId: number | null; wizard: boolean };
+
+function parseRoute(hash: string): Route {
   const m = /^#\/runs\/(\d+)/.exec(hash);
-  return { runId: m ? Number(m[1]) : null };
+  return { runId: m ? Number(m[1]) : null, wizard: /^#\/proposals\/new/.test(hash) };
 }
 
 export function App() {
@@ -41,10 +45,41 @@ export function App() {
     loadRuns();
   }, [loadWorkspace, loadRuns]);
 
+  // The routed run's workflow drives the rail and crumbs. A run just created by the wizard is not
+  // in the recent-runs list yet, so fetch it directly instead of showing Compare Quotes crumbs.
+  const [routeRun, setRouteRun] = useState<Run | null>(null);
+  const listed = route.runId != null ? runs?.find((r) => r.id === route.runId) ?? null : null;
+  useEffect(() => {
+    if (route.runId == null || listed) return;
+    let live = true;
+    api.run(route.runId).then((r) => live && setRouteRun(r), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [route.runId, listed]);
+  const runOfRoute = listed ?? (routeRun?.id === route.runId ? routeRun : null);
+  const proposalRun = runOfRoute?.workflow_name === PROPOSAL_WORKFLOW;
+
   useEffect(() => {
     loadRuns();
-    document.title = route.runId ? `Run ${route.runId}, Compare Quotes` : "Compare Quotes";
-  }, [route.runId, loadRuns]);
+  }, [route.runId, route.wizard, loadRuns]);
+
+  useEffect(() => {
+    document.title = route.wizard
+      ? "New proposal"
+      : route.runId
+        ? `Run ${route.runId}, ${proposalRun ? "Proposal" : "Compare Quotes"}`
+        : "Compare Quotes";
+  }, [route.runId, route.wizard, proposalRun]);
+
+  const section = route.wizard || proposalRun ? "proposals" : "workflows";
+  const crumbs: Crumb[] = route.wizard
+    ? [{ label: "Proposals" }, { label: "New proposal" }]
+    : route.runId
+      ? proposalRun
+        ? [{ label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
+        : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: `Run ${route.runId}` }]
+      : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME }];
 
   return (
     <ToastProvider>
@@ -55,10 +90,10 @@ export function App() {
         Skip to content
       </a>
       <div className={`app vp-${viewport}`}>
-        <Rail />
+        <Rail section={section} />
         <div className="app__main">
-          <TopBar crumb={route.runId ? `Run ${route.runId}` : null} />
-          {viewport === "narrow" && <NarrowNotice />}
+          <TopBar crumbs={crumbs} />
+          {viewport === "narrow" && !route.wizard && <NarrowNotice />}
           {wsError ? (
             <main className="pane" id="main" tabIndex={-1}>
               <div className="pane__body pane__body--center">
@@ -78,6 +113,8 @@ export function App() {
                 <span className="sr-only" role="status">Loading</span>
               </div>
             </main>
+          ) : route.wizard ? (
+            <ProposalWizard workspace={workspace} viewport={viewport} />
           ) : route.runId ? (
             <RunView key={route.runId} runId={route.runId} workspace={workspace} runs={runs} viewport={viewport} onRunsChanged={loadRuns} />
           ) : (

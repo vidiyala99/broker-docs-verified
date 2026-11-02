@@ -4,10 +4,15 @@ import type {
   DocumentInfo,
   EditResult,
   Message,
+  ProposalParameters,
   Rejection,
   Run,
+  Template,
+  TemplateSummary,
   Workspace,
 } from "./types";
+
+export type ExportFormat = "xlsx" | "pdf" | "docx";
 
 /** Every backend error has one shape: {"error": {"code", "message", ...}}. `message` is safe to show. */
 export class ApiError extends Error {
@@ -99,13 +104,21 @@ export const api = {
     }),
   suggestions: (runId: number) =>
     request<{ suggestions: string[] }>(`/api/runs/${runId}/suggestions`).then((r) => r.suggestions),
+  documents: () => request<{ documents: DocumentInfo[] }>("/api/documents").then((r) => r.documents),
+  templates: () => request<{ templates: TemplateSummary[] }>("/api/templates").then((r) => r.templates),
+  template: (idOrSlug: string | number) => request<Template>(`/api/templates/${encodeURIComponent(String(idOrSlug))}`),
+  startProposal: (documentIds: number[], parameters: ProposalParameters) =>
+    request<{ run: Run; created: boolean }>("/api/runs", {
+      method: "POST",
+      body: json({ document_ids: documentIds, workflow: "proposal-builder", parameters }),
+    }),
   fileUrl: (documentId: number) => `${API_BASE}/api/documents/${documentId}/file`,
   eventsUrl: (runId: number, lastEventId?: number) =>
     `${API_BASE}/api/runs/${runId}/events${lastEventId != null ? `?last_event_id=${lastEventId}` : ""}`,
 };
 
 /** Download an export. Returns the saved file name and the X-Export-Note header (XLSX holds tables only). */
-export async function downloadExport(artifactId: number, format: "xlsx" | "pdf", version: number) {
+export async function downloadExport(artifactId: number, format: ExportFormat, version: number) {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}/api/artifacts/${artifactId}/export?format=${format}&version=${version}`);

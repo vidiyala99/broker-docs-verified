@@ -14,20 +14,24 @@ import {
   ShieldCheck,
   Stamp,
 } from "@phosphor-icons/react";
-import { APP_NAME, WORKFLOW_NAME } from "../config";
+import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
+
+export type Section = "workflows" | "proposals";
 
 interface RailItem {
   label: string;
   icon: ReactNode;
-  active?: boolean;
+  /** Live items link somewhere; the rest are "coming in a later slice". */
+  href?: string;
+  section?: Section;
 }
 
-// DG1: the full rail from the reference; only Workflows is live in slice 1.
+// DG1: the full rail from the reference. Live: Workflows (slice 1) and Proposals (slice 2, the wizard).
 const GROUPS: RailItem[][] = [
   [
-    { label: "Workflows", icon: <Briefcase size={20} aria-hidden />, active: true },
-    { label: "Proposals", icon: <FileText size={20} aria-hidden /> },
+    { label: "Workflows", icon: <Briefcase size={20} aria-hidden />, href: "#/", section: "workflows" },
+    { label: "Proposals", icon: <FileText size={20} aria-hidden />, href: "#/proposals/new", section: "proposals" },
     { label: "Personal lines", icon: <Heartbeat size={20} aria-hidden /> },
     { label: "Policy check", icon: <ShieldCheck size={20} aria-hidden /> },
     { label: "Certificates", icon: <Stamp size={20} aria-hidden /> },
@@ -43,7 +47,7 @@ const GROUPS: RailItem[][] = [
   [{ label: "Vault", icon: <Archive size={20} aria-hidden /> }],
 ];
 
-export function Rail() {
+export function Rail({ section }: { section: Section }) {
   return (
     <nav className="rail" aria-label="Main">
       <a href="#/" className="rail__home" aria-label={`${APP_NAME} home`}>
@@ -53,9 +57,14 @@ export function Rail() {
         <ul key={gi} className="rail__group">
           {group.map((item) => (
             <li key={item.label}>
-              {item.active ? (
-                <Tip text={item.label} side="right">
-                  <a href="#/" className="rail__item is-active" aria-current="page" aria-label={item.label}>
+              {item.href ? (
+                <Tip text={item.section === "proposals" ? "Proposals: new proposal" : item.label} side="right">
+                  <a
+                    href={item.href}
+                    className={`rail__item${item.section === section ? " is-active" : ""}`}
+                    aria-current={item.section === section ? "page" : undefined}
+                    aria-label={item.section === "proposals" ? "Proposals, new proposal" : item.label}
+                  >
                     {item.icon}
                   </a>
                 </Tip>
@@ -87,7 +96,12 @@ export function Rail() {
   );
 }
 
-export function TopBar({ crumb }: { crumb: string | null }) {
+export interface Crumb {
+  label: string;
+  href?: string;
+}
+
+export function TopBar({ crumbs }: { crumbs: Crumb[] }) {
   return (
     <header className="topbar">
       <a href="#/" className="wordmark">
@@ -96,17 +110,17 @@ export function TopBar({ crumb }: { crumb: string | null }) {
       </a>
       <nav aria-label="Breadcrumb" className="crumbs">
         <ol>
-          <li>
-            <a href="#/">Workflows</a>
-          </li>
-          <li>
-            {crumb ? <a href="#/">{WORKFLOW_NAME}</a> : <span aria-current="page">{WORKFLOW_NAME}</span>}
-          </li>
-          {crumb && (
-            <li>
-              <span aria-current="page">{crumb}</span>
+          {crumbs.map((c, i) => (
+            <li key={`${c.label}-${i}`}>
+              {i === crumbs.length - 1 ? (
+                <span aria-current="page">{c.label}</span>
+              ) : c.href ? (
+                <a href={c.href}>{c.label}</a>
+              ) : (
+                <span>{c.label}</span>
+              )}
             </li>
-          )}
+          ))}
         </ol>
       </nav>
       <span className="topbar__spacer" />
