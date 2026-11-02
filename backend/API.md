@@ -476,7 +476,7 @@ shown (`reason`: `budget_exhausted`, another provider code, or
 current. Response: `{"artifact_id": 7, "version": 3, "feedback": {"rating": 1, "comment": null}}`
 (`feedback` null after a clear). `404 version_not_found`.
 
-### `GET /api/artifacts/{id}/export?format=xlsx|pdf&version=N`
+### `GET /api/artifacts/{id}/export?format=xlsx|pdf|docx&version=N`
 
 File download, `Content-Disposition: attachment; filename="compare-quotes-run-12-v3.xlsx"`.
 
@@ -486,7 +486,22 @@ File download, `Content-Disposition: attachment; filename="compare-quotes-run-12
   verify). Header `X-Export-Note: XLSX holds the report tables only.` (show it
   in the toast). Values are always text, never formulas.
 - `pdf`: the full report (notices, sections with the stale tag, prose with chip
-  labels, tables, Sources appendix).
+  labels, tables, Sources appendix). When the content has a cover and/or a TOC
+  (a section with id `cover` / `toc`, or holding a block with that id or an id
+  starting `cover-` / `toc-`), the PDF starts with a cover page and a contents
+  page with page numbers. Slice 1 reports have neither and export as before.
+- `docx` (slice 2): Word document with a cover page (the cover blocks, else the
+  report title), a Word TOC field (pre-filled with the section headings; Word
+  fills in page numbers on open), notices, sections, prose, tables, and a
+  Sources list at the end. Every citation chip is a numbered Word footnote
+  (`Source A1: quote.pdf page 3`; table cells carry the same note as the XLSX
+  comment). `Couldn't verify`, `Conflicting values` (with each value and page)
+  and `Read from scan, unverified` are written as words with the footnoted
+  source, never as a bare value; edited cells read `value (edited)`. Fonts,
+  heading colour and heading sizes come from the run's template snapshot
+  (`run.parameters["template"]["theme"]`, see `TEMPLATE_SNAPSHOT_KEYS` in
+  `backend/export.py`), else a default theme. Exporting the same version twice
+  gives identical bytes.
 
 Header `X-Export-Tables` gives the table count. `422 invalid_request` for
 another format; `500 export_failed` ("Export failed. Retry").

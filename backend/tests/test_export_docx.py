@@ -15,7 +15,8 @@ import zipfile
 from docx import Document
 from lxml import etree
 
-from backend import export, export_docx
+from api_support import DOC_A, api  # noqa: F401
+from backend import db, export, export_docx, models
 from backend.schemas import (
     ArtifactContent,
     Cell,
@@ -416,3 +417,62 @@ def test_front_matter_finds_cover_and_toc_by_section_or_block_id_only():
     assert fm.cover.id == "s0" and fm.toc.id == "s1" and [s.id for s in fm.body] == ["coverage"]
     none = export.front_matter(slice1_content())
     assert none.cover is None and none.toc is None and len(none.body) == 2
+
+
+# --------------------------------------------------------------------- API
+
+
+def _done_run(api):
+    doc = api.upload_pages(DOC_A, "a.pdf")
+    run, _ = api.run([doc])
+    return run, api.artifact(run["id"])
+
+
+def test_api_exports_docx_with_footnotes_and_identical_bytes_twice(api):
+    run, art = _done_run(api)
+    url = f"/api/artifacts/{art['id']}/export"
+    r = api.client.get(url, params={"format": "docx"})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == export_docx.DOCX_MIME
+    assert r.headers["content-disposition"] == f'attachment; filename="compare-quotes-run-{run["id"]}-v1.docx"'
+    assert int(r.headers["x-export-tables"]) >= 1 and "x-export-note" not in r.headers
+    notes = footnotes(r.content)
+    assert notes and ref_ids(r.content) == sorted(notes)
+    assert any("Harborline Specialty" in t for t in (c for row in table_texts(r.content) for c in row)) or \
+        any("Harborline Specialty" in t for _, t in body_paragraphs(r.content))
+    assert body_paragraphs(r.content)[-1][1].startswith("A")  # Sources list ends it
+    assert api.client.get(url, params={"format": "docx"}).content == r.content
+    old = api.client.get(url, params={"format": "docx", "version": 1})
+    assert old.status_code == 200 and old.content == r.content
+
+
+def test_api_docx_uses_the_theme_from_the_run_template_snapshot(api):
+    run, art = _done_run(api)
+    with db.session_scope(api.ctx.factory) as s:
+        s.get(models.Run, run["id"]).parameters = {"template": {"slug": "premier",
+                                                                "theme": {"font": "Georgia", "heading_color": "7A1F3D"}}}
+    r = api.client.get(f"/api/artifacts/{art['id']}/export", params={"format": "docx"})
+    assert r.status_code == 200
+    assert style_xml(r.content, "Heading1").find("w:rPr/w:color", NS).get(f"{{{W}}}val") == "7A1F3D"
+    assert style_xml(r.content, "Normal").find("w:rPr/w:rFonts", NS).get(f"{{{W}}}ascii") == "Georgia"
+
+
+def test_api_docx_failure_is_export_failed_not_silent(api, monkeypatch, caplog):
+    _, art = _done_run(api)
+
+    def boom(data):
+        raise ValueError("Harborline Specialty broke the renderer")
+    monkeypatch.setattr(export_docx, "to_docx", boom)
+    r = api.client.get(f"/api/artifacts/{art['id']}/export", params={"format": "docx"})
+    assert r.status_code == 500
+    assert r.json() == {"error": {"code": "export_failed", "message": "Export failed. Retry."}}
+    logged = "\n".join(rec.getMessage() for rec in caplog.records)
+    assert "format=docx" in logged and "ValueError" in logged and "Harborline" not in logged
+
+
+def test_api_rejects_unknown_formats_and_keeps_xlsx_and_pdf(api):
+    _, art = _done_run(api)
+    url = f"/api/artifacts/{art['id']}/export"
+    assert api.client.get(url, params={"format": "doc"}).status_code == 422
+    assert api.client.get(url, params={"format": "xlsx"}).headers["content-type"] == export.XLSX_MIME
+    assert api.client.get(url, params={"format": "pdf"}).headers["content-type"] == export.PDF_MIME

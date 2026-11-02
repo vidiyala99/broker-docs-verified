@@ -13,7 +13,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
-from backend import db, export, models
+from backend import db, export, export_docx, models
 from backend.context import AppContext
 from backend.edits import EditError, regenerate_prose, restore, save_cell_edit
 from backend.routes.common import ApiError, get_ctx, not_found
@@ -161,7 +161,7 @@ async def put_feedback(artifact_id: int, body: FeedbackIn, ctx: AppContext = Dep
 
 
 @router.get("/artifacts/{artifact_id}/export")
-async def export_artifact(artifact_id: int, format: Literal["xlsx", "pdf"] = Query(...),
+async def export_artifact(artifact_id: int, format: Literal["xlsx", "pdf", "docx"] = Query(...),
                           version: int | None = Query(None, ge=1), ctx: AppContext = Depends(get_ctx)) -> Response:
     with ctx.factory() as s:
         art = s.get(models.Artifact, artifact_id)
@@ -173,11 +173,17 @@ async def export_artifact(artifact_id: int, format: Literal["xlsx", "pdf"] = Que
         except LookupError:
             raise ApiError(404, "version_not_found", f"This report has no version {number}.") from None
         content = models.ArtifactContent.model_validate(row.content)
+        # D6: the theme comes from the run's template snapshot, so an old version
+        # re-exports with the theme it was made with.
         data = export.ExportData(title=art.title, run_id=art.run_id, version=number, content=content,
-                                 chips=chips(s, art.run, content))
+                                 chips=chips(s, art.run, content),
+                                 theme=export.theme_from_parameters(art.run.parameters),
+                                 created_at=row.created_at)
     try:
         if format == "xlsx":
             blob, mime = await asyncio.to_thread(export.to_xlsx, data), export.XLSX_MIME
+        elif format == "docx":
+            blob, mime = await asyncio.to_thread(export_docx.to_docx, data), export_docx.DOCX_MIME
         else:
             blob, mime = await asyncio.to_thread(export.to_pdf, data), export.PDF_MIME
     except Exception as exc:
