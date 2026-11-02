@@ -6,7 +6,7 @@
 
 :root {
   /* ---------- Type ---------- */
-  --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
 
   --text-xs: 12px;   /* legal, chip numerals, captions */
   --text-sm: 14px;   /* labels, table cells, body in panels */

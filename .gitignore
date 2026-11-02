@@ -5,3 +5,8 @@ __pycache__/
 .venv/
 node_modules/
 .claude/
+
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+.playwright-mcp/
