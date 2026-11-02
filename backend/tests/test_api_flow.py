@@ -64,8 +64,8 @@ def done(api):
 def test_workspace_and_workflows(api):
     ws = api.client.get("/api/workspace").json()
     assert ws["app_name"] == "BrokerDocs" and ws["default_workflow"] == "compare-quotes"
-    assert ws["limits"] == {"max_pages": 80, "max_bytes": 15 * 1024 * 1024, "max_megabytes": 15.0,
-                            "max_documents_per_run": 8, "accepts": "application/pdf", "run_token_budget": 600_000}
+    assert ws["limits"] == {"max_pages": 300, "max_bytes": 50 * 1024 * 1024, "max_megabytes": 50.0,
+                            "max_documents_per_run": 8, "accepts": "application/pdf", "run_token_budget": 1_500_000}
     wf = api.client.get("/api/workflows/compare-quotes").json()
     assert wf["name"] == "Compare Quotes" and len(wf["fact_schema"]) == 20 and wf["section_plan"][0]["number"] == "1"
     assert api.client.get(f"/api/workflows/{wf['id']}").json()["slug"] == "compare-quotes"

@@ -157,12 +157,10 @@ class ComposeInput:
         return {pid for f in self.cited_facts() for pid in f.passage_ids}
 
     def allowed_values(self) -> list[str | None]:
-        """Values whose numbers the prose may state: cited values and their conflicting values."""
-        return [v for f in self.cited_facts() for v in (f.value, *(c[0] for c in f.conflicts))]
-
-    def allowed_values(self) -> list[str | None]:
-        """Values whose numbers prose may state: cited fact values, plus user edits (D9)."""
-        return [f.value for f in self.cited_facts()] + [e.value for e in self.edits]
+        """Values whose numbers prose may state: cited fact values, their conflicting values (T14),
+        and user edits (D9)."""
+        cited = [v for f in self.cited_facts() for v in (f.value, *(c[0] for c in f.conflicts))]
+        return cited + [e.value for e in self.edits]
 
 
 @dataclass(frozen=True)

@@ -209,7 +209,7 @@ def test_gate_bars_are_the_r6_numbers():
     assert g.HARD_FAIL_MAX == 0
     assert g.FIELD_ACCURACY_CLEAN_MIN == 0.90
     assert g.FIELD_ACCURACY_MULTI_COLUMN_MIN == 0.80
-    assert g.RUN_INPUT_TOKEN_BUDGET == 600_000
+    assert g.RUN_INPUT_TOKEN_BUDGET == 1_500_000
 
 
 @pytest.mark.parametrize("clean,multi,passed", [
@@ -257,8 +257,8 @@ def test_missing_gated_bucket_is_not_a_pass():
 
 def test_token_budget_gate():
     docs = [_doc("clean", 10, 10), _doc("multi_column", 10, 10)]
-    assert g.evaluate_gates(g.aggregate(docs, [100_000, 600_000])).passed
-    assert not g.evaluate_gates(g.aggregate(docs, [600_001])).passed
+    assert g.evaluate_gates(g.aggregate(docs, [100_000, 1_500_000])).passed
+    assert not g.evaluate_gates(g.aggregate(docs, [1_500_001])).passed
     names = [r.name for r in g.evaluate_gates(g.aggregate(docs)).results]
     assert "max_run_input_tokens" not in names  # only gated when reported
 

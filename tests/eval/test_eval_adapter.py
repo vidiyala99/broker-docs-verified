@@ -44,7 +44,7 @@ def test_run_suite_with_oracle_passes(truths, fixture_dir, by_file):
 
 
 def test_run_suite_over_budget_fails(truths, fixture_dir, by_file):
-    m, rep = run_suite(_oracle_adapter(truths, by_file, tokens=700_000), fixture_dir, truths)
+    m, rep = run_suite(_oracle_adapter(truths, by_file, tokens=1_600_000), fixture_dir, truths)
     assert not rep.passed
     assert [r.name for r in rep.failures] == ["max_run_input_tokens"]
 
