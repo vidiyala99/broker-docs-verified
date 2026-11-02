@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowsClockwise, ArrowsSplit, PencilSimple, Warning } from "@phosphor-icons/react";
 import type { Block, Cell, Chip as ChipData, EvidenceState } from "../api/types";
 import { Chip, ChipList, hueOf, type OpenSource } from "./Chip";
@@ -116,7 +116,7 @@ function EditableCell({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [phase, setPhase] = useState<"idle" | "saving" | "error">("idle");
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const td = useRef<HTMLTableCellElement>(null);
   const errId = useId();
   const state = stateOf(cell);
@@ -127,11 +127,20 @@ function EditableCell({
     if (editing) {
       input.current?.focus();
       input.current?.select();
+      if (input.current) input.current.scrollTop = 0;
     } else if (refocus.current) {
       refocus.current = false;
       td.current?.focus();
     }
   }, [editing]);
+
+  // Grow the editor to fit its text so long values (territory, policy form) stay readable.
+  useLayoutEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft, editing]);
 
   const begin = () => {
     if (!canEdit) return;
@@ -181,8 +190,9 @@ function EditableCell({
     >
       {editing ? (
         <div className="cell-edit">
-          <input
+          <textarea
             ref={input}
+            rows={1}
             className="cell-edit__input"
             value={draft}
             aria-label={`Edit ${label}`}
@@ -190,7 +200,7 @@ function EditableCell({
             aria-invalid={phase === "error" || undefined}
             disabled={phase === "saving"}
             maxLength={2000}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => setDraft(e.target.value.replace(/\s*[\r\n]+\s*/g, " "))}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

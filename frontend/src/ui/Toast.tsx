@@ -69,6 +69,24 @@ function Toast({ item, onDone }: { item: ToastItem; onDone: () => void }) {
     return () => window.clearTimeout(timer.current);
   }, [paused, onDone]);
 
+  // Keyboard path to the action: the toast sits outside the tab order, so Ctrl/Cmd+Z runs it
+  // while it is showing (not while typing in a field, where Ctrl+Z means text undo).
+  const action = item.action;
+  useEffect(() => {
+    if (!action) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, select, [contenteditable]")) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        action.run();
+        onDone();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [action, onDone]);
+
   return (
     <div
       className={`toast${item.leaving ? " is-leaving" : ""}${item.tone === "error" ? " toast--error" : ""}`}
@@ -82,6 +100,7 @@ function Toast({ item, onDone }: { item: ToastItem; onDone: () => void }) {
         <button
           type="button"
           className="toast__action"
+          aria-keyshortcuts="Control+Z Meta+Z"
           onClick={() => {
             item.action?.run();
             onDone();
