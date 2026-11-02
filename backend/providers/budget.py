@@ -15,7 +15,7 @@ runner can mark the run partial.
 Per-document ceiling (T14): `RunBudget.child(ceiling)` returns a
 DocumentBudget that every call of one document goes through. It reserves from
 the run budget as usual and also refuses any reservation that would take that
-document past its own ceiling (400k by default), so one long document cannot
+document past its own ceiling (500k by default, see config), so one long document cannot
 starve the others. It has the same reserve / settle / release / record
 surface, so Provider code does not know the difference.
 
@@ -38,8 +38,11 @@ from .types import CallRecord, RoleTotals, UsageTotals
 log = logging.getLogger("brokerdocs.providers")
 
 
-def estimate_tokens(text: str, chars_per_token: float = 3.0) -> int:
-    """Conservative token estimate for a pre-call check. No tokenizer dependency."""
+def estimate_tokens(text: str, chars_per_token: float = 4.0) -> int:
+    """Conservative token estimate for a pre-call check. No tokenizer dependency.
+
+    The default matches ProviderConfig.chars_per_token (see the calibration note there).
+    """
     if not text:
         return 0
     return math.ceil(len(text) / chars_per_token)

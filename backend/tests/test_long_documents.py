@@ -181,11 +181,11 @@ def test_one_long_document_cannot_starve_the_others(h):
     s.close()
 
 
-def test_document_ceiling_counts_every_window_and_defaults_to_400k(h):
+def test_document_ceiling_counts_every_window_and_defaults_to_500k(h):
     long_id = h.add_doc(data=long_pdf(40), name="policy.pdf")
     fake = FakeProvider(smart_responder())
     m = h.manager(fake)
-    assert m._document_budget_limit == 400_000 == fake.config.document_token_budget
+    assert m._document_budget_limit == 500_000 == fake.config.document_token_budget
     assert fake.config.run_token_budget == 1_500_000
 
     async def main():
@@ -196,7 +196,7 @@ def test_document_ceiling_counts_every_window_and_defaults_to_400k(h):
     s, run = h.run_row(go(main()))
     extract_tokens = sum(c.tokens_in + c.tokens_out for c in run.model_calls if c.purpose == "extract")
     assert run.status == RunStatus.DONE and len([c for c in run.model_calls if c.purpose == "extract"]) == 3
-    assert 0 < extract_tokens <= 400_000
+    assert 0 < extract_tokens <= 500_000
     s.close()
 
 

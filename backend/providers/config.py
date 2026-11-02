@@ -66,8 +66,32 @@ FALLBACK_PRICE = ModelPrice(5.00, 0.50, 40.00)
 # conservative floor; slice 1 calls (one quote, about 10 pages) are far below it.
 DEFAULT_CONTEXT_WINDOW = 128_000
 
+# Typical output of one call, for planning many calls up front (the windows
+# pre-check). Each call still reserves its full max_output_tokens when sent.
+# A 20-field extract reply with quotes is about 1.5k visible tokens; 3k leaves
+# room for reasoning tokens.
+DEFAULT_EXPECTED_OUTPUT_TOKENS: dict[CallRole, int] = {
+    CallRole.EXTRACT: 3_000,
+    CallRole.VISION: 1_500,
+    CallRole.COMPOSE: 8_000,
+    CallRole.CHAT: 1_000,
+    CallRole.SUGGEST: 300,
+}
+
 RUN_TOKEN_BUDGET = 1_500_000  # T14 (D3 had 600k)
-DOCUMENT_TOKEN_BUDGET = 400_000  # T14: per-document ceiling inside the run budget
+# Per-document ceiling inside the run budget. T14 set 400k; the first live
+# eval showed a legitimate 300-page document cannot fit it. Arithmetic for the
+# largest allowed document (300 pages, the parse cap) at the long_300 fixture's
+# density (dense policy prose, 3.9k chars per page, max 4.2k):
+#   23 windows of 15 pages (2 overlap) send 1.33M page chars plus 4.6k chars of
+#   prompt and schema per window = 1.44M chars = 360k estimated input tokens
+#   at 4 chars per token (about 299k actual at the measured 4.7)
+#   + 19 windows x 3k expected output + 4 in-flight windows x 8k reserved
+#   output = 89k
+#   = 449k pre-check need (477k at 4.2k chars on every page).
+# 500k covers that with headroom and still lets three such documents share one
+# 1.5M run.
+DOCUMENT_TOKEN_BUDGET = 500_000
 MAX_CONCURRENCY = 4  # M6
 RETRY_DELAYS_S = (1.0, 2.0, 4.0)  # M8: 3 retries at 1/2/4 seconds
 SCHEMA_RETRIES = 1  # spec section 6: one retry
@@ -77,6 +101,8 @@ SCHEMA_RETRIES = 1  # spec section 6: one retry
 class ProviderConfig:
     models: dict[CallRole, str] = field(default_factory=lambda: dict(DEFAULT_MODELS))
     max_output_tokens: dict[CallRole, int] = field(default_factory=lambda: dict(DEFAULT_MAX_OUTPUT_TOKENS))
+    expected_output_tokens: dict[CallRole, int] = field(
+        default_factory=lambda: dict(DEFAULT_EXPECTED_OUTPUT_TOKENS))
     timeouts_s: dict[CallRole, float] = field(default_factory=lambda: dict(DEFAULT_TIMEOUTS_S))
     prices: dict[str, ModelPrice] = field(default_factory=lambda: dict(DEFAULT_PRICES))
     fallback_price: ModelPrice = FALLBACK_PRICE
@@ -87,9 +113,13 @@ class ProviderConfig:
     max_concurrency: int = MAX_CONCURRENCY
     retry_delays_s: tuple[float, ...] = RETRY_DELAYS_S
     schema_retries: int = SCHEMA_RETRIES
-    # Token estimation before a call (no tokenizer dependency). 3 chars per token
-    # over-counts typical English (about 4), which is the safe side for a cap.
-    chars_per_token: float = 3.0
+    # Token estimation before a call (no tokenizer dependency). Calibrated on the
+    # first live eval: the long_120 fixture's ten windows are 581k chars of
+    # prompt and schema and were billed about 122k prompt tokens, so 4.7 chars
+    # per token for dense policy prose. 4.0 over-counts that by about 18%, the
+    # safety margin. The earlier 3.0 over-counted by 57% and refused a
+    # 300-page document that fits (480k estimated, about 300k actual).
+    chars_per_token: float = 4.0
     image_token_estimate: int = 1_600
     message_overhead_tokens: int = 4
 
