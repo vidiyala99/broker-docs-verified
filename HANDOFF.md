@@ -69,11 +69,11 @@ toolbar wrap, auto-growing cell editor, Ctrl/Cmd+Z for the Undo toast, disabled 
 Owner calls left: repeated "Extraction failed + Retry" per cell (M1), collapse Upload when a run is Done, double-colon failure copy.
 Dev stack was left running (backend 8000, vite 5173); stop them when done. Re-seed the dev DB before reuse.
 
-## Slice 2 Proposal Builder (2026-11-02): spec approved, eng review done, nothing built
-Spec and eng review: `docs/specs/2026-11-02-proposal-builder-design.md` (commit a845b61). Read its "Engineering review" section: decision ledger D1 to D6, tasks T1 to T8, lanes.
-Decided (do not re-ask): scope option 1 (wizard + generate + light edit, no TipTap); approach A (seeded `proposal-builder` workflow on the existing run pipeline); at least one quote PDF required;
-two templates (Standard, Premier); no-AI prose mode as its own deterministic renderer (D5); extraction cache deferred to slice 2c (D1); original file arrangement (D2);
-blocks declare `fact_sections`, unowned facts dropped (D3); one table per fact section (D4); template snapshot in run.parameters (D6). Live OpenAI calls approved for evals and spikes.
-Start with T1 (proposal-aware eval adapter, `backend/eval_hook.py:89` is hard-wired to Compare Quotes; scorer ignores unlisted fields), then lane A (T2 to T4 backend core), DOCX spike (T5) in parallel. Wizard (T7) goes through the design stack after the template API (T6).
-Still unasked: TODO for slice 2c (extraction cache); separate design fix for the left panel (chunky stack, chat cannot collapse, collapse Upload when a run is Done), see owner screenshot feedback.
-Not run: plan-reality check and the review dashboard. Fresh session recommended.
+## Slice 2 Proposal Builder (2026-11-02): backend, DOCX and eval DONE and merged; wizard UI next
+Spec + eng review: `docs/specs/2026-11-02-proposal-builder-design.md` (decisions D1 to D6, tasks T1 to T8). Contract: `backend/API.md` ("Proposal templates", "Proposal runs").
+Done on main (backend 838 pass/2 skip, eval 240 pass/2 skip): T1 eval adapter + 3 fixtures (premier template), T2 to T4 + T6 backend (templates, outline validation, snapshot, no-AI renderer), T5 DOCX export (real Word footnotes, spike note `docs/specs/2026-11-02-docx-footnote-spike.md`).
+Live proposal eval PASSED 2026-11-02: 0 hard fails, cell accuracy 0.939, 191 prose segments checked. Run it under `backend/.venv` (tests/.venv_c lacks SQLAlchemy and silently skips):
+`set -a; . ./.env; set +a; BROKERDOCS_EVAL_PROPOSAL_REPORT=$PWD/proposal_eval_report.json backend/.venv/Scripts/python.exe -m pytest -m live tests/eval/test_live_eval.py -k proposal -q`
+Changed shared field descriptions (`each_occurrence_limit`, `retention`, `rate`): the full 23-doc Compare Quotes live eval has NOT been re-run since (T8, do before release). Standard template has no live eval coverage (fixtures use premier).
+Next: T7 wizard UI in `frontend/src/wizard/` through the full design stack (gstack, ui-ux-pro-max, taste-core + taste-redesign, impeccable, emil-design-eng, frontend-design, Playwright MCP), design gate, axe at both widths, phone width for step 3; then T8. Template API gives `kinds`, `fact_sections`, `limits` for the outline editor.
+Open: left-panel design fix (chunky stack, chat cannot collapse, collapse Upload when Done); slice 2c extraction cache; DOCX cover/TOC ids contract is `cover`/`toc` sections (matches Lane A). Fresh session recommended.
