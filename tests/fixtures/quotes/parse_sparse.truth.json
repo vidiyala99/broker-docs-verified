@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "parse_sparse",
+  "file": "parse_sparse.pdf",
+  "variant": "sparse",
+  "gate_bucket": "parse_only",
+  "description": "Page 1 digital; page 2 is a single raster with the premium facts; page 3 holds under 25 non-whitespace characters. Pages 2 and 3 must trigger OCR (M3, M8).",
+  "carrier": "Fairhaven General Insurance Company",
+  "page_count": 3,
+  "size_bytes": 106817,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [
+      2,
+      3
+    ],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Cedar Hollow Hospitality LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Cedar Hollow Hospitality LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "mailing_address": null,
+    "carrier": {
+      "value": "Fairhaven General Insurance Company",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Carrier: Fairhaven General Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": null,
+    "am_best_rating": null,
+    "policy_period": {
+      "value": "01/01/2027 - 01/01/2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: 01/01/2027 - 01/01/2028",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": null,
+    "producer": null,
+    "policy_form": null,
+    "premium": {
+      "value": "$12,300",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Annual Premium: $12,300",
+      "source": "image",
+      "accepted_values": []
+    },
+    "taxes_and_fees": null,
+    "total_cost": {
+      "value": "$12,450.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $12,450.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": null,
+    "aggregate_limit": null,
+    "deductible": null,
+    "rate": null,
+    "quote_valid_until": null
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": ""
+}

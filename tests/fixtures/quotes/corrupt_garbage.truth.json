@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "corrupt_garbage",
+  "file": "corrupt_garbage.pdf",
+  "variant": "corrupt",
+  "gate_bucket": "parse_only",
+  "description": "PDF magic bytes followed by seeded random bytes. Passes the magic-byte check, fails to parse.",
+  "carrier": null,
+  "page_count": null,
+  "size_bytes": 6009,
+  "expect": {
+    "parse": "failed",
+    "failure_reason": "corrupt",
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": null,
+    "mailing_address": null,
+    "carrier": null,
+    "admitted_status": null,
+    "am_best_rating": null,
+    "policy_period": null,
+    "territory": null,
+    "producer": null,
+    "policy_form": null,
+    "premium": null,
+    "taxes_and_fees": null,
+    "total_cost": null,
+    "each_occurrence_limit": null,
+    "aggregate_limit": null,
+    "deductible": null,
+    "rate": null,
+    "quote_valid_until": null
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": ""
+}

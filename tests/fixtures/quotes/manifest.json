@@ -1,0 +1,246 @@
+{
+  "generator_version": 1,
+  "seed": 20261101,
+  "pymupdf_version": "1.28.0",
+  "fields": {
+    "named_insured": "Named insured on the quote",
+    "mailing_address": "Named insured mailing address",
+    "carrier": "Issuing carrier legal name",
+    "admitted_status": "Admitted or non-admitted (surplus lines)",
+    "am_best_rating": "AM Best financial strength rating",
+    "policy_period": "Policy term, effective to expiration",
+    "territory": "Coverage territory",
+    "producer": "Producer or broker of record",
+    "policy_form": "Policy form name and number",
+    "premium": "Annual premium before taxes and fees",
+    "taxes_and_fees": "Taxes and fees",
+    "total_cost": "Total payable (premium plus taxes and fees)",
+    "each_occurrence_limit": "Each occurrence limit",
+    "aggregate_limit": "General aggregate limit",
+    "deductible": "Deductible or retention",
+    "rate": "Rate basis",
+    "quote_valid_until": "Date the quote expires"
+  },
+  "fixtures": [
+    {
+      "fixture_id": "carrier_a_clean",
+      "file": "carrier_a_clean.pdf",
+      "truth": "carrier_a_clean.truth.json",
+      "variant": "clean",
+      "gate_bucket": "clean",
+      "sha256": "75074eab8a3514f4d27ce7162dae337329e37de2ec414cba5811cb66704a7bf1",
+      "deterministic_bytes": true,
+      "description": "Clean digital 3-page quote from Harborline Specialty Insurance Company. All schema fields present."
+    },
+    {
+      "fixture_id": "carrier_a_multicol",
+      "file": "carrier_a_multicol.pdf",
+      "truth": "carrier_a_multicol.truth.json",
+      "variant": "multi_column",
+      "gate_bucket": "multi_column",
+      "sha256": "5d427155cc340b68b49eececd31fefffb02eddc197154449b801475ba520632a",
+      "deterministic_bytes": true,
+      "description": "Two-column layout of the same Harborline Specialty Insurance Company quote; premium table values precede labels in extraction order. All schema fields present."
+    },
+    {
+      "fixture_id": "carrier_a_scanned",
+      "file": "carrier_a_scanned.pdf",
+      "truth": "carrier_a_scanned.truth.json",
+      "variant": "scanned",
+      "gate_bucket": "scanned",
+      "sha256": "107fd1cebbf1df80eb8428198adf777c106a12d2486fcdc96b9b95c6114b2248",
+      "deterministic_bytes": true,
+      "description": "Image-only (scan-like, noisy JPEG) pages of the Harborline Specialty Insurance Company quote; every page needs OCR and facts are expected as scan_read. All schema fields present."
+    },
+    {
+      "fixture_id": "carrier_b_clean",
+      "file": "carrier_b_clean.pdf",
+      "truth": "carrier_b_clean.truth.json",
+      "variant": "clean",
+      "gate_bucket": "clean",
+      "sha256": "d357f5c6d4d63f8f268e50afd49d87afb6b3c74a71d6d4be04f7ed7c4d9ba64d",
+      "deterministic_bytes": true,
+      "description": "Clean digital 3-page quote from Ridgecrest Mutual Casualty Company. Absent fields (must return null): territory."
+    },
+    {
+      "fixture_id": "carrier_b_multicol",
+      "file": "carrier_b_multicol.pdf",
+      "truth": "carrier_b_multicol.truth.json",
+      "variant": "multi_column",
+      "gate_bucket": "multi_column",
+      "sha256": "4a0e344ef60828c5901b50282f373f17ab8d3201f9056c835d16e9c7e14874f4",
+      "deterministic_bytes": true,
+      "description": "Two-column layout of the same Ridgecrest Mutual Casualty Company quote; premium table values precede labels in extraction order. Absent fields (must return null): territory."
+    },
+    {
+      "fixture_id": "carrier_b_scanned",
+      "file": "carrier_b_scanned.pdf",
+      "truth": "carrier_b_scanned.truth.json",
+      "variant": "scanned",
+      "gate_bucket": "scanned",
+      "sha256": "7f73811111c69e8276374cb37046368c22ec3bd1a998765f77d2ca50cdd96b35",
+      "deterministic_bytes": true,
+      "description": "Image-only (scan-like, noisy JPEG) pages of the Ridgecrest Mutual Casualty Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): territory."
+    },
+    {
+      "fixture_id": "carrier_c_clean",
+      "file": "carrier_c_clean.pdf",
+      "truth": "carrier_c_clean.truth.json",
+      "variant": "clean",
+      "gate_bucket": "clean",
+      "sha256": "09ef8f15b246b6f40b29157abda16b2b132c332ddd1b43d7c7409150de1d583d",
+      "deterministic_bytes": true,
+      "description": "Clean digital 3-page quote from Northbeam Indemnity Company. Absent fields (must return null): am_best_rating."
+    },
+    {
+      "fixture_id": "carrier_c_multicol",
+      "file": "carrier_c_multicol.pdf",
+      "truth": "carrier_c_multicol.truth.json",
+      "variant": "multi_column",
+      "gate_bucket": "multi_column",
+      "sha256": "44232e276ad649477cead8d2ad2e635005a1acaee1a0f07492bf397792107352",
+      "deterministic_bytes": true,
+      "description": "Two-column layout of the same Northbeam Indemnity Company quote; premium table values precede labels in extraction order. Absent fields (must return null): am_best_rating."
+    },
+    {
+      "fixture_id": "carrier_c_scanned",
+      "file": "carrier_c_scanned.pdf",
+      "truth": "carrier_c_scanned.truth.json",
+      "variant": "scanned",
+      "gate_bucket": "scanned",
+      "sha256": "68d2df8033cf018852e4f90d63adac5b8a5a349764c7a4de49e3f1d250912b37",
+      "deterministic_bytes": true,
+      "description": "Image-only (scan-like, noisy JPEG) pages of the Northbeam Indemnity Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): am_best_rating."
+    },
+    {
+      "fixture_id": "carrier_d_clean",
+      "file": "carrier_d_clean.pdf",
+      "truth": "carrier_d_clean.truth.json",
+      "variant": "clean",
+      "gate_bucket": "clean",
+      "sha256": "623fa104ebd43fc74fe9b3a31e3e28a2edbb47a3b58113fdc0697c324e6befd6",
+      "deterministic_bytes": true,
+      "description": "Clean digital 3-page quote from Copperfield Surplus Lines Insurance Company. Absent fields (must return null): deductible, rate."
+    },
+    {
+      "fixture_id": "carrier_d_multicol",
+      "file": "carrier_d_multicol.pdf",
+      "truth": "carrier_d_multicol.truth.json",
+      "variant": "multi_column",
+      "gate_bucket": "multi_column",
+      "sha256": "0adc8466bc419cda076b30d0d9f7903ddc34da2ded7522ffba58e89148a913a7",
+      "deterministic_bytes": true,
+      "description": "Two-column layout of the same Copperfield Surplus Lines Insurance Company quote; premium table values precede labels in extraction order. Absent fields (must return null): deductible, rate."
+    },
+    {
+      "fixture_id": "carrier_d_scanned",
+      "file": "carrier_d_scanned.pdf",
+      "truth": "carrier_d_scanned.truth.json",
+      "variant": "scanned",
+      "gate_bucket": "scanned",
+      "sha256": "51d7e693b3a1fd86e46027f891b78bf2c84d061c911b0ae4847059dbccf23beb",
+      "deterministic_bytes": true,
+      "description": "Image-only (scan-like, noisy JPEG) pages of the Copperfield Surplus Lines Insurance Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): deductible, rate."
+    },
+    {
+      "fixture_id": "multi_option",
+      "file": "multi_option.pdf",
+      "truth": "multi_option.truth.json",
+      "variant": "multi_option",
+      "gate_bucket": "report_only",
+      "sha256": "87f4aede37e0c3f796756a5ef559786c3a4815ad510476d046b558b9bf0e525e",
+      "deterministic_bytes": true,
+      "description": "One PDF holding two quote options with different limits, deductible and premium. Truth is option 1 (the first presented); option 2 values are decoys (D8)."
+    },
+    {
+      "fixture_id": "conflicting_endorsement",
+      "file": "conflicting_endorsement.pdf",
+      "truth": "conflicting_endorsement.truth.json",
+      "variant": "conflicting_endorsement",
+      "gate_bucket": "report_only",
+      "sha256": "4399147b02706dc8fb37b27f2e77eb4d4d991a1ed91fc3b085539aaa1735e294",
+      "deterministic_bytes": true,
+      "description": "Declarations state one deductible; a later endorsement replaces it. Truth is the amended (effective) deductible; the declared figure is a decoy."
+    },
+    {
+      "fixture_id": "injection",
+      "file": "injection.pdf",
+      "truth": "injection.truth.json",
+      "variant": "injection",
+      "gate_bucket": "report_only",
+      "sha256": "47afa4bd91bf95dbc223f9f92c9c33c4b2e518cb5738249cf27d2d987ffc456b",
+      "deterministic_bytes": true,
+      "description": "Clean quote with a small-print paragraph instructing the model to report false values. Canary values must never appear as extracted facts; territory is absent."
+    },
+    {
+      "fixture_id": "parse_sparse",
+      "file": "parse_sparse.pdf",
+      "truth": "parse_sparse.truth.json",
+      "variant": "sparse",
+      "gate_bucket": "parse_only",
+      "sha256": "b5ffc24464db0a72111e94cbe9851d747c90489231619cd2b8d4464746ea46e2",
+      "deterministic_bytes": true,
+      "description": "Page 1 digital; page 2 is a single raster with the premium facts; page 3 holds under 25 non-whitespace characters. Pages 2 and 3 must trigger OCR (M3, M8)."
+    },
+    {
+      "fixture_id": "parse_mixed",
+      "file": "parse_mixed.pdf",
+      "truth": "parse_mixed.truth.json",
+      "variant": "mixed",
+      "gate_bucket": "parse_only",
+      "sha256": "f854b14ecaae87ef10d8d8fffa4e5dbeb20d03220f202bcf0cfcaf55fddc1e2d",
+      "deterministic_bytes": true,
+      "description": "Page 2: raster covering about half the page with fact text, plus a short digital caption (OCR). Page 3: small logo and full text (no OCR). Page 4: decorative image over 40% of the page but more than 600 characters of text (no OCR)."
+    },
+    {
+      "fixture_id": "password_protected",
+      "file": "password_protected.pdf",
+      "truth": "password_protected.truth.json",
+      "variant": "password",
+      "gate_bucket": "parse_only",
+      "sha256": "cdeef5f42e91f6085387c45536b6992a3ec98d8d7850f1c50deece18c7695e13",
+      "deterministic_bytes": false,
+      "description": "Clean quote encrypted with a user password (AES-256). The document must fail with a password message; only its column fails."
+    },
+    {
+      "fixture_id": "corrupt_garbage",
+      "file": "corrupt_garbage.pdf",
+      "truth": "corrupt_garbage.truth.json",
+      "variant": "corrupt",
+      "gate_bucket": "parse_only",
+      "sha256": "a4d2ed42c8c48cdacdb5890eecff206393cb06146c228a59ea4ccdc918ad0f8a",
+      "deterministic_bytes": true,
+      "description": "PDF magic bytes followed by seeded random bytes. Passes the magic-byte check, fails to parse."
+    },
+    {
+      "fixture_id": "corrupt_truncated",
+      "file": "corrupt_truncated.pdf",
+      "truth": "corrupt_truncated.truth.json",
+      "variant": "corrupt",
+      "gate_bucket": "parse_only",
+      "sha256": "6c0e5782f812b4bd65b8638267a698928a1e98c0f07ecd37bedd48e7c265f47c",
+      "deterministic_bytes": true,
+      "description": "A real generated quote cut to its first 5 percent. Longer cuts are partly repaired by MuPDF, so this cut keeps the expected outcome unambiguous."
+    },
+    {
+      "fixture_id": "not_a_pdf",
+      "file": "not_a_pdf.pdf",
+      "truth": "not_a_pdf.truth.json",
+      "variant": "not_pdf",
+      "gate_bucket": "parse_only",
+      "sha256": "e214244cae7cea75f6d0671bd54ed0aa75a893241831a097b4b8dee0d97b942d",
+      "deterministic_bytes": true,
+      "description": "Plain text saved with a .pdf name. Must be rejected by the magic-byte check."
+    },
+    {
+      "fixture_id": "over_cap_pages",
+      "file": "over_cap_pages.pdf",
+      "truth": "over_cap_pages.truth.json",
+      "variant": "over_cap",
+      "gate_bucket": "parse_only",
+      "sha256": "51c8787a87baf8e46de1a6406055c638d74da9c964751310d455b38ca09a8f2c",
+      "deterministic_bytes": true,
+      "description": "81 pages, one over the 80-page cap. Must be rejected before any model call with a message naming the page limit."
+    }
+  ]
+}

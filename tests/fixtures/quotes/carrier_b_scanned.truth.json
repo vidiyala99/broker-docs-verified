@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "carrier_b_scanned",
+  "file": "carrier_b_scanned.pdf",
+  "variant": "scanned",
+  "gate_bucket": "scanned",
+  "description": "Image-only (scan-like, noisy JPEG) pages of the Ridgecrest Mutual Casualty Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): territory.",
+  "carrier": "Ridgecrest Mutual Casualty Company",
+  "page_count": 3,
+  "size_bytes": 415475,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [
+      1,
+      2,
+      3
+    ],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Cedar Hollow Hospitality LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Cedar Hollow Hospitality LLC",
+      "source": "image",
+      "accepted_values": []
+    },
+    "mailing_address": {
+      "value": "305 Orchard Lane, Asheville, NC 28801",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 305 Orchard Lane, Asheville, NC 28801",
+      "source": "image",
+      "accepted_values": []
+    },
+    "carrier": {
+      "value": "Ridgecrest Mutual Casualty Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Carrier: Ridgecrest Mutual Casualty Company",
+      "source": "image",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Admitted",
+      "source": "image",
+      "accepted_values": []
+    },
+    "am_best_rating": {
+      "value": "A+ (Superior), XIV",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AM Best Rating: A+ (Superior), XIV",
+      "source": "image",
+      "accepted_values": []
+    },
+    "policy_period": {
+      "value": "January 1, 2027 to January 1, 2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: January 1, 2027 to January 1, 2028",
+      "source": "image",
+      "accepted_values": []
+    },
+    "territory": null,
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Meridian Risk Partners LLC",
+      "source": "image",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "source": "image",
+      "accepted_values": []
+    },
+    "premium": {
+      "value": "$29,325",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Annual Premium: $29,325",
+      "source": "image",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$350.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Taxes and Fees: $350.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "total_cost": {
+      "value": "$29,675.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $29,675.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $2,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "aggregate_limit": {
+      "value": "$4,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "General Aggregate Limit: $4,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "deductible": {
+      "value": "$5,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Deductible: $5,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "rate": {
+      "value": "$3.778 per $1,000 of gross sales",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Rate: $3.778 per $1,000 of gross sales",
+      "source": "image",
+      "accepted_values": []
+    },
+    "quote_valid_until": {
+      "value": "December 15, 2026",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Quote Valid Until: December 15, 2026",
+      "source": "image",
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": ""
+}

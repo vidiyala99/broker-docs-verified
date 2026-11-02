@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "carrier_b_multicol",
+  "file": "carrier_b_multicol.pdf",
+  "variant": "multi_column",
+  "gate_bucket": "multi_column",
+  "description": "Two-column layout of the same Ridgecrest Mutual Casualty Company quote; premium table values precede labels in extraction order. Absent fields (must return null): territory.",
+  "carrier": "Ridgecrest Mutual Casualty Company",
+  "page_count": 3,
+  "size_bytes": 13729,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Cedar Hollow Hospitality LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Cedar Hollow Hospitality LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "mailing_address": {
+      "value": "305 Orchard Lane, Asheville, NC 28801",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "305 Orchard Lane, Asheville, NC 28801",
+      "source": "text",
+      "accepted_values": []
+    },
+    "carrier": {
+      "value": "Ridgecrest Mutual Casualty Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Ridgecrest Mutual Casualty Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted",
+      "source": "text",
+      "accepted_values": []
+    },
+    "am_best_rating": {
+      "value": "A+ (Superior), XIV",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "A+ (Superior), XIV",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_period": {
+      "value": "January 1, 2027 to January 1, 2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "January 1, 2027 to January 1, 2028",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": null,
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Meridian Risk Partners LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "CG 00 02 04 13 Commercial General Liability Coverage Form (Claims-Made)",
+      "source": "text",
+      "accepted_values": []
+    },
+    "premium": {
+      "value": "$29,325",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$29,325",
+      "source": "text",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$350.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$350.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "total_cost": {
+      "value": "$29,675.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$29,675.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "aggregate_limit": {
+      "value": "$4,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$4,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "deductible": {
+      "value": "$5,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$5,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "rate": {
+      "value": "$3.778 per $1,000 of gross sales",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$3.778 per $1,000 of gross sales",
+      "source": "text",
+      "accepted_values": []
+    },
+    "quote_valid_until": {
+      "value": "December 15, 2026",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Valid until December 15, 2026",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": ""
+}

@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261101,
+  "fixture_id": "carrier_a_scanned",
+  "file": "carrier_a_scanned.pdf",
+  "variant": "scanned",
+  "gate_bucket": "scanned",
+  "description": "Image-only (scan-like, noisy JPEG) pages of the Harborline Specialty Insurance Company quote; every page needs OCR and facts are expected as scan_read. All schema fields present.",
+  "carrier": "Harborline Specialty Insurance Company",
+  "page_count": 3,
+  "size_bytes": 420754,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [
+      1,
+      2,
+      3
+    ],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Cedar Hollow Hospitality LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Cedar Hollow Hospitality LLC",
+      "source": "image",
+      "accepted_values": []
+    },
+    "mailing_address": {
+      "value": "305 Orchard Lane, Asheville, NC 28801",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 305 Orchard Lane, Asheville, NC 28801",
+      "source": "image",
+      "accepted_values": []
+    },
+    "carrier": {
+      "value": "Harborline Specialty Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Carrier: Harborline Specialty Insurance Company",
+      "source": "image",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Non-Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Non-Admitted",
+      "source": "image",
+      "accepted_values": [
+        "Non-Admitted (Surplus Lines)",
+        "Surplus Lines",
+        "Nonadmitted"
+      ]
+    },
+    "am_best_rating": {
+      "value": "A (Excellent), XII",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AM Best Rating: A (Excellent), XII",
+      "source": "image",
+      "accepted_values": []
+    },
+    "policy_period": {
+      "value": "01/01/2027 to 01/01/2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: 01/01/2027 to 01/01/2028",
+      "source": "image",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "United States of America, its territories and possessions, Puerto Rico and Canada",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage Territory: United States of America, its territories and possessions, Puerto Rico and Canada",
+      "source": "image",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Meridian Risk Partners LLC",
+      "source": "image",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)",
+      "source": "image",
+      "accepted_values": []
+    },
+    "premium": {
+      "value": "$25,075.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Annual Premium: $25,075.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$1,316.14",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Taxes and Fees: $1,316.14",
+      "source": "image",
+      "accepted_values": []
+    },
+    "total_cost": {
+      "value": "$26,391.14",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $26,391.14",
+      "source": "image",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": {
+      "value": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $1,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "aggregate_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "General Aggregate Limit: $2,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "deductible": {
+      "value": "$2,500",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Deductible: $2,500",
+      "source": "image",
+      "accepted_values": []
+    },
+    "rate": {
+      "value": "$5.466 per $1,000 of gross sales",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Rate: $5.466 per $1,000 of gross sales",
+      "source": "image",
+      "accepted_values": []
+    },
+    "quote_valid_until": {
+      "value": "12/15/2026",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Quote Valid Until: 12/15/2026",
+      "source": "image",
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": ""
+}
