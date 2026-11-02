@@ -346,13 +346,14 @@ class InvalidTransition(ValueError):
 _FACT_TRANSITIONS: dict[EvidenceState, frozenset[EvidenceState]] = {
     EvidenceState.PENDING: frozenset(
         {EvidenceState.VERIFIED, EvidenceState.SCAN_READ, EvidenceState.NOT_FOUND,
-         EvidenceState.ABSENT, EvidenceState.FAILED}
+         EvidenceState.ABSENT, EvidenceState.FAILED, EvidenceState.CONFLICTING}
     ),
     EvidenceState.FAILED: frozenset({EvidenceState.PENDING}),  # retry
     EvidenceState.VERIFIED: frozenset(),
     EvidenceState.SCAN_READ: frozenset(),
     EvidenceState.NOT_FOUND: frozenset(),
     EvidenceState.ABSENT: frozenset(),
+    EvidenceState.CONFLICTING: frozenset(),
 }
 
 _RUN_TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
@@ -405,6 +406,7 @@ _DISPLAY = {
     EvidenceState.PENDING: "Not specified",
     EvidenceState.NOT_FOUND: "Couldn't verify",
     EvidenceState.FAILED: "Extraction failed",
+    EvidenceState.CONFLICTING: "Conflicting values",  # T14: the values are on the cell's notice and chips
 }
 
 

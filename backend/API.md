@@ -275,7 +275,8 @@ report yet; `404 version_not_found`.
   "note": "edit premium-table/total_premium/A", "created_at": "...",
   "content": ArtifactContent,
   "chips": {"88": Chip},
-  "counts": {"verified": 31, "scan_read": 2, "not_found": 1, "absent": 6, "failed": 0, "edited": 1},
+  "counts": {"verified": 31, "scan_read": 2, "not_found": 1, "absent": 6, "failed": 0, "conflicting": 0,
+             "edited": 1},
   "stale_sections": ["executive_summary"],
   "feedback": {"rating": 1, "comment": null}
 }
@@ -330,13 +331,34 @@ Notice `kind`: `compose_fallback` (prose failed validation twice: banner plus
 `documents_failed` (`retryable`: offer run Retry), `info`. Show at most two
 rows at the top (DG5). Column `warning` is the column-level row (failed
 document reason, or `Compared "Option 1", option 1 of 3 in this document`).
+`conflicting_values` is cell-level only (`Cell.notice`, below), never in
+`notices`.
 
 `Cell`:
 
 ```json
 {"value": "$26,391.14", "passage_ids": [88], "fact_ids": [301], "state": "verified",
- "edited": false, "original_value": null, "original_passage_ids": []}
+ "edited": false, "original_value": null, "original_passage_ids": [],
+ "notice": null, "conflicts": []}
 ```
+
+`notice` is a cell-level Notice or null. `conflicts` is empty except in state
+`conflicting` (long documents, T14): the document states two or more
+different values for the field, each verified on its own page, and no
+endorsement makes one of them effective. Nothing is picked:
+
+```json
+{"value": "Conflicting values", "passage_ids": [88, 97], "fact_ids": [301], "state": "conflicting",
+ "edited": false, "original_value": null, "original_passage_ids": [],
+ "notice": {"kind": "conflicting_values", "retryable": false, "dismissible": false,
+            "message": "This document states different values for Deductible / Retention: $5,000 (page 20) and $7,500 (page 90). No value is shown as verified; check which one applies."},
+ "conflicts": [{"value": "$5,000", "page_no": 20, "passage_id": 88},
+               {"value": "$7,500", "page_no": 90, "passage_id": 97}]}
+```
+
+`conflicts` is ordered by page; `passage_ids` holds one chip per value in the
+same order, so each value's chip opens its own page. Show the values from
+`conflicts` (or the notice text), never one of them as the cell's value.
 
 Evidence states (M1, DG3); the text to show is already in `value`:
 
@@ -347,6 +369,14 @@ Evidence states (M1, DG3); the text to show is already in `value`:
 | `not_found` | `Couldn't verify` | none; triangle glyph |
 | `absent` | `Not specified` | none |
 | `failed` | `Extraction failed` | none; refresh glyph plus Retry (run retry) |
+| `conflicting` | `Conflicting values` | one chip per value (each a verified passage); same unverified treatment as `not_found` (triangle glyph, unverified text color) plus the notice listing every value and page. Never styled as verified. Counted under `counts.conflicting`, not `verified` |
+
+Design mapping note: `conflicting` is new (2026-11-02). Until DESIGN.md
+gives it its own treatment, render it like "Couldn't verify" (the
+`--evidence-unverified-fg` token and triangle glyph) with the text
+"Conflicting values", the cell notice row, and the chips from
+`passage_ids`. XLSX and PDF exports write "Conflicting values" with the
+values and pages in the cell note.
 
 When `edited` is true, show the user's `value` with the pencil glyph; the
 extracted value and its chips are in `original_value` and

@@ -90,18 +90,22 @@ def test_120_page_document_is_extracted_in_windows_verified_and_merged(h):
     assert len(carrier.extra_passage_ids) == 1 and carrier.extra_passage_ids[0] != carrier.passage_id
     prem = facts["total_premium"]
     assert prem.page_no == 50 and prem.value == "$26,391.14" and prem.extra_passage_ids == []
+    # two verified values, no endorsement: a conflict, never a silent pick (owner decision 2026-11-02)
     ret = facts["retention"]
-    assert (ret.value, ret.page_no) == ("$5,000", 20)
-    assert [(c["value"], c["page_no"]) for c in ret.conflicts] == [("$7,500", 90)]
-    assert ret.conflicts[0]["passage_id"] is not None
+    assert ret.state == EvidenceState.CONFLICTING and ret.value is None and ret.passage_id is None
+    assert [(c["value"], c["page_no"]) for c in ret.conflicts] == [("$5,000", 20), ("$7,500", 90)]
+    assert all(c["passage_id"] is not None for c in ret.conflicts)
 
     content = run.artifact.latest_content()
     cells = {r.key: r.cells["A"] for _, b in content.iter_blocks() if b.type == "table" for r in b.rows}
     assert cells["carrier_name"].passage_ids == [carrier.passage_id, carrier.extra_passage_ids[0]]
-    notice = cells["retention"].notice
+    cell = cells["retention"]
+    notice = cell.notice
     assert notice is not None and notice.kind == "conflicting_values"
     assert "$5,000 (page 20)" in notice.message and "$7,500 (page 90)" in notice.message
-    assert cells["retention"].value == "$5,000" and cells["retention"].state == EvidenceState.VERIFIED
+    assert cell.value == "Conflicting values" and cell.state == EvidenceState.CONFLICTING
+    assert cell.passage_ids == [c["passage_id"] for c in ret.conflicts]  # a chip per value, clickable
+    assert [(c.value, c.page_no) for c in cell.conflicts] == [("$5,000", 20), ("$7,500", 90)]
     assert all(c.notice is None for k, c in cells.items() if k != "retention")
     s.close()
 

@@ -15,7 +15,10 @@ Mapping to the eval's vocabulary:
   ProviderError code (budget_exhausted, refusal, ...); a path that cannot be
   read is missing_file.
 - state: EvidenceState, with absent -> not_found and a null value (the eval
-  treats a not_found fact with no value as absent).
+  treats a not_found fact with no value as absent). conflicting (T14: a long
+  document states different values, none picked) -> not_found with value
+  "Conflicting values: v1 (page p1); v2 (page p2)", so it counts as a
+  rejected fact, never as a verified wrong value.
 - page: the page the quote was found on (after a D6 re-point), else the page
   the model cited.
 - input_tokens: prompt tokens of every model call in the run (M4), as logged
@@ -43,7 +46,8 @@ _REASONS = {"encrypted": "password_protected", "too_large": "over_cap", "too_man
             "too_many_documents": "over_cap"}
 _STATES = {EvidenceState.VERIFIED: "verified", EvidenceState.SCAN_READ: "scan_read",
            EvidenceState.NOT_FOUND: "not_found", EvidenceState.ABSENT: "not_found",
-           EvidenceState.FAILED: "failed", EvidenceState.PENDING: "not_found"}
+           EvidenceState.FAILED: "failed", EvidenceState.PENDING: "not_found",
+           EvidenceState.CONFLICTING: "not_found"}
 
 
 def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
@@ -136,5 +140,9 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None) -
 def _fact(f: models.Fact) -> dict[str, Any]:
     state = EvidenceState(f.state)
     value = None if state == EvidenceState.ABSENT else f.value
+    if state == EvidenceState.CONFLICTING:
+        listed = "; ".join(f"{c.get('value')} (page {c['page_no']})" if c.get("page_no") is not None
+                           else f"{c.get('value')}" for c in f.conflicts or ())
+        value = f"Conflicting values: {listed}" if listed else None
     return {"field": f.field, "value": value, "page": f.page_no if f.page_no is not None else f.cited_page,
             "quote": f.quote, "state": _STATES[state]}

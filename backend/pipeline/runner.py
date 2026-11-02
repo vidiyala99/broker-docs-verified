@@ -276,7 +276,7 @@ def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactFie
                                          state=EvidenceState(f.state), passage_id=f.passage_id,
                                          page_no=f.page_no, fact_id=f.id,
                                          extra_passage_ids=tuple(f.extra_passage_ids or ()),
-                                         conflicts=tuple((c["value"], c.get("page_no"))
+                                         conflicts=tuple((c["value"], c.get("page_no"), c.get("passage_id"))
                                                          for c in f.conflicts or ())) for f in doc_facts)
     notices = []
     if budget_failed:
@@ -755,6 +755,8 @@ class RunManager:
                                                     verified=r.state == EvidenceState.VERIFIED, rects=r.rects)
                     fact.passage_id = passage.id
                     models.attach_merged_evidence(s, fact, doc_id, r)  # T14: no-op for single-call facts
+                elif getattr(r, "conflicts", ()):  # T14 CONFLICTING: no value, a passage per stated value
+                    models.attach_merged_evidence(s, fact, doc_id, r)
                 s.add(fact)
 
     def _compose_input(self, run: models.Run, plan: _Plan, budget: RunBudget) -> compose.ComposeInput:

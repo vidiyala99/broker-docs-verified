@@ -97,7 +97,8 @@ def test_precheck_counts_every_input_full_output_in_flight_and_expected_output_a
     ws = windows.plan_windows(120)
     schema = extract.build_extraction_schema(FIELDS)
     inputs = sum(fake.estimate_input_tokens(
-        extract.build_extraction_messages(FIELDS, windows._window_pages(pages, w), document_name="x.pdf"), schema)
+        extract.build_extraction_messages(FIELDS, windows._window_pages(pages, w), document_name="x.pdf",
+                                          part=windows.window_part(w, ws, 120)), schema)
         for w in ws)
     cfg = fake.config
     expected = (inputs + (len(ws) - cfg.max_concurrency) * cfg.expected_output_tokens[CallRole.EXTRACT]
@@ -107,7 +108,8 @@ def test_precheck_counts_every_input_full_output_in_flight_and_expected_output_a
     two = windows.plan_windows(20)
     short = prose_doc(20, 3900)
     in2 = sum(fake.estimate_input_tokens(
-        extract.build_extraction_messages(FIELDS, windows._window_pages(short, w), document_name="x.pdf"), schema)
+        extract.build_extraction_messages(FIELDS, windows._window_pages(short, w), document_name="x.pdf",
+                                          part=windows.window_part(w, two, 20)), schema)
         for w in two)
     assert windows.precheck_tokens(fake, FIELDS, short, two, document_name="x.pdf") == (
         in2 + 2 * cfg.max_output_tokens[CallRole.EXTRACT])
