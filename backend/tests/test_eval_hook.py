@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from backend import eval_hook
+from backend.pipeline.parse import DEFAULT_LIMITS
 from backend.providers import FakeProvider
 from pipeline_fakes import smart_responder
 
@@ -16,6 +17,13 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "quotes"
 NAMES = ["carrier_a_clean", "password_protected", "not_a_pdf", "corrupt_garbage", "over_cap_pages",
          "carrier_a_scanned"]
+
+
+def _page_count(path: Path) -> int:
+    import fitz
+
+    with fitz.open(path) as doc:
+        return doc.page_count
 
 
 @pytest.fixture(scope="module")
@@ -43,9 +51,15 @@ def test_parse_failures_map_to_eval_reasons(output):
     assert docs["password_protected"]["failure_reason"] == "password_protected"
     assert docs["not_a_pdf"]["failure_reason"] == "not_pdf"
     assert docs["corrupt_garbage"]["failure_reason"] == "corrupt"
-    assert docs["over_cap_pages"]["failure_reason"] == "over_cap"
-    for name in ("password_protected", "not_a_pdf", "corrupt_garbage", "over_cap_pages"):
+    for name in ("password_protected", "not_a_pdf", "corrupt_garbage"):
         assert docs[name]["status"] == "failed" and docs[name]["facts"] == []
+    # T14 raised the page cap to 300; the fixture is over the cap only once the eval
+    # lane regenerates it past 300 pages (it had 81 when the cap was 80).
+    if _page_count(FIXTURES / "over_cap_pages.pdf") > DEFAULT_LIMITS.max_pages:
+        assert docs["over_cap_pages"]["failure_reason"] == "over_cap"
+        assert docs["over_cap_pages"]["status"] == "failed" and docs["over_cap_pages"]["facts"] == []
+    else:
+        assert docs["over_cap_pages"]["failure_reason"] != "over_cap"
 
 
 def test_ok_documents_carry_verified_facts_ocr_pages_and_option_count(output):

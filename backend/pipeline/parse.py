@@ -1,7 +1,8 @@
 """Step 1, parse: PyMuPDF text and word boxes per page, OCR triggers, caps.
 
-Caps (D3, all configurable through ParseLimits): 80 pages and 15 MB per
-document, 8 documents per run. Over a cap raises ParseError whose message
+Caps (D3, raised by T14; all configurable through ParseLimits): 300 pages
+and 50 MB per document, 8 documents per run. Documents over 15 pages are
+extracted in page windows (pipeline.windows). Over a cap raises ParseError whose message
 names the limit, so the user sees why.
 
 OCR triggers (M3, M8): a page is sent to the vision pass when it has fewer
@@ -32,8 +33,8 @@ _MB = 1024 * 1024
 
 @dataclass(frozen=True)
 class ParseLimits:
-    max_pages: int = 80
-    max_bytes: int = 15 * _MB
+    max_pages: int = 300  # T14 (D3 had 80)
+    max_bytes: int = 50 * _MB  # T14 (D3 had 15 MB)
     max_documents_per_run: int = 8
     ocr_min_chars: int = 25  # fewer non-whitespace chars than this -> OCR
     image_heavy_ratio: float = 0.40

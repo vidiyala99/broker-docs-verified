@@ -6,6 +6,7 @@
 - **Pros:** removes the page cap. **Cons:** merge conflicts between windows, more pipeline code.
 - **Context:** D3 in docs/specs/2026-11-01-brokerdocs-core-design.md chose hard caps for slice 1.
 - **Depends on:** slice 1 pipeline.
+- **Status:** done in T14 (backend/pipeline/windows.py, merge.py): 15-page windows with 2 pages of overlap, caps raised to 300 pages and 50 MB, 1.5M run budget with a 400k per-document ceiling. Open follow-up: the page-scoring skip pass (off; extension point `windows.select_windows`).
 
 ## Claim-level validation of report prose
 - **What:** check each prose claim (for example "Carrier A is cheaper than B") against the facts it cites.

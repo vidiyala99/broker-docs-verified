@@ -28,6 +28,12 @@ The validator (R1, M2) rejects:
   and limit-like numbers only"). Numbers compare by value, so "$1 million"
   matches "$1,000,000", but a percent never matches a plain number.
 Claim-level checks (who is cheaper) are a TODO (R10).
+
+Long documents (T14, pipeline.merge): a cited fact may carry extra passages
+(the same value on other pages: more chips on the cell, also allowed in
+prose) and conflicting values (the document states other values too: the
+cell gets a conflicting_values notice naming every value and page, the prose
+is told about them, and their numbers are allowed in the prose).
 """
 
 from __future__ import annotations
@@ -41,6 +47,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from backend.models import display_value
+from backend.pipeline.merge import conflict_message
 from backend.providers import (
     CallRole,
     CallUsage,
@@ -104,6 +111,14 @@ class ComposeFact:
     passage_id: int | None = None
     page_no: int | None = None
     fact_id: int | None = None
+    extra_passage_ids: tuple[int, ...] = ()  # T14: same value on other pages
+    conflicts: tuple[tuple[str | None, int | None], ...] = ()  # T14: (other value, page)
+
+    @property
+    def passage_ids(self) -> list[int]:
+        """Primary passage first, then the extra passages (no repeats)."""
+        ids = [self.passage_id] if self.passage_id is not None else []
+        return list(dict.fromkeys([*ids, *self.extra_passage_ids]))
 
     @property
     def cited(self) -> bool:
@@ -124,7 +139,11 @@ class ComposeInput:
         return [f for f in self.facts if f.cited]
 
     def allowed_passage_ids(self) -> set[int]:
-        return {f.passage_id for f in self.cited_facts() if f.passage_id is not None}
+        return {pid for f in self.cited_facts() for pid in f.passage_ids}
+
+    def allowed_values(self) -> list[str | None]:
+        """Values whose numbers the prose may state: cited values and their conflicting values."""
+        return [v for f in self.cited_facts() for v in (f.value, *(c[0] for c in f.conflicts))]
 
 
 @dataclass(frozen=True)
@@ -238,6 +257,7 @@ def _level(number: str) -> int:
 def build_tables(inp: ComposeInput) -> dict[str, TableBlock]:
     """One table per section that owns fields; rows = fields, columns = documents."""
     by_cell = {(f.column_key, f.field): f for f in inp.facts}
+    labels = {f.key: f.label for f in inp.fields}
     known_sections = {s.id for s in inp.sections}
     columns = [Column(key=c.key, label=c.label, document_id=c.document_id, warning=c.warning)
                for c in inp.columns]
@@ -261,11 +281,16 @@ def build_tables(inp: ComposeInput) -> dict[str, TableBlock]:
             cited = fact is not None and fact.cited and not col.failed
             if state in CITED_STATES and not cited:
                 state = EvidenceState.ABSENT  # a cited state without a value or passage shows nothing
+            notice = None
+            if cited and fact.conflicts:
+                notice = Notice(kind="conflicting_values", message=conflict_message(
+                    labels.get(fdef.key, fdef.key), (fact.value, fact.page_no), fact.conflicts))
             cells[col.key] = Cell(
                 value=display_value(state, fact.value if cited else None),
-                passage_ids=[fact.passage_id] if cited else [],
+                passage_ids=fact.passage_ids if cited else [],
                 fact_ids=[fact.fact_id] if fact is not None and fact.fact_id is not None else [],
                 state=state,
+                notice=notice,
             )
         table.rows.append(Row(key=fdef.key, label=fdef.label, cells=cells))
     return tables
@@ -333,6 +358,8 @@ value: say so plainly and never guess the value.
 Mention a column warning (such as a multi-option document) where it matters.
 6. Keep it brief and factual: one or two short paragraphs per section, and skip a \
 section rather than pad it.
+7. A fact with conflicting_values: the document states more than one value for that \
+field. Say so and name the values; do not choose one.
 """
 
 
@@ -348,9 +375,12 @@ def _facts_payload(inp: ComposeInput) -> dict[str, Any]:
         if f.cited:
             evidence = "verified" if EvidenceState(f.state) == EvidenceState.VERIFIED else \
                 "read from scan, unverified"
-            cited.append({"passage_id": f.passage_id, "document": f.column_key, "field": f.field,
-                          "label": labels.get(f.field, f.field), "value": f.value, "page": f.page_no,
-                          "evidence": evidence})
+            item = {"passage_id": f.passage_id, "document": f.column_key, "field": f.field,
+                    "label": labels.get(f.field, f.field), "value": f.value, "page": f.page_no,
+                    "evidence": evidence}
+            if f.conflicts:
+                item["conflicting_values"] = [{"value": v, "page": p} for v, p in f.conflicts]
+            cited.append(item)
         else:
             status = "could not be verified" if EvidenceState(f.state) == EvidenceState.NOT_FOUND \
                 else "not specified"
@@ -386,7 +416,7 @@ def _segments(draft: dict[str, Any]) -> Iterable[tuple[str, dict[str, Any]]]:
 def validate_draft(draft: dict[str, Any], inp: ComposeInput) -> list[str]:
     """Errors for one model draft; an empty list means it may be shipped."""
     allowed_ids = inp.allowed_passage_ids()
-    allowed = allowed_numbers(f.value for f in inp.cited_facts())
+    allowed = allowed_numbers(inp.allowed_values())
     known_sections = {s.id for s in inp.sections}
     errors: list[str] = []
     any_text = False
@@ -458,7 +488,7 @@ def template_report(inp: ComposeInput, *, reason: str = "") -> ArtifactContent:
         scanned = [f for f in facts if f.cited and EvidenceState(f.state) == EvidenceState.SCAN_READ]
         unverified = sum(1 for f in facts if EvidenceState(f.state) == EvidenceState.NOT_FOUND)
         unspecified = len(inp.fields) - len(verified) - len(scanned) - unverified
-        pids = sorted({f.passage_id for f in verified + scanned if f.passage_id is not None})
+        pids = sorted({pid for f in verified + scanned for pid in f.passage_ids})
         text = (f"{c.key}, {c.label}: {len(verified)} fields verified, {len(scanned)} read from scan, "
                 f"{unverified} could not be verified, {unspecified} not specified.")
         if c.warning:

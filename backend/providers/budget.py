@@ -7,10 +7,17 @@ BudgetExhausted and nothing is sent. After the call, the reservation is
 settled with the provider-reported prompt + completion tokens, so unused
 reserved output returns to the pool.
 
-The budget counts input and output together against one limit (600k by
-default, D3). Exhaustion is not sticky: a later, smaller call that fits still
+The budget counts input and output together against one limit (1.5M by
+default since T14; 600k in D3). Exhaustion is not sticky: a later, smaller call that fits still
 runs. `exhausted` reports whether any reservation was ever denied, so the
 runner can mark the run partial.
+
+Per-document ceiling (T14): `RunBudget.child(ceiling)` returns a
+DocumentBudget that every call of one document goes through. It reserves from
+the run budget as usual and also refuses any reservation that would take that
+document past its own ceiling (400k by default), so one long document cannot
+starve the others. It has the same reserve / settle / release / record
+surface, so Provider code does not know the difference.
 
 Thread-safe: parse and verify run in a thread pool (M6), model calls run on
 the event loop; a plain lock covers both.
@@ -24,8 +31,8 @@ import threading
 from dataclasses import dataclass
 from typing import Callable
 
-from .config import RUN_TOKEN_BUDGET
-from .errors import BudgetExhausted
+from .config import DOCUMENT_TOKEN_BUDGET, RUN_TOKEN_BUDGET
+from .errors import BudgetExhausted, DocumentBudgetExhausted
 from .types import CallRecord, RoleTotals, UsageTotals
 
 log = logging.getLogger("brokerdocs.providers")
@@ -121,6 +128,10 @@ class RunBudget:
         with self._lock:
             return list(self._records)
 
+    def child(self, ceiling: int = DOCUMENT_TOKEN_BUDGET, *, label: str | None = None) -> DocumentBudget:
+        """A per-document view of this budget, capped at `ceiling` tokens (T14)."""
+        return DocumentBudget(self, ceiling, label=label)
+
     def totals(self) -> UsageTotals:
         totals = UsageTotals()
         for r in self.records:
@@ -132,3 +143,69 @@ class RunBudget:
                 bucket.reasoning_tokens += r.reasoning_tokens
                 bucket.cost_usd += r.cost_usd
         return totals
+
+
+class DocumentBudget:
+    """One document's share of a RunBudget: reserves from the run, capped at `ceiling`.
+
+    A reservation must fit both the document's ceiling (else
+    DocumentBudgetExhausted) and the run's remaining tokens (else
+    BudgetExhausted). Settled tokens count against both. Records go to the
+    run budget's ledger (and its on_record hook).
+    """
+
+    def __init__(self, parent: RunBudget, ceiling: int, *, label: str | None = None):
+        if ceiling <= 0:
+            raise ValueError("document ceiling must be positive")
+        self.parent = parent
+        self.limit = ceiling
+        self.label = label
+        self._lock = threading.Lock()
+        self._used = 0
+        self._open: dict[int, int] = {}  # reservation id -> tokens
+        self.exhausted = False
+
+    @property
+    def used(self) -> int:
+        return self._used
+
+    @property
+    def reserved(self) -> int:
+        return sum(self._open.values())
+
+    @property
+    def remaining(self) -> int:
+        return max(0, min(self.limit - self._used - self.reserved, self.parent.remaining))
+
+    def can_afford(self, tokens: int) -> bool:
+        return tokens <= self.remaining
+
+    def reserve(self, tokens: int, *, label: str | None = None) -> Reservation:
+        if tokens < 0:
+            raise ValueError("reservation must be non-negative")
+        with self._lock:
+            own = max(0, self.limit - self._used - sum(self._open.values()))
+            if tokens > own:
+                self.exhausted = True
+                raise DocumentBudgetExhausted(requested=tokens, remaining=own, label=label or self.label)
+            try:
+                reservation = self.parent.reserve(tokens, label=label)
+            except BudgetExhausted:
+                self.exhausted = True
+                raise
+            self._open[reservation.id] = tokens
+            return reservation
+
+    def settle(self, reservation: Reservation, actual_tokens: int) -> None:
+        self.parent.settle(reservation, actual_tokens)
+        with self._lock:
+            self._open.pop(reservation.id, None)
+            self._used += max(0, actual_tokens)
+
+    def release(self, reservation: Reservation) -> None:
+        self.parent.release(reservation)
+        with self._lock:
+            self._open.pop(reservation.id, None)
+
+    def record(self, rec: CallRecord) -> None:
+        self.parent.record(rec)

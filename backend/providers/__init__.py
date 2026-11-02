@@ -6,11 +6,12 @@ Pipeline code imports from here only:
 """
 
 from .base import Provider
-from .budget import Reservation, RunBudget, estimate_tokens
+from .budget import DocumentBudget, Reservation, RunBudget, estimate_tokens
 from .config import ModelPrice, ProviderConfig
 from .errors import (
     BudgetExhausted,
     ContextOverflow,
+    DocumentBudgetExhausted,
     MissingApiKey,
     OutputTruncated,
     ProviderError,
@@ -39,7 +40,8 @@ from .types import (
 )
 
 __all__ = [
-    "BudgetExhausted", "CallRecord", "CallRole", "CallUsage", "ContextOverflow", "FakeProvider", "ImagePart",
+    "BudgetExhausted", "CallRecord", "CallRole", "CallUsage", "ContextOverflow", "DocumentBudget",
+    "DocumentBudgetExhausted", "FakeProvider", "ImagePart",
     "Message", "MissingApiKey", "ModelPrice", "OpenAIProvider", "OutputTruncated", "Provider", "ProviderConfig",
     "ProviderError", "ProviderRequest", "ProviderRequestError", "ProviderTimeout", "ProviderUnavailable",
     "RawResponse", "RefusalError", "Reservation", "RunBudget", "SchemaBuildError", "SchemaValidationError",

@@ -152,12 +152,17 @@ def test_password_protected_pdf(pdf_factory):
 
 
 def test_over_page_cap_names_the_limit(pdf_factory):
-    data = pdf_factory(["x" * 40] * 81)
+    # T14 raised the default cap from 80 to 300 pages (the 300/301 PDFs are in test_long_documents)
     with pytest.raises(ParseError) as exc:
-        parse.parse_pdf(data)
+        parse.check_page_count(301)
     assert exc.value.code == ParseErrorCode.TOO_MANY_PAGES
-    assert exc.value.limit == 80
-    assert "80 pages" in exc.value.message
+    assert exc.value.limit == 300
+    assert "300 pages" in exc.value.message
+    parse.check_page_count(300)
+    data = pdf_factory(["x" * 40] * 3)
+    with pytest.raises(ParseError) as exc2:
+        parse.parse_pdf(data, limits=ParseLimits(max_pages=2))
+    assert "2 pages" in exc2.value.message
 
 
 def test_page_cap_is_configurable(pdf_factory):
@@ -172,10 +177,11 @@ def test_over_size_cap_names_the_limit(pdf_factory):
     with pytest.raises(ParseError) as exc:
         parse.parse_pdf(data, limits=ParseLimits(max_bytes=len(data) - 1))
     assert exc.value.code == ParseErrorCode.TOO_LARGE
-    # the default message names the 15 MB default
+    # the default message names the 50 MB default (T14; D3 had 15 MB)
     with pytest.raises(ParseError) as exc2:
-        parse.check_size(15 * 1024 * 1024 + 1)
-    assert "15 MB" in exc2.value.message
+        parse.check_size(50 * 1024 * 1024 + 1)
+    assert "50 MB" in exc2.value.message
+    parse.check_size(50 * 1024 * 1024)
 
 
 def test_document_count_cap():
