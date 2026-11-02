@@ -1,6 +1,6 @@
 # Handoff: BrokerDocs, slice 1
 
-Date: 2026-11-01 (late). State: backend COMPLETE and merged to `main`; frontend (T10) NOT started.
+Date: 2026-11-01 (late). State: backend AND frontend (T10) built and merged to `main`. Next: design review against the real frames.
 Repo: `broker-docs-verified` is now a git repo (`main`). `.env` (OpenAI key) is gitignored.
 
 ## What is built (all merged, 608 backend tests + 153 eval tests pass offline)
@@ -15,14 +15,14 @@ Repo: `broker-docs-verified` is now a git repo (`main`). `.env` (OpenAI key) is 
 - Evidence for later slices: `docs/reference/brokerdocs-workflows-evidence.md` (ranking: Proposal Builder, data-only pack,
   Policy Check, COI, Loss Run, Assistant, Market Search, ACORD).
 
-## Live eval (run 5, 2026-11-02, final pipeline)
+## Live eval status (2026-11-02)
 Models `gpt-5.4-mini` (extract/vision), `gpt-5.5` (compose/chat), `gpt-5.4-nano` (suggest). Prices in `providers/config.py` are stand-ins.
-Run 5: **0 hard fails, 0 injection canaries verified**, clean 1.000, multi-column 0.983, scanned 1.000, report-only 1.000,
-overall 264/286 (0.923), citation verification 0.971, 437k input tokens for the whole eval.
-Only gate red: `field_accuracy[long]` 0.833 (25/30; needs 0.85 = 26/30). Run 4 scored 0.867 (26/30): it flickers by one field,
-so the long gate sits on a noise boundary with 30 fields. Per-field misses are not stored in the report json (add that before
-tuning further). History: run1 31 hard fails (harness bugs + 300-page budget), run2 4, run3 5, run4 1, run5 0.
-Reports: scratchpad `live_eval_report{1..5}.json`.
+Full run 5: 0 hard fails, 0 injection canaries verified, clean 1.000, multi-column 0.983, scanned 1.000, overall 264/286 (0.923).
+Long group (subset run, after the containment merge rule): 28/30 (0.933), 0 hard fails; gate passes with margin
+(3 earlier subset runs scored 26/30 each). Remaining misses: `territory` in long_120 and long_300 (a very long sentence across
+pages 14 to 16 comes back truncated, verify rejects it): accepted, fixture-hard.
+A full 23-document run has not been repeated since the containment rule and the backend fixes; do one before any release.
+Run subsets with `BROKERDOCS_EVAL_GROUPS=long`; reports list per-field MISS lines. History: run1 31 hard fails, run2 4, run3 5, run4 1, run5 0.
 
 ## Decisions made this session (do not re-ask)
 Input border `#848D99` (DG10 3:1) kept; collapsed-outline warning mark = triangle glyph on the handle;
@@ -31,15 +31,23 @@ failed extraction shows "Extraction failed" + Retry (M1), budget exhaustion not 
 long docs: 300 pages, windows + merge, conflicting values shown with a notice (never silently picked), page-scoring skip pass OFF.
 
 ## Open items
-1. Long-document accuracy gate flickers at 0.833 to 0.867 (see above). Options for the owner: measure with 3 runs, add
-   per-field miss detail to the eval report, or set the long gate by sample size (30 fields makes 0.85 = one field).
-2. Residual injection bypasses: a note to the AI followed by a separate declarative sentence; imperatives outside the verb
-   list. Claim-level checks remain TODO R10.
-3. A database seeded before the `policy_form` description change keeps the old description (seed only inserts if absent);
+1. Residual injection bypasses: a note to the AI followed by a separate declarative sentence; imperatives outside the verb list.
+   Claim-level checks remain TODO R10.
+2. A database seeded before the `policy_form` description change keeps the old description (seed only inserts if absent);
    add re-seed/update at startup before anyone keeps a persistent DB.
-4. `over_cap_pages.pdf` is obsolete (kept on disk); `long_301` (--include-oversize) is the over-cap test.
-5. No DB migrations: delete any local `data/brokerdocs.db` created before 2026-11-02.
-6. Rotate the OpenAI key if transcript exposure matters.
+3. Frontend gaps: "sample quotes" link (no endpoint), version history UI, real too-large/too-many-pages upload rejections in the
+   browser, Chromium only.
+4. Cross-reference gap (a value defined by reference across windows) is unmeasured: see TODOS.md.
+5. `over_cap_pages.pdf` is obsolete (kept on disk); `long_301` (--include-oversize) is the over-cap test.
+6. No DB migrations: delete any local `data/brokerdocs.db` created before 2026-11-02.
+7. Rotate the OpenAI key if transcript exposure matters.
+8. Port 5173: the BFL clone (JobHunt\BFLfl-clone) also uses it; one BFL server was stopped on 2026-11-02 at the owner's request.
+
+## Next, in order
+1. `/design-review` of the live app against the real frames: follow `docs/design-review-brief.md` (fresh session, design skills loaded,
+   Playwright MCP, max 3 rounds). Dev stack: README in `frontend/`; set up `main` first (backend/.venv py3.12 pymupdf<2, npm install).
+2. Slice 2 spec: owner picks the first workflow from `docs/reference/brokerdocs-workflows-evidence.md` (ranking: Proposal Builder,
+   data-only pack, Policy Check, COI, Loss Run, Assistant, Market Search, ACORD). A slice map was offered, not drafted.
 
 ## Next, in order
 1. T10 frontend (running as an agent in a worktree as of 2026-11-02 09:00; merge, build, check its screenshots and axe results).
