@@ -28,7 +28,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "mailing_address": {
+    "address": {
       "value": "305 Orchard Lane, Asheville, NC 28801",
       "page": 1,
       "pages": [
@@ -38,7 +38,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "carrier": {
+    "carrier_name": {
       "value": "Harborline Specialty Insurance Company",
       "page": 1,
       "pages": [
@@ -74,7 +74,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "policy_period": {
+    "policy_term": {
       "value": "01/01/2027 to 01/01/2028",
       "page": 1,
       "pages": [
@@ -114,7 +114,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "premium": {
+    "total_premium": {
       "value": "$25,075.00",
       "page": 2,
       "pages": [
@@ -131,16 +131,6 @@
         2
       ],
       "quote": "$1,316.14",
-      "source": "text",
-      "accepted_values": []
-    },
-    "total_cost": {
-      "value": "$26,391.14",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "$26,391.14",
       "source": "text",
       "accepted_values": []
     },
@@ -164,7 +154,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "deductible": {
+    "retention": {
       "value": "$2,500",
       "page": 2,
       "pages": [
@@ -184,7 +174,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "quote_valid_until": {
+    "quote_expiration": {
       "value": "12/15/2026",
       "page": 3,
       "pages": [

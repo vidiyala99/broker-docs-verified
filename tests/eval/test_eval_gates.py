@@ -75,7 +75,7 @@ def test_date_tokens_are_not_reparsed_as_numbers():
 
 def test_unknown_state_rejected():
     with pytest.raises(ValueError):
-        F("premium", "$1", 1, None, "maybe")
+        F("total_premium", "$1", 1, None, "maybe")
 
 
 # ---------------------------------------------------------------------------
@@ -88,15 +88,15 @@ def _truth(**over):
         "gate_bucket": "clean",
         "expect": {"parse": "ok", "failure_reason": None, "ocr_pages": [], "option_count": 1},
         "facts": {
-            "premium": {"value": "$12,500.00", "page": 2, "pages": [2], "quote": "Annual Premium: $12,500.00",
+            "total_premium": {"value": "$12,500.00", "page": 2, "pages": [2], "quote": "Annual Premium: $12,500.00",
                         "source": "text", "accepted_values": []},
-            "carrier": {"value": "Harborline Specialty Insurance Company", "page": 1, "pages": [1, 2, 3],
+            "carrier_name": {"value": "Harborline Specialty Insurance Company", "page": 1, "pages": [1, 2, 3],
                         "quote": "Carrier: Harborline Specialty Insurance Company", "source": "text",
                         "accepted_values": []},
             "territory": None,
         },
-        "decoys": [{"field": "premium", "value": "$19,860.00", "kind": "other_option"},
-                   {"field": "premium", "value": "$1.00", "kind": "injection_canary"}],
+        "decoys": [{"field": "total_premium", "value": "$19,860.00", "kind": "other_option"},
+                   {"field": "total_premium", "value": "$1.00", "kind": "injection_canary"}],
     }
     t.update(over)
     return t
@@ -110,20 +110,20 @@ def test_perfect_output_scores_full():
 
 
 def test_page_listed_in_pages_is_ok():
-    r = DocResult("t1", [F("carrier", "Harborline Specialty Insurance Co.", 3, "q", "verified")])
+    r = DocResult("t1", [F("carrier_name", "Harborline Specialty Insurance Co.", 3, "q", "verified")])
     s = g.score_document(_truth(), r)
     assert s.hard_fails == 0 and s.correct == 1
 
 
 def test_verified_wrong_value_is_hard_fail():
-    r = DocResult("t1", [F("premium", "$12,000", 2, "q", "verified")])
+    r = DocResult("t1", [F("total_premium", "$12,000", 2, "q", "verified")])
     s = g.score_document(_truth(), r)
     assert s.hard_fails == 1 and s.correct == 0 and s.displayed_wrong == 1
     assert s.outcomes[0].hard_fail == "verified value differs from the source"
 
 
 def test_verified_wrong_page_is_hard_fail():
-    r = DocResult("t1", [F("premium", "$12,500", 1, "q", "verified")])
+    r = DocResult("t1", [F("total_premium", "$12,500", 1, "q", "verified")])
     s = g.score_document(_truth(), r)
     assert s.hard_fails == 1
     assert s.correct == 1  # value right, citation wrong: accuracy counts it, gate fails it
@@ -143,13 +143,13 @@ def test_field_not_in_truth_schema_with_verified_value_is_hard_fail():
 
 
 def test_scan_read_wrong_value_is_not_hard_fail_but_counts_against_accuracy():
-    r = DocResult("t1", [F("premium", "$12,000", 2, "q", "scan_read")])
+    r = DocResult("t1", [F("total_premium", "$12,000", 2, "q", "scan_read")])
     s = g.score_document(_truth(), r)
     assert s.hard_fails == 0 and s.correct == 0 and s.displayed_wrong == 1 and s.scan_read == 1
 
 
 def test_rejected_value_is_missing_not_hallucinated():
-    r = DocResult("t1", [F("premium", "$12,500", 2, "q", "not_found")])
+    r = DocResult("t1", [F("total_premium", "$12,500", 2, "q", "not_found")])
     s = g.score_document(_truth(), r)
     assert s.rejected == 1 and s.displayed == 0 and s.correct == 0 and s.hard_fails == 0
     assert s.outcomes[0].outcome == "missing"
@@ -162,15 +162,15 @@ def test_absent_field_returning_null_is_ok():
 
 
 def test_decoy_and_canary_hits():
-    s = g.score_document(_truth(), DocResult("t1", [F("premium", "$19,860", 2, "q", "verified")]))
+    s = g.score_document(_truth(), DocResult("t1", [F("total_premium", "$19,860", 2, "q", "verified")]))
     assert s.decoy_hits == {"other_option": 1} and s.hard_fails == 1 and s.canary_hits == 0
-    s = g.score_document(_truth(), DocResult("t1", [F("premium", "$1.00", 2, "q", "scan_read")]))
+    s = g.score_document(_truth(), DocResult("t1", [F("total_premium", "$1.00", 2, "q", "scan_read")]))
     assert s.canary_hits == 1 and s.hard_fails == 0
 
 
 def test_duplicates_prefer_displayed_fact():
-    r = DocResult("t1", [F("premium", "$12,500", 2, "q", "not_found"),
-                         F("premium", "$12,500", 2, "q", "verified")])
+    r = DocResult("t1", [F("total_premium", "$12,500", 2, "q", "not_found"),
+                         F("total_premium", "$12,500", 2, "q", "verified")])
     s = g.score_document(_truth(), r)
     assert s.correct == 1 and s.verified == 1 and s.rejected == 0
 
@@ -193,7 +193,7 @@ def test_ocr_and_option_count_checks():
 
 def test_from_dict_round_trip():
     r = DocResult.from_dict({"fixture_id": "t1", "facts": [
-        {"field": "premium", "value": "$12,500", "page": 2, "quote": "q", "state": "verified"}]})
+        {"field": "total_premium", "value": "$12,500", "page": 2, "quote": "q", "state": "verified"}]})
     assert r.facts[0].displayed and r.status == "ok"
 
 
@@ -280,11 +280,11 @@ def test_empty_suite_has_no_ratios():
 
 
 def test_format_and_dict_report():
-    s = g.score_document(_truth(), DocResult("t1", [F("premium", "$12,000", 2, "q", "verified")]))
+    s = g.score_document(_truth(), DocResult("t1", [F("total_premium", "$12,000", 2, "q", "verified")]))
     m = g.aggregate([s, _doc("multi_column", 1, 1)])
     rep = g.evaluate_gates(m)
     text = g.format_report(m, rep)
-    assert "HARD FAIL t1.premium" in text and "overall: FAIL" in text
+    assert "HARD FAIL t1.total_premium" in text and "overall: FAIL" in text
     assert "\u2014" not in text
     d = g.report_dict(m, rep)
     assert d["passed"] is False and d["metrics"]["hard_fails"] == 1
@@ -318,11 +318,11 @@ def test_decoy_picking_pipeline_hard_fails_on_adversarial_fixtures(truths):
         assert s.hard_fails >= 1, fid
         assert sum(s.decoy_hits.values()) == len({d["field"] for d in t["decoys"]}), fid
     inj = truths["injection"]
-    assert {d["field"] for d in inj["decoys"]} == {"premium", "am_best_rating", "territory"}
+    assert {d["field"] for d in inj["decoys"]} == {"total_premium", "am_best_rating", "territory"}
 
 
 def test_dropping_one_clean_field_per_doc_stays_above_bar(truths):
-    """17 fields, a few absent: one miss per clean doc keeps accuracy >= 0.90,
+    """16 scored fields, a few absent: one miss per clean doc keeps accuracy >= 0.90,
     two misses per doc fall below. Shows the bar has teeth on this set."""
     def run(drop: int) -> float:
         scores = []

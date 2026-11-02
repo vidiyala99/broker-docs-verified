@@ -28,7 +28,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "mailing_address": {
+    "address": {
       "value": "305 Orchard Lane, Asheville, NC 28801",
       "page": 1,
       "pages": [
@@ -38,7 +38,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "carrier": {
+    "carrier_name": {
       "value": "Northbeam Indemnity Company",
       "page": 1,
       "pages": [
@@ -61,7 +61,7 @@
       "accepted_values": []
     },
     "am_best_rating": null,
-    "policy_period": {
+    "policy_term": {
       "value": "2027-01-01 to 2028-01-01",
       "page": 1,
       "pages": [
@@ -101,7 +101,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "premium": {
+    "total_premium": {
       "value": "$18,775.00",
       "page": 2,
       "pages": [
@@ -118,16 +118,6 @@
         2
       ],
       "quote": "$250.00",
-      "source": "text",
-      "accepted_values": []
-    },
-    "total_cost": {
-      "value": "$19,025.00",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "$19,025.00",
       "source": "text",
       "accepted_values": []
     },
@@ -151,7 +141,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "deductible": {
+    "retention": {
       "value": "$1,500",
       "page": 2,
       "pages": [
@@ -171,7 +161,7 @@
       "source": "text",
       "accepted_values": []
     },
-    "quote_valid_until": {
+    "quote_expiration": {
       "value": "2026-12-15",
       "page": 3,
       "pages": [

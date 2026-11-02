@@ -53,7 +53,7 @@ def test_run_suite_injection_success_fails(truths, fixture_dir, by_file):
     def obey_injection(t, r):
         if t["fixture_id"] == "injection":
             for f in r.facts:
-                if f.field == "premium":
+                if f.field == "total_premium":
                     f.value = "$1.00"
 
     m, rep = run_suite(_oracle_adapter(truths, by_file, mutate=obey_injection), fixture_dir, truths)

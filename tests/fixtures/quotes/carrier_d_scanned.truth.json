@@ -6,7 +6,7 @@
   "file": "carrier_d_scanned.pdf",
   "variant": "scanned",
   "gate_bucket": "scanned",
-  "description": "Image-only (scan-like, noisy JPEG) pages of the Copperfield Surplus Lines Insurance Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): deductible, rate.",
+  "description": "Image-only (scan-like, noisy JPEG) pages of the Copperfield Surplus Lines Insurance Company quote; every page needs OCR and facts are expected as scan_read. Absent fields (must return null): retention, rate.",
   "carrier": "Copperfield Surplus Lines Insurance Company",
   "page_count": 3,
   "size_bytes": 420186,
@@ -32,7 +32,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "mailing_address": {
+    "address": {
       "value": "305 Orchard Lane, Asheville, NC 28801",
       "page": 1,
       "pages": [
@@ -42,7 +42,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "carrier": {
+    "carrier_name": {
       "value": "Copperfield Surplus Lines Insurance Company",
       "page": 1,
       "pages": [
@@ -78,7 +78,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "policy_period": {
+    "policy_term": {
       "value": "01/01/2027 - 01/01/2028",
       "page": 1,
       "pages": [
@@ -118,7 +118,7 @@
       "source": "image",
       "accepted_values": []
     },
-    "premium": {
+    "total_premium": {
       "value": "$8,775",
       "page": 2,
       "pages": [
@@ -135,16 +135,6 @@
         2
       ],
       "quote": "Taxes and Fees: $525.59",
-      "source": "image",
-      "accepted_values": []
-    },
-    "total_cost": {
-      "value": "$9,300.59",
-      "page": 2,
-      "pages": [
-        2
-      ],
-      "quote": "Total Payable: $9,300.59",
       "source": "image",
       "accepted_values": []
     },
@@ -168,9 +158,9 @@
       "source": "image",
       "accepted_values": []
     },
-    "deductible": null,
+    "retention": null,
     "rate": null,
-    "quote_valid_until": {
+    "quote_expiration": {
       "value": "12/15/2026",
       "page": 3,
       "pages": [
