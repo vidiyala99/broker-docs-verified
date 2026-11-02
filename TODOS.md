@@ -21,3 +21,9 @@
 - **Pros:** scanned citations reach digital-PDF trust. **Cons:** needs a Tesseract install; lower accuracy on messy scans.
 - **Context:** parse returns optional word boxes, so this slots in behind the same seam.
 - **Depends on:** slice 1 parse module.
+
+## Cross-reference long fixture and targeted second pass
+- **What:** add a long fixture where a value is defined by reference (page 12 says "see Schedule C", Schedule C is on page 250) and measure it; if it fails, add a bounded second pass for null or pointer fields (keyword search on the field label and synonyms, one more extract call over the top 10 to 15 pages, verification unchanged).
+- **Why:** windows are read independently, so references across windows are not followed (known gap, not yet measured).
+- **Context:** needed before Policy Check and Coverage Gap workflows. Not retrieval for everything, only a fallback for fields that need it.
+- **Depends on:** slice 1 pipeline (windows.py, merge.py).
