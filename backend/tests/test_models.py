@@ -103,8 +103,8 @@ def test_init_db_seeds_workspace_and_compare_quotes_idempotently():
     db.init_db(engine)  # second call must not duplicate seed rows
     factory = db.make_session_factory(engine)
     with factory() as s:
-        workflows = s.scalars(select(models.Workflow)).all()
-        assert [w.slug for w in workflows] == ["compare-quotes"]
+        workflows = s.scalars(select(models.Workflow).order_by(models.Workflow.id)).all()
+        assert [w.slug for w in workflows] == ["compare-quotes", "proposal-builder"]
         wf = workflows[0]
         assert wf.name == "Compare Quotes"
         keys = [f["key"] for f in wf.fact_schema]
@@ -123,6 +123,26 @@ def test_init_db_seeds_workspace_and_compare_quotes_idempotently():
         assert titles[0] == "Executive Summary"
         assert "Cross-Quote Consistency Flags" in titles
         assert s.get(models.Workspace, db.DEFAULT_WORKSPACE_ID) is not None
+
+
+def test_seed_upserts_changed_workflow_definitions_keeping_ids():
+    # S6: a database seeded before a definition change gets the current one at the next start
+    engine = db.make_engine("sqlite://")
+    db.init_db(engine)
+    factory = db.make_session_factory(engine)
+    with db.session_scope(factory) as s:
+        wf = s.scalar(select(models.Workflow).where(models.Workflow.slug == "compare-quotes"))
+        old_id = wf.id
+        wf.fact_schema = [{**wf.fact_schema[0], "description": "stale"}]
+        wf.instructions = "stale"
+    db.init_db(engine)
+    with factory() as s:
+        wf = s.scalar(select(models.Workflow).where(models.Workflow.slug == "compare-quotes"))
+        assert wf.id == old_id and wf.instructions == db.COMPARE_QUOTES["instructions"]
+        assert wf.fact_schema == db.COMPARE_QUOTES["fact_schema"]
+        pb = s.scalar(select(models.Workflow).where(models.Workflow.slug == db.PROPOSAL_BUILDER_SLUG))
+        assert pb.fact_schema == db.PROPOSAL_BUILDER["fact_schema"]
+    engine.dispose()
 
 
 def test_sqlite_enforces_foreign_keys(session):

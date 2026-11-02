@@ -69,7 +69,7 @@ def test_workspace_and_workflows(api):
     wf = api.client.get("/api/workflows/compare-quotes").json()
     assert wf["name"] == "Compare Quotes" and len(wf["fact_schema"]) == 20 and wf["section_plan"][0]["number"] == "1"
     assert api.client.get(f"/api/workflows/{wf['id']}").json()["slug"] == "compare-quotes"
-    assert [w["slug"] for w in api.client.get("/api/workflows").json()["workflows"]] == ["compare-quotes"]
+    assert [w["slug"] for w in api.client.get("/api/workflows").json()["workflows"]] == ["compare-quotes", "proposal-builder"]
 
 
 def test_error_shape(api):
