@@ -153,32 +153,25 @@ def outline_from_blocks(blocks: Sequence[Any]) -> list[dict[str, Any]]:
 
 def proposal_parameters(session: Any, parameters: dict[str, Any] | None,
                         template: str | int | None) -> tuple[dict[str, Any], list[str]]:
-    """Run parameters for a proposal eval run, as the wizard would send them
-    (spec section 2), and warnings for the report.
+    """Run parameters for a proposal eval run, validated and snapshotted by the same
+    code the POST /api/runs route uses (proposal.prepare_parameters), so the eval
+    exercises the real outline validation and template snapshot (D3, D6)."""
+    from backend import proposal as proposal_mod
+    from backend.proposal import ParameterErrors
 
-    The integration point with lane A: template lookup by slug or id, and the
-    outline copied from the template's blocks."""
     params = {k: v for k, v in (parameters or {}).items() if k in _PROPOSAL_PARAM_KEYS}
-    warnings: list[str] = []
-    cls = _template_model()
-    if cls is None:
-        if "outline" not in params:
-            warnings.append("this backend has no proposal_template table: the run used the "
-                            "workflow's static section plan (no template_id, no outline)")
-        return params, warnings
-    row = None
-    if isinstance(template, int) or (isinstance(template, str) and template.isdigit()):
-        row = session.get(cls, int(template))
-    elif template is not None and hasattr(cls, "slug"):
-        row = session.scalar(select(cls).where(cls.slug == template))
-    elif template is None:
-        row = session.scalar(select(cls).order_by(cls.id))
-    if row is None:
-        raise WorkflowUnavailable(f"proposal template {template!r} is not seeded in this backend")
-    params.setdefault("template_id", row.id)
-    if "outline" not in params:
-        params["outline"] = outline_from_blocks(getattr(row, "blocks", None) or [])
-    return params, warnings
+    if template is not None:
+        params["template_id"] = template
+    elif "template_id" not in params:
+        first = session.scalar(select(models.ProposalTemplate).order_by(models.ProposalTemplate.id))
+        if first is None:
+            raise WorkflowUnavailable("no proposal template is seeded in this backend")
+        params["template_id"] = first.id
+    wf = session.scalar(select(models.Workflow).where(models.Workflow.slug == PROPOSAL_SLUG))
+    try:
+        return proposal_mod.prepare_parameters(session, wf, params), []
+    except proposal_mod.ParameterErrors as exc:
+        raise ValueError(f"invalid proposal parameters: {exc}") from exc
 
 
 async def _run(paths: list[str], provider: Provider, budget_limit: int | None,

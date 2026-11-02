@@ -18,6 +18,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from backend import db, eval_hook, models
 from backend.providers import FakeProvider
+from test_proposal_runner import responder as proposal_responder
 from pipeline_fakes import smart_responder
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -110,7 +111,7 @@ def test_proposal_run_reports_cells_and_prose(seeded_proposal_workflow, proposal
 
     def respond(req):
         calls.append(req.role)
-        return smart_responder()(req)
+        return proposal_responder(req)
 
     out = eval_hook.run_eval_batch(list(paths.values()), workflow="proposal-builder",
                                    parameters=dict(p["parameters"]), template=p["template"],
@@ -195,27 +196,14 @@ def test_outline_is_a_copy_of_the_template_blocks():
     ]
 
 
-def test_parameters_resolve_template_by_slug_and_id(monkeypatch):
-    engine = create_engine("sqlite://")
-    _Base.metadata.create_all(engine)
-    monkeypatch.setattr(eval_hook, "_template_model", lambda: _Template)
-    with Session(engine) as s:
-        s.add_all([_Template(id=1, slug="standard", blocks=_BLOCKS), _Template(id=2, slug="premier", blocks=[])])
-        s.flush()
+def test_parameters_are_validated_and_snapshotted_like_the_route():
+    engine = db.make_engine("sqlite://")
+    db.init_db(engine)
+    with db.session_scope(db.make_session_factory(engine)) as s:
         params, warnings = eval_hook.proposal_parameters(
-            s, {"broker_name": "B", "no_ai_prose": False, "stray": 1}, "standard")
-        assert warnings == []
-        assert params == {"broker_name": "B", "no_ai_prose": False, "template_id": 1,
-                          "outline": eval_hook.outline_from_blocks(_BLOCKS)}
-        params, _ = eval_hook.proposal_parameters(s, {}, 2)
-        assert params == {"template_id": 2, "outline": []}
-        with pytest.raises(eval_hook.WorkflowUnavailable):
+            s, {"broker_name": "B", "no_ai_prose": True, "stray": 1}, "standard")
+        assert warnings == [] and "stray" not in params
+        assert params["template"]["slug"] == "standard" and params["no_ai_prose"] is True
+        assert [b["id"] for b in params["outline"]][:2] == ["cover", "toc"]
+        with pytest.raises(ValueError):
             eval_hook.proposal_parameters(s, {}, "missing")
-
-
-def test_parameters_without_template_table_warn(monkeypatch):
-    monkeypatch.setattr(eval_hook, "_template_model", lambda: None)
-    params, warnings = eval_hook.proposal_parameters(None, {"broker_name": "B"}, "standard")
-    assert params == {"broker_name": "B"} and "static section plan" in warnings[0]
-    params, warnings = eval_hook.proposal_parameters(None, {"outline": []}, "standard")
-    assert params == {"outline": []} and warnings == []
