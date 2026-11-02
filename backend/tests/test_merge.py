@@ -244,6 +244,95 @@ def test_long_300_definition_body_is_not_a_policy_term(long_300_pages):
     assert [d.value for d in m.dropped] == [body]
 
 
+LONG_300_TERM = "January 1, 2027 to January 1, 2028"
+POLICY_NO = "Policy No. LG-773595"
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_long_300_policy_number_header_is_not_a_policy_term(long_300_pages, reverse):
+    """Live eval 2026-11-02 (compare_eval2): long_300.policy_term was 'Conflicting values' between the
+    real period on page 1 and 'Policy No. LG-773595' (page 170), the first line of every page. The
+    running-header rule only covers policy_form, so the field-type rule must drop it: not a date."""
+    cands = [CandidateFact("policy_term", LONG_300_TERM, 1, f"Policy Period: {LONG_300_TERM}"),
+             CandidateFact("policy_term", POLICY_NO, 170, POLICY_NO)]
+    if reverse:
+        cands.reverse()
+    checked = verify.verify_facts(cands, long_300_pages)
+    assert [c.state for c in checked] == [V, V]  # both really are printed on their pages
+    text = {p.page_no: p.text for p in long_300_pages}
+    assert text[170].splitlines()[0] == POLICY_NO
+    m = merge.merge_field(_field("policy_term"), checked, text)
+    assert (m.value, m.page_no, m.state, m.resolution) == (LONG_300_TERM, 1, V, "single")
+    assert m.conflicts == () and [d.value for d in m.dropped] == [POLICY_NO]
+
+
+def test_long_300_only_the_policy_number_means_couldnt_verify(long_300_pages):
+    checked = verify.verify_facts([CandidateFact("policy_term", POLICY_NO, 170, POLICY_NO)], long_300_pages)
+    m = merge.merge_field(_field("policy_term"), checked, {p.page_no: p.text for p in long_300_pages})
+    assert (m.state, m.reason, m.page_no) == (NF, "implausible_value", None)
+
+
+def test_policy_number_is_still_a_value_for_fields_without_a_type():
+    # the type rule is per field: an identifier is a plausible value for an untyped field
+    assert merge.implausible_reason(_field("named_insured"), POLICY_NO) is None
+    assert merge.implausible_reason(_field("policy_form"), POLICY_NO) is None
+
+
+def _term(value, page, quote=None):
+    return vr(value, page, field="policy_term", quote=quote or f"Policy Period: {value}")
+
+
+def test_two_different_date_ranges_still_conflict():
+    a, b = "01/01/2027 to 01/01/2028", "03/01/2027 to 03/01/2028"
+    pages = {1: f"Declarations\nPolicy Period: {a}", 40: f"Schedule\nPolicy Period: {b}"}
+    m = merge.merge_field(_field("policy_term"), [_term(a, 1), _term(b, 40), _term(POLICY_NO, 12, POLICY_NO)],
+                          pages)
+    assert (m.state, m.resolution) == (C, "ambiguous")
+    assert [(c.value, c.page_no) for c in m.conflicts] == [(a, 1), (b, 40)]
+    assert [d.value for d in m.dropped] == [POLICY_NO]
+
+
+def test_amended_policy_term_still_wins_by_endorsement():
+    a, b = "January 1, 2027 to January 1, 2028", "January 1, 2027 to July 1, 2028"
+    pages = {1: f"Declarations\nPolicy Period: {a}", 90: f"Endorsement No. 7 - Policy Period Extension\nPolicy Period: {b}"}
+    m = merge.merge_field(_field("policy_term"), [_term(a, 1), _term(b, 90), _term(POLICY_NO, 50, POLICY_NO)], pages)
+    assert (m.value, m.page_no, m.state, m.resolution) == (b, 90, V, "endorsement")
+    assert [s.value for s in m.superseded] == [a]
+
+
+@pytest.mark.parametrize("field, value", [
+    ("policy_term", POLICY_NO),
+    ("policy_term", "LG-773595"),
+    ("policy_term", "Policy No. LG-2027"),  # a year glued into an identifier is not a year
+    ("policy_term", "Commercial General Liability Policy"),
+    ("policy_term", "the period of time stated in the Declarations"),
+    ("quote_expiration", POLICY_NO),
+    ("quote_expiration", "Ironvale Specialty Insurance Company"),
+])
+def test_temporal_field_values_without_a_date_are_implausible(field, value):
+    assert merge.implausible_reason(_field(field), value) == "not_a_date"
+
+
+@pytest.mark.parametrize("field, value", [
+    *(("policy_term", v) for v in ("01/01/2027 to 01/01/2028", "January 1, 2027 to January 1, 2028",
+                                   "2027-01-01 to 2028-01-01", "01/01/2027 - 01/01/2028")),
+    *(("quote_expiration", v) for v in ("12/15/2026", "December 15, 2026", "2026-12-15")),
+    ("policy_term", "Jan. 1, 2027 - Jan. 1, 2028"),
+    ("policy_term", "1st January 2027 to 1st January 2028"),
+    ("policy_term", "12 months"),
+    ("policy_term", "twelve months"),
+    ("policy_term", "One-year"),
+    ("policy_term", "18 mos."),
+    ("policy_term", "Annual"),
+    ("policy_term", "12"),
+    ("policy_term", "2027 policy year"),
+    ("quote_expiration", "30 days from the date of this quotation"),
+    ("quote_expiration", "thirty (30) days"),
+])
+def test_temporal_field_values_with_a_date_or_duration_pass(field, value):
+    assert merge.implausible_reason(_field(field), value) is None
+
+
 def test_definition_body_is_kept_when_it_is_the_only_value():
     pages = {3: 'Definitions\n"Coverage territory" means the United States of America.'}
     only = vr("the United States of America", 3, field="territory",
