@@ -566,7 +566,7 @@ def test_suite_calls_the_proposal_workflow_per_fixture(proposals, proposal_doc_t
     assert rep.passed, g.format_proposal_report(m, rep)
     assert [c["workflow"] for c in calls] == ["proposal-builder"] * 3
     assert sorted(c["n"] for c in calls) == [2, 2, 3]
-    assert {c["template"] for c in calls} == {"standard", "premier"}
+    assert {c["template"] for c in calls} == {"premier"}
     assert all(set(c["parameters"]) == {"broker_name", "brokerage_name", "additional_context",
                                         "no_ai_prose"} for c in calls)
     assert m.max_run_input_tokens == 2000

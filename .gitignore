@@ -12,3 +12,4 @@ frontend/test-results/
 frontend/playwright-report/
 .playwright-mcp/
 *.egg-info/
+proposal_eval_report.json

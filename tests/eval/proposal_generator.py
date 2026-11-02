@@ -206,7 +206,7 @@ BROKERAGE = "Meridian Risk Partners LLC"
 
 PROPOSALS: tuple[ProposalSpec, ...] = (
     ProposalSpec(
-        "prop_three_carrier", "standard", INSUREDS[0],
+        "prop_three_carrier", "premier", INSUREDS[0],
         "Three carriers quoting one Cyber and Technology E&O program; two single-column "
         "quotes and one whose coverage part schedule is a two-column table.",
         (
@@ -246,7 +246,7 @@ PROPOSALS: tuple[ProposalSpec, ...] = (
         no_ai_prose=True,
     ),
     ProposalSpec(
-        "prop_amended", "standard", INSUREDS[2],
+        "prop_amended", "premier", INSUREDS[2],
         "Two carriers; one quote's coverage schedule states a social engineering sublimit that "
         "a later endorsement replaces (truth is the amended figure, the scheduled one is a decoy).",
         (

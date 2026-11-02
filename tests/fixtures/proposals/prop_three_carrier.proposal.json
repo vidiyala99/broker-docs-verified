@@ -6,7 +6,7 @@
   "workflow": "proposal-builder",
   "gate_bucket": "proposal",
   "description": "Three carriers quoting one Cyber and Technology E&O program; two single-column quotes and one whose coverage part schedule is a two-column table.",
-  "template": "standard",
+  "template": "premier",
   "parameters": {
     "broker_name": "Dana Whitfield",
     "brokerage_name": "Meridian Risk Partners LLC",

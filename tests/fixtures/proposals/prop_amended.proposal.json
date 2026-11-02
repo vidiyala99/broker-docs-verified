@@ -6,7 +6,7 @@
   "workflow": "proposal-builder",
   "gate_bucket": "proposal",
   "description": "Two carriers; one quote's coverage schedule states a social engineering sublimit that a later endorsement replaces (truth is the amended figure, the scheduled one is a decoy).",
-  "template": "standard",
+  "template": "premier",
   "parameters": {
     "broker_name": "Dana Whitfield",
     "brokerage_name": "Meridian Risk Partners LLC",

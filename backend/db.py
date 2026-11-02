@@ -129,7 +129,7 @@ _FIELDS = [
                            "generic title (such as 'Commercial General Liability Policy'). If no form number "
                            "or edition is printed on the pages read, return null.")),
     FactField(key="rate", label="Rate", section="rate",
-              description="Rate as stated, for example per $1,000 of exposure."),
+              description="Rate as stated, for example per $1,000 of exposure. Null when only a premium amount is given (a premium is not a rate)."),
     FactField(key="total_premium", label="Total Premium", section="premium",
               description="Total premium payable, including taxes and fees if stated as one figure."),
     FactField(key="taxes_and_fees", label="Taxes and Fees", section="premium",
