@@ -64,6 +64,18 @@ dropped when its value:
    number varies per document, so no word list could: the value simply is
    not a date. A real conflict between two date ranges (an amended term)
    still conflicts or resolves by the endorsement rule.
+7. field quote_expiration (DATED_FIELDS): is a duration measured from the policy
+   period and states no calendar date (reason policy_period_duration: "45 days
+   of the end of the policy period", "30 days after the expiration of the
+   policy period"). Live eval 2026-11-02: long_300.quote_expiration conflicted
+   between that notice clause (page 6) and "December 15, 2026" (page 298).
+   Further, when some cited quote_expiration candidate states a calendar date
+   (states_date: month, day and year), the cited candidates that do not are
+   dropped too (reason no_date), so only dates are conflict candidates; an
+   undated expiry such as "30 days from the date of this quotation" is still
+   the value when no date came back. Two different dates still conflict.
+   policy_term is not affected (a "12 months" term may genuinely conflict with
+   a date range).
 False-positive risk: a real value that is literally the label's words (for
 example a producer whose registered name is "Producer Of Record") is
 dropped; every word of the label must be present, so one-word values such
@@ -221,6 +233,31 @@ _TEMPORAL_RE = re.compile(
 )
 
 
+# quote_expiration only (rule 7 and the dated-value preference in merge_field): the quote lapses
+# on a calendar date; a duration measured from the policy period is a notice or cancellation
+# clause, never when the quote expires (live eval 2026-11-02, long_300 page 6: "45 days of the
+# end of the policy period").
+DATED_FIELDS = frozenset({"quote_expiration"})
+_DATE_RE = re.compile(
+    r"\b\d{1,4}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}\b"  # 12/15/2026, 2026-12-15
+    rf"|\b{_MONTH}\s+\d{{1,2}}(?:st|nd|rd|th)?\s*,?\s*(?:19|20)\d{{2}}\b"  # December 15, 2026
+    rf"|\b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?{_MONTH}\s*,?\s*(?:19|20)\d{{2}}\b",  # 15 December 2026
+    re.I,
+)
+_POLICY_PERIOD_DURATION_RE = re.compile(
+    r"\b(?:hours?|days?|weeks?|months?|years?)\)?\s+(?:of|after|from|before|prior\s+to|following|preceding)\s+"
+    r"(?:the\s+)?(?:end|expiration|expiry|effective(?:\s+date)?|inception|start|beginning)\s+"
+    r"(?:date\s+)?of\s+(?:the\s+|this\s+)?policy(?:\s+period)?\b",
+    re.I,
+)
+
+
+def states_date(value: str | None) -> bool:
+    """True when ``value`` states a calendar date with month, day and year ("12/15/2026",
+    "December 15, 2026", "15 December 2026"); a year or a month and year alone is not one."""
+    return bool(_DATE_RE.search(value or ""))
+
+
 def _words(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", (text or "").lower())
 
@@ -253,6 +290,8 @@ def implausible_reason(fdef: FactField | str, value: str | None) -> str | None:
     key = fdef.key if isinstance(fdef, FactField) else str(fdef)
     if key in TEMPORAL_FIELDS and not states_time(v):
         return "not_a_date"
+    if key in DATED_FIELDS and not states_date(v) and _POLICY_PERIOD_DURATION_RE.search(v):
+        return "policy_period_duration"
     return None
 
 
@@ -477,6 +516,14 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
             for c in defs:
                 reasons[id(c)] = "definition_body"
             plausible, dropped = rest, dropped + defs
+    if key in DATED_FIELDS:  # an undated expiry ("30 days from the date of this quotation") loses to a date
+        cited = [c for c in plausible if c.state in (EvidenceState.VERIFIED, EvidenceState.SCAN_READ)]
+        undated = [c for c in cited if not states_date(c.value)]
+        if undated and len(undated) < len(cited):
+            und_ids = {id(c) for c in undated}
+            for c in undated:
+                reasons[id(c)] = "no_date"
+            plausible, dropped = [c for c in plausible if id(c) not in und_ids], dropped + undated
     if dropped:
         log.info("merge: %s dropped implausible values %s", key,
                  [(r.value, r.page_no or r.cited_page, reasons[id(r)]) for r in dropped])
@@ -567,7 +614,7 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
     return f"This document states different values for {label}: {listed}. {tail}"
 
 
-__all__ = ["AMEND_RE", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "TEMPORAL_FIELDS",
+__all__ = ["AMEND_RE", "DATED_FIELDS", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "TEMPORAL_FIELDS",
            "MergedFact", "conflict_message", "contained_in", "definition_body", "implausible_reason",
-           "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "states_time",
+           "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "states_date", "states_time",
            "value_key"]
