@@ -207,3 +207,81 @@ Owner feedback logged during review (not slice 2): the left panel (Upload, Input
 - S4 [P2] (8/10) backend/pyproject.toml lists openpyxl and reportlab but not python-docx; DOCX needs a new dependency, and footnotes need raw XML (spike first, fallback: superscript numbers plus a Sources list).
 - S5 [P2] (7/10) backend/edits.py:125 `merge_edits` re-applies edits by block id; outline-derived table ids must be unique and stable under reorder, and cover/TOC blocks must survive a merge.
 - S6 [P3] (8/10) db.py seeds only if absent (HANDOFF open item 2); new templates and the `proposal-builder` workflow need an upsert.
+
+### Review sections: findings
+- A1 [P1] (9/10) db.py FactField.section is one static section per field; outline blocks need explicit fact bindings (D3).
+- A2 [P1] (8/10) Export resolves the theme at export time and ArtifactVersion stores content only (models.py:306); snapshot the template per run (D6).
+- A3 [P1] (9/10) eval_hook.py:89 selects Compare Quotes only and eval_gates.py:372-377 ignores unlisted fields; the proposal gate needs a proposal-aware adapter first (required proof of the approved gate, task T1).
+- A4 [P2] (8/10) validator uses report-wide allowlists (compose.py:495); keep TODO "Claim-level validation of report prose"; mitigation: each block's prose sees only its own facts.
+- C1 [P2] (9/10) template_report (compose.py:552) models failure; the no-AI mode needs its own successful renderer (D5).
+- C2 [P3] (8/10) DOCX footnotes reuse cell_note and _source_note (export.py:63-100); no new abstraction.
+- O4 [P1] (9/10, Codex) compose_edits (edits.py:155) drops block identity; two blocks showing one fact can contradict (D4).
+- Performance: no findings (at most 8 documents, outline capped near 20 blocks, in-memory DOCX).
+
+### Decision ledger
+- D1: extraction cache deferred to slice 2c. Answer: "Defer to slice 2c".
+- D2: original file arrangement. Answer: "Original arrangement".
+- S1 to S6: accepted as plan items on the owner's "sounds good" after the recommendation was stated.
+- D3: explicit `fact_sections` per block; facts owned by no block are dropped, not relocated. Compare Quotes with no outline unchanged. Answer: "Explicit fact_sections (Recommended)".
+- D4: at most one table per fact section; narrative blocks may repeat; violation is 422 at outline validation. Answer: "One table per fact section (Recommended)".
+- D5: no-AI mode is a separate deterministic renderer (plain per-kind text from verified facts, no compose_fallback notice, preserved across retry and regenerate). Answer: "Deterministic renderer (Recommended)".
+- D6: resolved template (blocks, theme, variables) snapshotted into run.parameters at creation; export and regenerate read the snapshot. Answer: "Snapshot into run (Recommended)".
+Process note: D3 to D6 were asked in one batched call, and the ledger was recorded after the answers, not before.
+Approval readiness: PASS for D1 to D6 and S1 to S6.
+
+### NOT in scope
+Extraction cache (slice 2c); TipTap editor, theme panel, variable chips (slice 2b); DOCX template import; email and share; zero-document proposals; claim-level prose validation (existing TODO); left-panel redesign (separate design fix).
+
+### What already exists
+build_tables (compose.py:302) is extended, not duplicated; template_report stays the failure fallback; cell_note and _source_note (export.py) feed footnotes; SectionPlanItem and the workflow seed in db.py carry the outline shape; slice 1 edit, undo, chat, SSE and versions are reused unchanged.
+
+### Failure modes
+- Deleted block's facts shown elsewhere: fixed by D3, test required. No critical gap.
+- Eval gate passes without touching a proposal: fixed by T1 before the wizard.
+- Old version re-exports differently: fixed by D6.
+- Intentional no-AI mode looks broken: fixed by D5.
+- DOCX footnote XML invalid in Word: spike (T5) with python-docx reopen test; fallback superscripts plus a Sources list. Not silent: export_failed is shown to the user.
+Critical gaps: 0.
+
+### Implementation Tasks
+- [ ] **T1 (P1, human: ~4h / CC: ~25min)**: eval: proposal-aware adapter, 2 to 3 multi-quote fixtures with cell ground truth, scorer coverage for new fields, 0 hard fails and accuracy gate 0.85. Files: backend/eval_hook.py, tests/eval/. Verify: offline eval tests, then a live run.
+- [ ] **T2 (P1, ~4h / ~25min)**: outline in schemas.py (kinds, caps, locked, unique ids, one table per fact section), shared plan helper at runner.py:319 and :646, template snapshot into run.parameters. Verify: backend tests plus Compare Quotes regression (test_compose.py, test_runner.py, test_api_flow.py unchanged).
+- [ ] **T3 (P1, ~4h / ~20min)**: compose: block-to-fact_sections binding, drop unowned facts, per-block fact scoping for prose, cover and TOC, merge_edits survives them. Files: backend/pipeline/compose.py, backend/edits.py.
+- [ ] **T4 (P1, ~3h / ~15min)**: deterministic renderer for no-AI mode, preserved across retry and regenerate. File: backend/pipeline/compose.py.
+- [ ] **T5 (P2, ~6h / ~30min)**: DOCX spike (python-docx footnote XML, reopen test), then export and PDF cover and TOC; add python-docx to pyproject. Files: backend/export.py, backend/routes/artifacts.py.
+- [ ] **T6 (P2, ~3h / ~15min)**: proposal_template table, seeded Standard and Premier with fact_sections, workflow seed and template upsert, template endpoints. Files: backend/models.py, backend/db.py, backend/routes/templates.py.
+- [ ] **T7 (P2, ~2d / ~1h)**: wizard UI under the design gate (design stack, Playwright MCP, axe at both widths, phone width for step 3). Files: frontend/src/wizard/.
+- [ ] **T8 (P3, ~1h / ~10min)**: full live eval before release.
+
+### Worktree parallelization
+| Step | Modules touched | Depends on |
+|---|---|---|
+| T1 eval | tests/eval, backend/eval_hook | none |
+| T2, T3, T4 core | backend/schemas, backend/pipeline, backend/edits | T2 first |
+| T5 export | backend/export, routes/artifacts | none (spike first) |
+| T6 templates | backend/models, db, routes | T2 |
+| T7 wizard | frontend/src/wizard | T6 API contract |
+
+Lane A: T2, T3, T4 then T6 (shared backend/pipeline and db). Lane B: T5. Lane C: T1. Lane D: T7 after T6. Launch A, B, C together, merge, then D, then T8. Conflict flag: T3 and T4 both edit compose.py, so keep them in one lane.
+
+### Unresolved decisions
+- TODO proposals not yet asked: extraction cache as slice 2c; left-panel design fix (chunky panel, collapsible chat, collapse Upload when Done).
+
+### Suppressed findings
+None.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | none | none |
+| Outside Review | codex, plan-review | Independent 2nd opinion | 1 | completed | 6 findings, all dispositioned |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open | 7 issues, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | none | wizard UI goes through the design gate at build time |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | none | none |
+
+**OUTSIDE COVERAGE:** codex, plan-review, completed, 6 findings (A1 to A4, C1 and O4 overlap; all resolved by D3 to D6 or kept as an existing TODO).
+**VERDICT:** ENG REVIEW: issues_open (all mapped to tasks T1 to T8); CEO and design reviews not run.
+
+**UNRESOLVED DECISIONS:**
+- TODO proposals not yet asked: extraction cache as slice 2c; left-panel design fix.
