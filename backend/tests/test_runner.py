@@ -528,6 +528,134 @@ def test_live_subscriber_receives_events_until_run_end(h):
     assert "artifact.ready" in [e["type"] for e in received]
 
 
+def _refusing_b(state: dict):
+    smart = smart_responder()
+
+    def respond(req):
+        if state["refuse"] and req.role is CallRole.EXTRACT and "Juniper" in str(req.messages[-1].content):
+            return FakeRefusal("no")
+        return smart(req)
+
+    return respond
+
+
+def test_events_of_a_retried_run_close_only_on_the_current_execution_end(h):
+    a, b = h.add_doc(DOC_A), h.add_doc(DOC_B)
+    state = {"refuse": True}
+    gated = GatedProvider(_refusing_b(state))
+
+    async def main():
+        m = h.manager(gated)
+        gated.gate.set()
+        rid = await _run_to_end(m, h.workflow_id, [a, b])
+        first = m.bus.history(rid)
+        assert first[-1]["type"] == "run.end" and first[-1]["data"]["status"] == "partial"
+        state["refuse"] = False
+        gated.gate.clear()
+        waiting = gated.waiting
+        assert m.retry(rid)
+        received = []
+
+        async def listen():  # a fresh client (no Last-Event-ID) while the retry runs
+            async for e in m.events(rid):
+                received.append(e)
+
+        listener = asyncio.create_task(listen())
+        while gated.waiting == waiting:
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
+        still_open = not listener.done()
+        gated.gate.set()
+        await m.wait(rid)
+        await asyncio.wait_for(listener, 2)
+        mid = first[0]["id"]
+        resumed_mid = [e async for e in m.events(rid, last_event_id=mid)]
+        resumed_end = [e async for e in m.events(rid, last_event_id=first[-1]["id"])]
+        after_all = [e async for e in m.events(rid, last_event_id=m.bus.history(rid)[-1]["id"])]
+        history = m.bus.history(rid)
+        await m.shutdown()
+        return first, received, still_open, resumed_mid, resumed_end, after_all, history
+
+    first, received, still_open, resumed_mid, resumed_end, after_all, history = go(main())
+    assert still_open, "the earlier execution's run.end closed the stream of the retry"
+    ends = [e for e in received if e["type"] == "run.end"]
+    assert len(ends) == 1 and received[-1] is ends[0] and ends[0]["data"]["status"] == "done"
+    assert first[-1]["id"] not in [e["id"] for e in received]  # the stale run.end is not replayed
+    ids = [e["id"] for e in received]
+    assert ids == sorted(ids) and len(set(ids)) == len(ids)
+    assert {e["execution"] for e in first} == {1} and received[-1]["execution"] == 2
+    # Last-Event-ID resume: from inside the first execution, and from its run.end
+    assert [e["id"] for e in resumed_mid] == [e["id"] for e in history
+                                             if e["id"] > first[0]["id"] and e["id"] != first[-1]["id"]]
+    assert resumed_mid[-1]["data"]["status"] == "done"
+    assert [e["id"] for e in resumed_end] == [e["id"] for e in history if e["id"] > first[-1]["id"]]
+    assert resumed_end[-1]["type"] == "run.end" and resumed_end[-1]["data"]["status"] == "done"
+    assert [e["type"] for e in after_all] == ["run.snapshot"]
+    assert after_all[0]["data"]["run"]["status"] == "done"
+
+
+def test_finished_retried_run_replays_to_the_last_run_end_and_idle_runs_still_snapshot(h):
+    a, b = h.add_doc(DOC_A), h.add_doc(DOC_B)
+    state = {"refuse": True}
+
+    async def main():
+        m = h.manager(FakeProvider(_refusing_b(state)))
+        rid = await _run_to_end(m, h.workflow_id, [a, b])
+        state["refuse"] = False
+        assert m.retry(rid)
+        await m.wait(rid)
+        replay = [e async for e in m.events(rid)]
+        fresh = h.manager(FakeProvider(smart_responder()))  # restart: no history, no task
+        snap = [e async for e in fresh.events(rid)]
+        await m.shutdown()
+        await fresh.shutdown()
+        return replay, snap
+
+    replay, snap = go(main())
+    assert [e["type"] for e in replay].count("run.end") == 1
+    assert replay[-1]["type"] == "run.end" and replay[-1]["data"]["status"] == "done"
+    assert [e["type"] for e in snap] == ["run.snapshot"] and snap[0]["data"]["run"]["status"] == "done"
+
+
+def test_retryable_is_true_exactly_when_retry_would_be_accepted(h):
+    a, b = h.add_doc(DOC_A), h.add_doc(DOC_B)
+    state = {"refuse": True}
+    gated = GatedProvider(_refusing_b(state))
+
+    async def main():
+        m = h.manager(gated)
+        gated.gate.set()
+        partial = await _run_to_end(m, h.workflow_id, [a, b])
+        out = {"partial": (m.snapshot(partial)["run"],
+                           [e for e in m.bus.history(partial) if e["type"] == "run.status"][-1]["data"])}
+        state["refuse"] = False
+        done = await _run_to_end(m, h.workflow_id, [a])
+        out["done"] = (m.snapshot(done)["run"],
+                       [e for e in m.bus.history(done) if e["type"] == "run.status"][-1]["data"])
+        gated.gate.clear()
+        cancelled, _ = m.submit(h.workflow_id, [b])
+        while gated.waiting < 1:
+            await asyncio.sleep(0.01)
+        assert m.snapshot(cancelled)["run"]["retryable"] is False  # running: retry would be refused
+        await m.cancel(cancelled)
+        out["cancelled"] = (m.snapshot(cancelled)["run"],
+                            [e for e in m.bus.history(cancelled) if e["type"] == "run.status"][-1]["data"])
+        gated.gate.set()
+        accepted = {k: m.retry(rid) for k, rid in (("done", done), ("partial", partial),
+                                                   ("cancelled", cancelled))}
+        for rid in (partial, cancelled):
+            await m.wait(rid)
+        await m.shutdown()
+        return out, accepted
+
+    out, accepted = go(main())
+    for kind, (snap, status_event) in out.items():
+        assert snap["status"] == kind
+        assert snap["retryable"] is accepted[kind], kind
+        assert status_event["retryable"] is accepted[kind], kind
+    assert accepted == {"done": False, "partial": True, "cancelled": True}
+
+
 def test_runner_module_exposes_reason_map():
     assert runner.failure_message("budget_exhausted").lower().startswith("budget exhausted")
     assert runner.failure_message("unknown_code")

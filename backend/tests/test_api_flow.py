@@ -139,6 +139,7 @@ def test_double_submit_returns_the_active_run_and_cancel_ends_it(api_factory):
     assert a.client.post(f"/api/runs/{run_id}/retry").status_code == 409
     out = a.client.post(f"/api/runs/{run_id}/cancel").json()
     assert out["cancelled"] is True and out["run"]["status"] == "cancelled"
+    assert out["run"]["retryable"] is True  # POST /retry accepts a cancelled run
     assert out["run"]["documents"][0]["error_code"] == "cancelled"
     events = a.events(run_id)
     assert events[-1]["type"] == "run.end" and events[-1]["data"]["status"] == "cancelled"
@@ -346,18 +347,24 @@ def test_retry_run_keeps_edits_and_marks_their_sections_stale(api_factory):
 
     api = api_factory(respond)
     a, b = api.upload_pages(DOC_A, "a.pdf"), api.upload_pages(DOC_B, "b.pdf")
-    run, _ = api.run([a, b])
-    assert run["status"] == "partial"
+    run, first_events = api.run([a, b])
+    assert run["status"] == "partial" and run["retryable"] is True
+    assert [e for e in first_events if e["type"] == "run.status"][-1]["data"]["retryable"] is True
     art = api.artifact(run["id"])
     assert cell(art, TABLE, "named_insured", "B")["state"] == "failed"
     api.client.patch(f"/api/artifacts/{art['id']}/cells", json={
         "block_id": "premium-table", "row_key": "total_premium", "column_key": "A", "value": "$30,000.00"})
     refuse["on"] = False
     r = api.client.post(f"/api/runs/{run['id']}/retry")
-    assert r.status_code == 202
-    api.events(run["id"])
+    assert r.status_code == 202 and r.json()["run"]["retryable"] is False
+    events = api.events(run["id"])
+    # the stream belongs to the retry: it ends on the retry's run.end, not the first execution's
+    assert [e["type"] for e in events].count("run.end") == 1
+    assert events[-1]["type"] == "run.end" and events[-1]["data"]["status"] == "done"
+    resumed = api.events(run["id"], last_event_id=first_events[-1]["id"])
+    assert resumed and resumed[-1]["data"]["status"] == "done"
     run = wait_terminal(api, run["id"])
-    assert run["status"] == "done"
+    assert run["status"] == "done" and run["retryable"] is False
     new = api.artifact(run["id"])
     assert new["version"] == 3 and new["note"] == "retry, generated"
     kept = cell(new, "premium-table", "total_premium")
@@ -477,6 +484,22 @@ def test_chat_sees_the_latest_edited_values_with_the_original(api_factory):
     assert any(s.get("may_be_out_of_date") for s in payload["report"]["sections"])
     assert payload["pages"][0]["text"].startswith("Carrier: Harborline")
     assert "$30,000.00" in r.json()["assistant_message"]["content"]
+
+
+def test_chat_keeps_the_spaces_between_answer_segments(api_factory):
+    def chat(req):
+        payload = context_payload(req)
+        pid = payload["passages"][0]["passage_id"]
+        return {"answer": [{"text": "A is Harborline Specialty,", "passage_ids": [pid]},
+                           {"text": " per the quote.", "passage_ids": []}], "proposed_edits": []}
+
+    api = api_factory(api_responder(chat=chat))
+    run, _ = api.run([api.upload_pages(DOC_A)])
+    r = api.client.post(f"/api/runs/{run['id']}/messages", json={"content": "Who is A?"})
+    assert r.status_code == 201, r.text
+    bot = r.json()["assistant_message"]
+    assert [s["text"] for s in bot["segments"]] == ["A is Harborline Specialty,", " per the quote."]
+    assert bot["content"] == "A is Harborline Specialty, per the quote."
 
 
 def test_chat_rejects_bad_citations_and_invented_numbers_then_retries_once(api_factory):

@@ -60,22 +60,57 @@ def redact(text: str) -> str:
     return _KEY_SHAPE.sub("[redacted]", text)
 
 
+def _redact_arg(value: Any) -> Any:
+    """A str arg is redacted in place; any other arg whose text leaks becomes the redacted text."""
+    if isinstance(value, str):
+        return redact(value)
+    try:
+        text = str(value)
+    except Exception:  # pragma: no cover - an arg that cannot print cannot leak through %s either
+        return value
+    clean = redact(text)
+    return value if clean == text else clean
+
+
 class RedactSecrets(logging.Filter):
-    """Scrubs the API key from the message, its args and any traceback text."""
+    """Scrubs the API key from the message, its args and any traceback text.
+
+    The record keeps its shape: `msg` stays the format string and `args` stays
+    a tuple (or mapping) of the same length, because formatters read them.
+    uvicorn's AccessFormatter unpacks `record.args` into five names, so
+    replacing args with None (or ()) crashes every access-log line. Only when
+    per-arg redaction cannot clean the message (a key split across args, or a
+    %d arg that had to become text) does the record collapse to the redacted
+    message with empty args.
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
             message = record.getMessage()
         except Exception:  # pragma: no cover - a broken format string is not ours to fix
             return True
-        clean = redact(message)
-        if clean != message or record.args:
-            record.msg, record.args = clean, None
+        if redact(message) != message:
+            self._scrub(record, message)
         if record.exc_info and not record.exc_text:
             record.exc_text = logging.Formatter().formatException(record.exc_info)
         if record.exc_text:
             record.exc_text = redact(record.exc_text)
         return True
+
+    @staticmethod
+    def _scrub(record: logging.LogRecord, message: str) -> None:
+        if isinstance(record.msg, str):
+            record.msg = redact(record.msg)
+        if isinstance(record.args, tuple):
+            record.args = tuple(_redact_arg(a) for a in record.args)
+        elif isinstance(record.args, dict):
+            record.args = {k: _redact_arg(v) for k, v in record.args.items()}
+        try:
+            out = record.getMessage()
+        except Exception:  # e.g. a %d arg that is now redacted text
+            out = None
+        if out is None or redact(out) != out:
+            record.msg, record.args = redact(message), ()
 
 
 _FILTER = RedactSecrets()

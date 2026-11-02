@@ -185,9 +185,14 @@ URL to pdf.js for the source viewer. `404 file_missing` if the file is gone
 `status`: `queued`, `running` (documents in progress), `composing` (all
 documents settled, "Writing report..."), `done`, `partial` (report written,
 some documents failed or the budget ran out), `failed` (no report: every
-document failed, or a crash; `retryable` true), `cancelled`. `terminal` is true
+document failed, or a crash), `cancelled`. `terminal` is true
 once the status is final and no task is running. `artifact` is null until a
 report exists.
+
+`retryable` is true exactly when `POST /api/runs/{id}/retry` would be
+accepted: the status is `failed`, `partial` or `cancelled` and no task is
+running (`active` false). It is false for `done` and for any active run. Use
+it to show the Retry button.
 
 `RunDocument` (identical to the SSE `document.status` payload):
 
@@ -220,7 +225,9 @@ header shows the warning from the artifact table.
 recomposes (a new artifact version). Cell edits are carried into the new
 version and the sections they affect are flagged stale.
 `409 not_retryable` (with `run_status`) unless the run is `failed`,
-`partial` or `cancelled` and idle.
+`partial` or `cancelled` and idle (that is, unless `Run.retryable` is true).
+After a retry, open the events stream again: it follows the new execution
+to its own `run.end` (see below).
 
 ### `POST /api/runs/{id}/cancel`
 
@@ -234,22 +241,34 @@ be retried.
 `text/event-stream`. Use `EventSource`; on reconnect the browser sends
 `Last-Event-ID` and the stream resumes after it (or pass
 `?last_event_id=N`). The stream first sends `retry: 3000`, then replays the
-run's events, then live ones, and **closes after `run.end`**. Lines starting
-with `:` are keepalive comments (every 15 s).
+run's events, then live ones, and **closes after the `run.end` of the current
+execution**. Lines starting with `:` are keepalive comments (every 15 s).
 
 Each frame:
 
 ```
 id: 41
 event: document.status
-data: {"id":41,"run_id":12,"type":"document.status","data":{...}}
+data: {"id":41,"run_id":12,"execution":2,"type":"document.status","data":{...}}
 ```
 
 The `data` line is the whole event; the payload is its `data` field.
+`execution` numbers the run's executions in this server process: 1 for the
+first, 2 after the first retry, and so on (0 for a run never started since
+the server started, such as a queued run cancelled after a restart).
+
+Retried runs: the history keeps the events of earlier executions, but their
+`run.end` is superseded and never sent, so a stream (fresh, or resumed with
+`Last-Event-ID`) never stops on an earlier execution's end. The replay
+shows the earlier execution's other events (its last `run.status` says, for
+example, `partial`), then the retry's `run.status` `queued`/`running`, and
+ends on the retry's `run.end`. A client that closes on `run.end` therefore
+needs no special case. `Last-Event-ID` resume works across executions: the
+stream resumes after the given id, skipping superseded `run.end` events.
 
 | `type` | payload `data` |
 |---|---|
-| `run.status` | `{"status": "running", "error": null, "retryable": false}` |
+| `run.status` | `{"status": "running", "error": null, "retryable": false}` (`retryable` as on `Run`) |
 | `document.status` | `RunDocument` |
 | `run.usage` | `{"tokens_in": 5120, "tokens_out": 830, "cost_usd": 0.0029}` |
 | `artifact.ready` | `{"artifact_id": 7, "version": 1, "fallback": false}` (`fallback` true: template report, see notices) |
@@ -257,8 +276,10 @@ The `data` line is the whole event; the payload is its `data` field.
 | `run.snapshot` | `{"run": {"id", "status", "error", "retryable", "tokens_in", "tokens_out", "cost_usd"}, "documents": [RunDocument], "artifact": {"id": 7, "version": 1} or null}` |
 
 `run.snapshot` has no `id` and is sent alone when the server has no history
-for the run (for example after a restart) and the run is idle; render from it
-and close. For a run that already ended, the replay ends with its `run.end`.
+for the run (for example after a restart, or a `Last-Event-ID` after the last
+event) and the run is idle; render from it and close. It also closes an idle
+run's replay that has no current `run.end` to end on. For a run that already
+ended, the replay ends with the `run.end` of its latest execution.
 After `run.end` (or a snapshot), fetch `GET /api/runs/{id}` and the artifact.
 
 ## Artifacts
@@ -488,7 +509,9 @@ another format; `500 export_failed` ("Export failed. Retry").
 ```
 
 Render `segments` with chips (look chips up in the artifact's `chips`; for an
-answer that cites a scan-read passage use the dashed chip).
+answer that cites a scan-read passage use the dashed chip). Segment `text` is
+stored as the model wrote it, spaces included: concatenate segments as they
+are, adding no separator (`content` is that concatenation, trimmed).
 
 ### `POST /api/runs/{id}/messages`
 

@@ -200,6 +200,73 @@ def test_redaction_filter_scrubs_key_shapes_args_and_tracebacks(monkeypatch):
     assert "sk-abcdefghijklmnopqrstu" not in other.getMessage()
 
 
+class _Capture(logging.Handler):
+    def __init__(self, formatter: logging.Formatter):
+        super().__init__()
+        self.setFormatter(formatter)
+        self.lines: list[str] = []
+        self.errors: list[BaseException] = []
+
+    def emit(self, record):
+        self.lines.append(self.format(record))
+
+    def handleError(self, record):  # logging swallows emit errors; surface them to the test
+        import sys
+        self.errors.append(sys.exc_info()[1])
+
+
+def _access_record(path: str) -> logging.LogRecord:
+    # Exactly what uvicorn.protocols.http logs for every request.
+    return logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1, '%s - "%s %s HTTP/%s" %d',
+                             ("127.0.0.1:51234", "GET", path, "1.1", 200), None)
+
+
+@pytest.mark.parametrize("formatter", [
+    logging.Formatter("%(levelname)s %(message)s"),
+    pytest.param("uvicorn", id="uvicorn-AccessFormatter"),
+])
+def test_redaction_filter_keeps_uvicorn_access_lines_formattable(monkeypatch, formatter):
+    key = "sk-proj-abcdefghijklmnopqrstuvwx"
+    monkeypatch.setenv("OPENAI_API_KEY", key)
+    if formatter == "uvicorn":
+        from uvicorn.logging import AccessFormatter
+        formatter = AccessFormatter('%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+                                    use_colors=False)
+    handler = _Capture(formatter)
+    handler.addFilter(RedactSecrets())
+    logger = logging.getLogger("test.redaction.access")
+    logger.propagate = False
+    logger.addHandler(handler)
+    try:
+        for path in ("/api/runs/12/events", f"/api/health?token={key}", "/api/x?k=sk-abcdefghijklmnopqrstu"):
+            logger.handle(_access_record(path))
+    finally:
+        logger.removeHandler(handler)
+    assert handler.errors == []
+    assert len(handler.lines) == 3
+    assert '127.0.0.1:51234 - "GET /api/runs/12/events HTTP/1.1" 200' in handler.lines[0]
+    assert '"GET /api/health?token=[redacted] HTTP/1.1" 200' in handler.lines[1]
+    assert '"GET /api/x?k=[redacted] HTTP/1.1" 200' in handler.lines[2]
+    assert all(key not in line and "sk-abcdefghijklmnopqrstu" not in line for line in handler.lines)
+
+
+def test_redaction_filter_handles_non_string_args_and_mapping_args(monkeypatch):
+    key = "sk-proj-abcdefghijklmnopqrstuvwx"
+    monkeypatch.setenv("OPENAI_API_KEY", key)
+    f = RedactSecrets()
+    rec = logging.LogRecord("x", logging.WARNING, __file__, 1, "failed: %r (%d tries)",
+                            (RuntimeError(f"key {key}"), 2), None)
+    f.filter(rec)
+    out = rec.getMessage()
+    assert key not in out and "[redacted]" in out and "(2 tries)" in out
+    rec = logging.LogRecord("x", logging.WARNING, __file__, 1, "%(who)s used %(k)s", ({"who": "me", "k": key},), None)
+    f.filter(rec)
+    assert rec.getMessage() == "me used [redacted]"
+    clean = logging.LogRecord("x", logging.INFO, __file__, 1, "%s took %.1fs", ("run", 1.25), None)
+    f.filter(clean)
+    assert clean.args == ("run", 1.25) and clean.getMessage() == "run took 1.2s"
+
+
 # --------------------------------------------------------------------- prompt injection (R3, D7)
 
 INJECTION = json.loads((FIXTURES / "injection.truth.json").read_text(encoding="utf-8"))
