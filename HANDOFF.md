@@ -69,11 +69,10 @@ toolbar wrap, auto-growing cell editor, Ctrl/Cmd+Z for the Undo toast, disabled 
 Owner calls left: repeated "Extraction failed + Retry" per cell (M1), collapse Upload when a run is Done, double-colon failure copy.
 Dev stack was left running (backend 8000, vite 5173); stop them when done. Re-seed the dev DB before reuse.
 
-## Slice 2 Proposal Builder (2026-11-02): backend, DOCX and eval DONE and merged; wizard UI next
-Spec + eng review: `docs/specs/2026-11-02-proposal-builder-design.md` (decisions D1 to D6, tasks T1 to T8). Contract: `backend/API.md` ("Proposal templates", "Proposal runs").
-Done on main (backend 838 pass/2 skip, eval 240 pass/2 skip): T1 eval adapter + 3 fixtures (premier template), T2 to T4 + T6 backend (templates, outline validation, snapshot, no-AI renderer), T5 DOCX export (real Word footnotes, spike note `docs/specs/2026-11-02-docx-footnote-spike.md`).
-Live proposal eval PASSED 2026-11-02: 0 hard fails, cell accuracy 0.939, 191 prose segments checked. Run it under `backend/.venv` (tests/.venv_c lacks SQLAlchemy and silently skips):
-`set -a; . ./.env; set +a; BROKERDOCS_EVAL_PROPOSAL_REPORT=$PWD/proposal_eval_report.json backend/.venv/Scripts/python.exe -m pytest -m live tests/eval/test_live_eval.py -k proposal -q`
-Changed shared field descriptions (`each_occurrence_limit`, `retention`, `rate`): the full 23-doc Compare Quotes live eval has NOT been re-run since (T8, do before release). Standard template has no live eval coverage (fixtures use premier).
-Next: T7 wizard UI in `frontend/src/wizard/` through the full design stack (gstack, ui-ux-pro-max, taste-core + taste-redesign, impeccable, emil-design-eng, frontend-design, Playwright MCP), design gate, axe at both widths, phone width for step 3; then T8. Template API gives `kinds`, `fact_sections`, `limits` for the outline editor.
-Open: left-panel design fix (chunky stack, chat cannot collapse, collapse Upload when Done); slice 2c extraction cache; DOCX cover/TOC ids contract is `cover`/`toc` sections (matches Lane A). Fresh session recommended.
+## Slice 2 Proposal Builder (2026-11-02): backend, DOCX, eval and wizard UI (T7) merged to main
+Spec + eng review: `docs/specs/2026-11-02-proposal-builder-design.md`. Contract: `backend/API.md`. Wizard brief: `frontend/WIZARD-BRIEF.md`.
+Main: backend 838 pass/2 skip; wizard e2e 3/3 with axe 0 (run with a scratch backend: `BROKERDOCS_DATA_DIR=<scratch> BROKERDOCS_PORT=8010 BROKERDOCS_UI_ORIGIN=http://localhost:5183`, `python -m backend.dev_seed seed` then `serve`; then `E2E_UI_PORT=5183 VITE_API_BASE=http://127.0.0.1:8010 npx playwright test` in frontend/).
+Live proposal eval passed (0 hard fails, cell accuracy 0.939). Run under `backend/.venv`, see `tests/eval/test_live_eval.py` (`-k proposal`).
+T8 (full 23-doc Compare Quotes live eval after the field-description changes): started 2026-11-02 11:35, result in `compare_eval.log` / `compare_eval_report.json`; record it here.
+Wizard owner calls taken by default (not explicitly answered): dev_seed.py proposal prose merged; reorder = Move up/down buttons only (no drag); phone top bar shows only current breadcrumb app-wide.
+Open gaps: chat copy on proposal runs ("Run a comparison..." in Chat.tsx); duplicate uploads in the picker (collapse by sha256); Preview hides chips only; section edit-open state resets between steps; PRODUCT.md missing; left-panel design fix (chunky stack, chat cannot collapse, collapse Upload when Done); slice 2c extraction cache; Standard template has no live eval coverage; Playwright MCP wrote files to `BrokerDocs/.playwright-mcp/` outside the repo.
