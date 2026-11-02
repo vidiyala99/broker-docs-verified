@@ -111,7 +111,7 @@ def resolve_theme(raw: Any) -> dict[str, Any]:
     if isinstance(sizes, dict):
         for key, value in sizes.items():
             k = str(key).strip().lower()
-            k = "title" if k == "title" else re.sub(r"^(h|heading|level)[ _-]?", "", k)
+            k = "title" if k == "title" else re.sub(r"^(heading|level|h)[ _-]?", "", k)
             if k not in theme["heading_sizes"]:
                 continue
             if isinstance(value, (int, float)) and not isinstance(value, bool) and 6 <= value <= 72:
