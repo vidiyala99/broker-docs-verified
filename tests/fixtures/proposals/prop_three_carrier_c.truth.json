@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261102,
+  "fixture_id": "prop_three_carrier_c",
+  "proposal_id": "prop_three_carrier",
+  "column": "C",
+  "file": "prop_three_carrier_c.pdf",
+  "variant": "proposal_table",
+  "gate_bucket": "proposal",
+  "description": "Brassridge Technology Insurance Company Cyber and Technology E&O quote for Halcyon Data Systems LLC (table layout). Absent fields (must show no value): each_occurrence_limit, rate, retention.",
+  "carrier": "Brassridge Technology Insurance Company",
+  "page_count": 3,
+  "size_bytes": 12073,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "fail_closed": true,
+  "unscored_fields": {
+    "key_endorsements": "free-text list, not scored",
+    "key_exclusions": "free-text list, not scored",
+    "subjectivities": "free-text list, not scored"
+  },
+  "facts": {
+    "named_insured": {
+      "value": "Halcyon Data Systems LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Halcyon Data Systems LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "address": {
+      "value": "2210 Brookfield Parkway, Suite 400, Madison, WI 53703",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 2210 Brookfield Parkway, Suite 400, Madison, WI 53703",
+      "source": "text",
+      "accepted_values": []
+    },
+    "carrier_name": {
+      "value": "Brassridge Technology Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Carrier: Brassridge Technology Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Admitted",
+      "source": "text",
+      "accepted_values": []
+    },
+    "am_best_rating": {
+      "value": "A- (Excellent), IX",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AM Best Rating: A- (Excellent), IX",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_term": {
+      "value": "2027-01-01 to 2028-01-01",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: 2027-01-01 to 2028-01-01",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "Worldwide, provided the claim is brought in the United States",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage Territory: Worldwide, provided the claim is brought in the United States",
+      "source": "text",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Meridian Risk Partners LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "TEC 100 07 24 Technology Errors and Omissions and Cyber Liability Policy (Claims-Made)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: TEC 100 07 24 Technology Errors and Omissions and Cyber Liability Policy (Claims-Made)",
+      "source": "text",
+      "accepted_values": []
+    },
+    "total_premium": {
+      "value": "$37,275.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $37,275.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$250.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Taxes and Fees: $250.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": null,
+    "aggregate_limit": {
+      "value": "$4,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Maximum Policy Aggregate Limit: $4,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "retention": null,
+    "rate": null,
+    "quote_expiration": {
+      "value": "2026-12-15",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Quote Valid Until: 2026-12-15",
+      "source": "text",
+      "accepted_values": []
+    },
+    "minimum_earned_premium": {
+      "value": "$2,500",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Minimum Earned Premium: $2,500",
+      "source": "text",
+      "accepted_values": []
+    },
+    "retroactive_date": {
+      "value": "January 1, 2021",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Retroactive Date: January 1, 2021",
+      "source": "text",
+      "accepted_values": []
+    },
+    "tech_eo_limit": {
+      "value": "$3,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$3,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "tech_eo_retention": {
+      "value": "$30,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$30,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_liability_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_liability_retention": {
+      "value": "$20,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$20,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_crime_limit": {
+      "value": "$150,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$150,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_crime_retention": {
+      "value": "$7,500",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$7,500",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "notes": ""
+}

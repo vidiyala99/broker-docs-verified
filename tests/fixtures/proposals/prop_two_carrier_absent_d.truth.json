@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261102,
+  "fixture_id": "prop_two_carrier_absent_d",
+  "proposal_id": "prop_two_carrier_absent",
+  "column": "A",
+  "file": "prop_two_carrier_absent_d.pdf",
+  "variant": "proposal_table",
+  "gate_bucket": "proposal",
+  "description": "Quarrystone Surplus Insurance Company Cyber and Technology E&O quote for Orchard Ridge Software Inc. (table layout). Absent fields (must show no value): each_occurrence_limit, rate, retention.",
+  "carrier": "Quarrystone Surplus Insurance Company",
+  "page_count": 3,
+  "size_bytes": 12055,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "fail_closed": true,
+  "unscored_fields": {
+    "key_endorsements": "free-text list, not scored",
+    "key_exclusions": "free-text list, not scored",
+    "subjectivities": "free-text list, not scored"
+  },
+  "facts": {
+    "named_insured": {
+      "value": "Orchard Ridge Software Inc.",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Orchard Ridge Software Inc.",
+      "source": "text",
+      "accepted_values": []
+    },
+    "address": {
+      "value": "77 Millbrook Street, Floor 3, Burlington, VT 05401",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 77 Millbrook Street, Floor 3, Burlington, VT 05401",
+      "source": "text",
+      "accepted_values": []
+    },
+    "carrier_name": {
+      "value": "Quarrystone Surplus Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Carrier: Quarrystone Surplus Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Non-Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Non-Admitted",
+      "source": "text",
+      "accepted_values": [
+        "Non-Admitted (Surplus Lines)",
+        "Surplus Lines",
+        "Nonadmitted"
+      ]
+    },
+    "am_best_rating": {
+      "value": "A (Excellent), X",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AM Best Rating: A (Excellent), X",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_term": {
+      "value": "01/01/2027 - 01/01/2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: 01/01/2027 - 01/01/2028",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "Worldwide, provided the claim is brought in the United States",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage Territory: Worldwide, provided the claim is brought in the United States",
+      "source": "text",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Meridian Risk Partners LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CYB 2000 01 25 Cyber and Technology Professional Liability Coverage Form",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: CYB 2000 01 25 Cyber and Technology Professional Liability Coverage Form",
+      "source": "text",
+      "accepted_values": []
+    },
+    "total_premium": {
+      "value": "$26,181.44",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $26,181.44",
+      "source": "text",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$1,306.44",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Taxes and Fees: $1,306.44",
+      "source": "text",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": null,
+    "aggregate_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Maximum Policy Aggregate Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "retention": null,
+    "rate": null,
+    "quote_expiration": {
+      "value": "12/15/2026",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Quote Valid Until: 12/15/2026",
+      "source": "text",
+      "accepted_values": []
+    },
+    "minimum_earned_premium": {
+      "value": "$1,500",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Minimum Earned Premium: $1,500",
+      "source": "text",
+      "accepted_values": []
+    },
+    "retroactive_date": {
+      "value": "06/15/2020",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Retroactive Date: 06/15/2020",
+      "source": "text",
+      "accepted_values": []
+    },
+    "tech_eo_limit": {
+      "value": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "tech_eo_retention": {
+      "value": "$10,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$10,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_liability_limit": {
+      "value": "$750,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$750,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_liability_retention": {
+      "value": "$12,500",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$12,500",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_crime_limit": {
+      "value": "$100,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$100,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_crime_retention": {
+      "value": "$5,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$5,000",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "notes": ""
+}

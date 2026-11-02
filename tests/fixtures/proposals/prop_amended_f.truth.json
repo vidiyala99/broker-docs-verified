@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261102,
+  "fixture_id": "prop_amended_f",
+  "proposal_id": "prop_amended",
+  "column": "A",
+  "file": "prop_amended_f.pdf",
+  "variant": "proposal_clean",
+  "gate_bucket": "proposal",
+  "description": "Kestrel Bay Assurance Company Cyber and Technology E&O quote for Pinecrest Analytics Corp. (clean layout). Absent fields (must show no value): each_occurrence_limit, rate, retention.",
+  "carrier": "Kestrel Bay Assurance Company",
+  "page_count": 4,
+  "size_bytes": 12410,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "fail_closed": true,
+  "unscored_fields": {
+    "key_endorsements": "free-text list, not scored",
+    "key_exclusions": "free-text list, not scored",
+    "subjectivities": "free-text list, not scored"
+  },
+  "facts": {
+    "named_insured": {
+      "value": "Pinecrest Analytics Corp.",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Pinecrest Analytics Corp.",
+      "source": "text",
+      "accepted_values": []
+    },
+    "address": {
+      "value": "4100 Wexford Lane, Building B, Boise, ID 83702",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 4100 Wexford Lane, Building B, Boise, ID 83702",
+      "source": "text",
+      "accepted_values": []
+    },
+    "carrier_name": {
+      "value": "Kestrel Bay Assurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "quote": "Carrier: Kestrel Bay Assurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Admitted",
+      "source": "text",
+      "accepted_values": []
+    },
+    "am_best_rating": {
+      "value": "A (Excellent), XI",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AM Best Rating: A (Excellent), XI",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_term": {
+      "value": "2027-01-01 to 2028-01-01",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: 2027-01-01 to 2028-01-01",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "Worldwide, provided the claim is brought in the United States",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage Territory: Worldwide, provided the claim is brought in the United States",
+      "source": "text",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Meridian Risk Partners LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Meridian Risk Partners LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "TEC 100 07 24 Technology Errors and Omissions and Cyber Liability Policy (Claims-Made)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: TEC 100 07 24 Technology Errors and Omissions and Cyber Liability Policy (Claims-Made)",
+      "source": "text",
+      "accepted_values": []
+    },
+    "total_premium": {
+      "value": "$18,225.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Payable: $18,225.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$150.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Taxes and Fees: $150.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": null,
+    "aggregate_limit": {
+      "value": "$3,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Maximum Policy Aggregate Limit: $3,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "retention": null,
+    "rate": null,
+    "quote_expiration": {
+      "value": "2026-12-15",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Quote Valid Until: 2026-12-15",
+      "source": "text",
+      "accepted_values": []
+    },
+    "minimum_earned_premium": {
+      "value": "25%",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Minimum Earned Premium: 25%",
+      "source": "text",
+      "accepted_values": []
+    },
+    "retroactive_date": {
+      "value": "09/01/2018",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Retroactive Date: 09/01/2018",
+      "source": "text",
+      "accepted_values": []
+    },
+    "tech_eo_limit": {
+      "value": "$3,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Technology Errors and Omissions Liability Limit: $3,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "tech_eo_retention": {
+      "value": "$40,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Technology Errors and Omissions Liability Retention: $40,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_liability_limit": {
+      "value": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Network Security and Privacy Liability Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_liability_retention": {
+      "value": "$25,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Network Security and Privacy Liability Retention: $25,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_crime_limit": {
+      "value": "$500,000",
+      "page": 4,
+      "pages": [
+        4
+      ],
+      "quote": "Amended Cyber Crime Sublimit: $500,000 each claim",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cyber_crime_retention": {
+      "value": "$15,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Cyber Crime Retention: $15,000",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "decoys": [
+    {
+      "field": "cyber_crime_limit",
+      "value": "$250,000",
+      "kind": "superseded",
+      "pages": [
+        2
+      ]
+    }
+  ],
+  "notes": "Effective value chosen as truth: a later endorsement amends the declarations."
+}
