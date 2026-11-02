@@ -18,6 +18,7 @@ from __future__ import annotations
 import io
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from xml.sax.saxutils import escape
 
@@ -34,6 +35,7 @@ from backend.schemas import (
     IssueBlock,
     ListBlock,
     ParagraphBlock,
+    Section,
     Segment,
     TableBlock,
 )
@@ -49,6 +51,86 @@ class ExportData:
     version: int
     content: ArtifactContent
     chips: dict[str, dict[str, Any]]  # views.chips shape, keyed by str(passage id)
+    # Raw theme from the run's template snapshot (theme_from_parameters); DOCX only.
+    theme: dict[str, Any] | None = None
+    # The version's own timestamp: DOCX metadata, so a re-export stays byte-identical.
+    created_at: datetime | None = None
+
+
+# ----------------------------------------------------------------- template snapshot (D6)
+
+# Lane A snapshots the resolved template into run.parameters when a proposal run
+# is created (D6), so an old version re-exports with the theme it was made with.
+# The exporter reads the first of these keys that holds a dict with a "theme"
+# dict. Expected snapshot shape (every theme field optional; a missing or invalid
+# field falls back to export_docx.DEFAULT_THEME field by field):
+#
+#   run.parameters["template"] = {
+#       "slug": "standard", "blocks": [...], "variables": [...],
+#       "theme": {
+#           "font": "Calibri",                 # font family for body and headings
+#           "heading_color": "#1F2A44",        # hex RGB, with or without "#"
+#           "heading_sizes": {"title": 26, "1": 16, "2": 13, "3": 11},  # points;
+#                                              # "h1"/"heading1" keys also accepted
+#       },
+#   }
+TEMPLATE_SNAPSHOT_KEYS = ("template", "template_snapshot")
+
+
+def theme_from_parameters(parameters: Any) -> dict[str, Any] | None:
+    """The raw theme dict from a run's template snapshot, or None (slice 1 runs)."""
+    if not isinstance(parameters, dict):
+        return None
+    for key in TEMPLATE_SNAPSHOT_KEYS:
+        snap = parameters.get(key)
+        if isinstance(snap, dict) and isinstance(snap.get("theme"), dict):
+            return snap["theme"]
+    return None
+
+
+# ----------------------------------------------------------------- cover page and TOC
+
+# Proposal artifacts carry the cover page and the table of contents as ordinary
+# heading/paragraph/list blocks, flagged by id (spec section 3): a section whose
+# id is "cover" or "toc", or a section holding a block with that id (or an id
+# starting "cover-" / "toc-"). Slice 1 artifacts have neither, so their exports
+# do not change.
+COVER_ID = "cover"
+TOC_ID = "toc"
+
+
+def _front_kind(section: Section) -> str | None:
+    for key in (COVER_ID, TOC_ID):
+        if section.id == key or any(b.id == key or b.id.startswith(key + "-") for b in section.blocks):
+            return key
+    return None
+
+
+@dataclass(frozen=True)
+class FrontMatter:
+    cover: Section | None
+    toc: Section | None
+    body: list[Section]
+
+
+def front_matter(content: ArtifactContent) -> FrontMatter:
+    cover = toc = None
+    body: list[Section] = []
+    for section in content.sections:
+        kind = _front_kind(section)
+        if kind == COVER_ID and cover is None:
+            cover = section
+        elif kind == TOC_ID and toc is None:
+            toc = section
+        else:
+            body.append(section)
+    return FrontMatter(cover, toc, body)
+
+
+def first_heading(section: Section | None) -> str | None:
+    if section is None:
+        return None
+    return next((b.text for b in section.blocks if isinstance(b, HeadingBlock) and b.text.strip()), None)
 
 
 def filename(data: ExportData, ext: str) -> str:
