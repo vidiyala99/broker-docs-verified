@@ -193,6 +193,20 @@ def test_no_ai_prose_over_the_api_survives_regenerate(papi):
     assert r.json()["artifact"]["content"] == art["content"]
 
 
+def test_slice1_chat_export_and_cell_edit_work_on_a_proposal(papi):
+    a, b = papi.upload_pages(DOC_A, "a.pdf"), papi.upload_pages(DOC_B, "b.pdf")
+    run = finish(papi, post_run(papi, [a, b], {"template_id": "premier", "client_name": "Cedar Hollow LLC"}))
+    art = papi.artifact(run["id"])
+    for fmt in ("pdf", "xlsx"):
+        r = papi.client.get(f"/api/artifacts/{art['id']}/export?format={fmt}")
+        assert r.status_code == 200, (fmt, r.text)
+    r = papi.client.patch(f"/api/artifacts/{art['id']}/cells", json={
+        "block_id": "premium-table", "row_key": "total_premium", "column_key": "A", "value": "$30,000.00"})
+    assert r.status_code == 200, r.text
+    r = papi.client.post(f"/api/runs/{run['id']}/messages", json={"content": "Which quote is cheaper?"})
+    assert r.status_code == 201, r.text
+
+
 # --------------------------------------------------------------------- injection canary
 
 

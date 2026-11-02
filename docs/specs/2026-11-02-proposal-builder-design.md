@@ -245,11 +245,12 @@ Critical gaps: 0.
 
 ### Implementation Tasks
 - [ ] **T1 (P1, human: ~4h / CC: ~25min)**: eval: proposal-aware adapter, 2 to 3 multi-quote fixtures with cell ground truth, scorer coverage for new fields, 0 hard fails and accuracy gate 0.85. Files: backend/eval_hook.py, tests/eval/. Verify: offline eval tests, then a live run.
-- [ ] **T2 (P1, ~4h / ~25min)**: outline in schemas.py (kinds, caps, locked, unique ids, one table per fact section), shared plan helper at runner.py:319 and :646, template snapshot into run.parameters. Verify: backend tests plus Compare Quotes regression (test_compose.py, test_runner.py, test_api_flow.py unchanged).
-- [ ] **T3 (P1, ~4h / ~20min)**: compose: block-to-fact_sections binding, drop unowned facts, per-block fact scoping for prose, cover and TOC, merge_edits survives them. Files: backend/pipeline/compose.py, backend/edits.py.
-- [ ] **T4 (P1, ~3h / ~15min)**: deterministic renderer for no-AI mode, preserved across retry and regenerate. File: backend/pipeline/compose.py.
+- [x] **T2 (P1, ~4h / ~25min)**: outline in schemas.py (kinds, caps, locked, unique ids, one table per fact section), shared plan helper at runner.py:319 and :646, template snapshot into run.parameters. Verify: backend tests plus Compare Quotes regression (test_compose.py, test_runner.py, test_api_flow.py unchanged).
+- [x] **T3 (P1, ~4h / ~20min)**: compose: block-to-fact_sections binding, drop unowned facts, per-block fact scoping for prose, cover and TOC, merge_edits survives them. Files: backend/pipeline/compose.py, backend/edits.py.
+- [x] **T4 (P1, ~3h / ~15min)**: deterministic renderer for no-AI mode, preserved across retry and regenerate. File: backend/pipeline/compose.py.
 - [ ] **T5 (P2, ~6h / ~30min)**: DOCX spike (python-docx footnote XML, reopen test), then export and PDF cover and TOC; add python-docx to pyproject. Files: backend/export.py, backend/routes/artifacts.py.
-- [ ] **T6 (P2, ~3h / ~15min)**: proposal_template table, seeded Standard and Premier with fact_sections, workflow seed and template upsert, template endpoints. Files: backend/models.py, backend/db.py, backend/routes/templates.py.
+- [x] **T6 (P2, ~3h / ~15min)**: proposal_template table, seeded Standard and Premier with fact_sections, workflow seed and template upsert, template endpoints. Files: backend/models.py, backend/db.py, backend/routes/templates.py.
+- Lane A build notes (2026-11-02, T2 T3 T4 T6 done): contract in backend/API.md ("Proposal templates", "Proposal runs"). Table ids are `<fact section>-table`; cover and TOC sections have ids `cover`, `toc` (blocks `cover-title`, `cover-details`, `toc-entries`) and number `""`. Field paths in `fields.loc` are strings (`"2"`), as for every slice 1 `invalid_request`. The seed now upserts every seeded workflow and template by slug (also closes HANDOFF open item 2). New files: backend/proposal.py (template resolve and snapshot, kind library).
 - [ ] **T7 (P2, ~2d / ~1h)**: wizard UI under the design gate (design stack, Playwright MCP, axe at both widths, phone width for step 3). Files: frontend/src/wizard/.
 - [ ] **T8 (P3, ~1h / ~10min)**: full live eval before release.
 
