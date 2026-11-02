@@ -106,7 +106,8 @@ def cell_counts(content: ArtifactContent) -> dict[str, int]:
         counts[str(cell.state) if cell.state else "absent"] += 1
         if cell.edited:
             counts["edited"] += 1
-    return {k: counts.get(k, 0) for k in ("verified", "scan_read", "not_found", "absent", "failed", "edited")}
+    return {k: counts.get(k, 0)
+            for k in ("verified", "scan_read", "not_found", "absent", "failed", "conflicting", "edited")}
 
 
 def artifact_out(session: Session, art: models.Artifact, version: int | None = None) -> dict[str, Any]:

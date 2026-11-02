@@ -92,6 +92,26 @@ def test_output_parses_with_the_eval_scorer(output):
         assert result.status in ("ok", "failed")
 
 
+def test_conflicting_fact_is_reported_not_found_with_every_candidate_value():
+    from backend import models
+    from backend.schemas import EvidenceState
+
+    f = models.Fact(field="retention", value=None, state=EvidenceState.CONFLICTING, page_no=None, cited_page=None,
+                    quote=None, conflicts=[{"value": "$5,000", "page_no": 20, "passage_id": 3},
+                                           {"value": "$7,500", "page_no": 90, "passage_id": 8}])
+    out = eval_hook._fact(f)
+    assert out == {"field": "retention", "value": "Conflicting values: $5,000 (page 20); $7,500 (page 90)",
+                   "page": None, "quote": None, "state": "not_found"}
+    sys.path.insert(0, str(ROOT / "tests" / "eval"))
+    try:
+        gates = importlib.import_module("eval_gates")
+    finally:
+        sys.path.remove(str(ROOT / "tests" / "eval"))
+    truth = {"fixture_id": "t", "facts": {"retention": {"value": "$5,000", "page": 20, "quote": "q"}}}
+    score = gates.score_document(truth, gates.DocResult.from_dict({"fixture_id": "t", "facts": [out]}))
+    assert score.hard_fails == 0 and score.displayed == 0 and score.rejected == 1
+
+
 def test_more_than_eight_documents_is_rejected():
     with pytest.raises(ValueError):
         eval_hook.run_eval_batch([str(FIXTURES / "carrier_a_clean.pdf")] * 9, provider=FakeProvider([]))

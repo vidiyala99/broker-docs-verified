@@ -165,7 +165,7 @@ def test_fact_defaults_to_pending_and_moves_to_terminal_state(session):
 @pytest.mark.parametrize(
     "target",
     [EvidenceState.VERIFIED, EvidenceState.SCAN_READ, EvidenceState.NOT_FOUND,
-     EvidenceState.ABSENT, EvidenceState.FAILED],
+     EvidenceState.ABSENT, EvidenceState.FAILED, EvidenceState.CONFLICTING],
 )
 def test_every_terminal_state_reachable_from_pending(target):
     fact = models.Fact(field="f", state=EvidenceState.PENDING)
@@ -181,6 +181,7 @@ def test_every_terminal_state_reachable_from_pending(target):
         (EvidenceState.SCAN_READ, EvidenceState.VERIFIED),
         (EvidenceState.ABSENT, EvidenceState.VERIFIED),
         (EvidenceState.FAILED, EvidenceState.VERIFIED),
+        (EvidenceState.CONFLICTING, EvidenceState.VERIFIED),
         (EvidenceState.PENDING, EvidenceState.PENDING),
     ],
 )
