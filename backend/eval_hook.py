@@ -52,7 +52,20 @@ def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
     if len(paths) > DEFAULT_LIMITS.max_documents_per_run:
         raise ValueError(f"{len(paths)} documents; one run takes at most "
                          f"{DEFAULT_LIMITS.max_documents_per_run} (D3)")
-    return asyncio.run(_run(paths, provider or OpenAIProvider.from_env(), budget_limit))
+    owned = provider is None
+    prov = provider or OpenAIProvider.from_env()
+
+    async def _main() -> dict[str, Any]:
+        try:
+            return await _run(paths, prov, budget_limit)
+        finally:
+            # Close the HTTP client we created inside this loop, else teardown logs
+            # 'Event loop is closed' errors.
+            close = getattr(getattr(prov, "_client", None), "close", None) if owned else None
+            if close is not None:
+                await close()
+
+    return asyncio.run(_main())
 
 
 def _failed(reason: str) -> dict[str, Any]:
