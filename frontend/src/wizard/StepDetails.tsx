@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CaretDown, FilePdf, Trash, WarningCircle } from "@phosphor-icons/react";
 import { api, ApiError, uploadFile } from "../api/client";
 import type { DocumentInfo, TemplateLimits, Workspace } from "../api/types";
@@ -320,7 +320,16 @@ function UploadedPicker({ selected, max, onChange }: { selected: DocumentInfo[];
     if (open && docs == null) load();
   }, [open, docs]);
 
-  const ids = new Set(selected.map((d) => d.id));
+  // Same file uploaded more than once (same sha256): show only the newest copy.
+  const shown = useMemo(() => {
+    const newest = new Map<string, DocumentInfo>();
+    for (const d of docs ?? []) {
+      const cur = newest.get(d.sha256);
+      if (!cur || d.created_at > cur.created_at || (d.created_at === cur.created_at && d.id > cur.id)) newest.set(d.sha256, d);
+    }
+    return (docs ?? []).filter((d) => newest.get(d.sha256) === d);
+  }, [docs]);
+  const hashes = new Set(selected.map((d) => d.sha256));
   const full = selected.length >= max;
 
   return (
@@ -342,15 +351,15 @@ function UploadedPicker({ selected, max, onChange }: { selected: DocumentInfo[];
             <span />
             <span />
           </div>
-        ) : docs.length === 0 ? (
+        ) : shown.length === 0 ? (
           <p className="hint">No files uploaded yet. Drop quote PDFs above.</p>
         ) : (
           <fieldset>
             <legend className="sr-only">Uploaded files</legend>
             {full && <p className="hint">This proposal has {max} quotes, the most a run can use.</p>}
             <ul className="picker__list">
-              {docs.map((d) => {
-                const on = ids.has(d.id);
+              {shown.map((d) => {
+                const on = hashes.has(d.sha256);
                 return (
                   <li key={d.id}>
                     <label className="picker__row">
@@ -358,7 +367,7 @@ function UploadedPicker({ selected, max, onChange }: { selected: DocumentInfo[];
                         type="checkbox"
                         checked={on}
                         disabled={!on && full}
-                        onChange={() => onChange(on ? selected.filter((x) => x.id !== d.id) : [...selected, d])}
+                        onChange={() => onChange(on ? selected.filter((x) => x.sha256 !== d.sha256) : [...selected, d])}
                       />
                       <span className="picker__name">{d.filename}</span>
                       <span className="picker__meta">

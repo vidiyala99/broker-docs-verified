@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, CaretDown, LockSimple, PencilSimple, Plus, Table, TextAlignLeft, Trash, Warning, WarningCircle } from "@phosphor-icons/react";
 import type { OutlineBlock, Template, TemplateKind } from "../api/types";
 import { useToast } from "../ui/Toast";
@@ -29,6 +29,8 @@ export function StepOutline({
   tpl,
   outline,
   edited,
+  openIds,
+  setOpenIds,
   setOutline,
   onReset,
   errors,
@@ -38,6 +40,8 @@ export function StepOutline({
   tpl: Template;
   outline: OutlineBlock[];
   edited: boolean;
+  openIds: string[];
+  setOpenIds: (fn: (prev: string[]) => string[]) => void;
   setOutline: (o: OutlineBlock[]) => void;
   onReset: () => void;
   errors: Errors;
@@ -45,7 +49,9 @@ export function StepOutline({
   focusKey: { path: string; n: number } | null;
 }) {
   const toast = useToast();
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  // Open sections live in the wizard draft so they survive leaving step 3 and coming back.
+  const open = useMemo(() => new Set(openIds), [openIds]);
+  const setOpen = (fn: (s: Set<string>) => Set<string>) => setOpenIds((prev) => [...fn(new Set(prev))]);
   const [library, setLibrary] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);

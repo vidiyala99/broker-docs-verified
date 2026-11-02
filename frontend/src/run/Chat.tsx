@@ -12,10 +12,12 @@ import type { OpenSource } from "../report/Chip";
 export function Chat({
   runId,
   artifact,
+  proposal = false,
   onOpen,
   onEdited,
 }: {
   runId: number;
+  proposal?: boolean;
   artifact: Artifact | null;
   onOpen: OpenSource;
   onEdited: (res: EditResult) => void;
@@ -96,7 +98,7 @@ export function Chat({
   return (
     <section className={`chat${hasReport ? "" : " chat--idle"}`} aria-label="Ask about this report">
       <div className="chat__log" ref={list} aria-live="polite" aria-relevant="additions">
-        {!hasReport && <p className="chat__empty">Run a comparison to ask questions.</p>}
+        {!hasReport && <p className="chat__empty">{proposal ? "Generate a proposal to ask questions about its sources." : "Run a comparison to ask questions."}</p>}
         {messages.map((m) => (
           <div key={m.id} className={`msg msg--${m.role}`}>
             {m.role === "user" ? (
@@ -192,7 +194,7 @@ export function Chat({
           className="chat__input"
           rows={1}
           maxLength={4000}
-          placeholder={hasReport ? "Ask about these quotes" : "Run a comparison to ask questions"}
+          placeholder={hasReport ? (proposal ? "Ask about this proposal's sources" : "Ask about these quotes") : proposal ? "Generate a proposal to ask questions" : "Run a comparison to ask questions"}
           value={draft}
           disabled={!hasReport}
           onChange={(e) => setDraft(e.target.value)}
