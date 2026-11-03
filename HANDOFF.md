@@ -91,3 +91,15 @@ Open:
 
 ## 2026-11-02 15:05: left-panel fix merged to main
 Upload folds when Done ("N documents, all read"), compact document rows with "+N more" past 6, Chat collapse handle. Brief: frontend/LEFT-PANEL-BRIEF.md; screenshots frontend/qa-screenshots/left-panel/. Branch e2e 7/7, axe 0; tsc clean on main (e2e not re-run on main). Owner calls: "Add or replace" copy dropped (needs a real action), failed run repeats its error in header and rows (G6), PRODUCT.md missing. OpenAI key rotation dropped by owner. Worktrees t8-followup and left-panel under .claude/worktrees can be deleted.
+
+## 2026-11-02 15:20: main verified, ready for slice 3
+- e2e on `main` (5a368bc): 7/7 pass, axe 0 at 1440/1024/390 (scratch backend on 8010, UI 5183). Left-panel merge is confirmed.
+- Not done: worktree cleanup. About 28 stale worktrees/branches under `.claude/worktrees/` (all branches merged; only venvs, egg-info, screenshots uncommitted). Remove the `t8-followup/frontend/node_modules` junction with `cmd /c rmdir` first, unlock `agent-a8111b1d5360d15d0`, then `git worktree remove --force` and `git branch -d`. Also delete untracked `compare_eval*.log/json` in the repo root. The auto-mode classifier blocked this, so the owner runs it or adds a Bash permission rule.
+- Next: slice 3 brainstorm. Read `docs/reference/brokerdocs-workflows-evidence.md`. Lean: data-only pack (reuses extract/verify, no new UI paradigm). Ask first: is the aim a verified-citation engine demo (favours Policy Check) or visual fidelity to BrokerDocs?
+- Still open (owner decisions): template library, extraction cache 2c, Standard-template eval, PRODUCT.md.
+
+## 2026-11-02 16:35: slice 3 Policy Check spec reviewed (eng review done, build not started)
+- Spec + eng review ledger: `docs/specs/2026-11-02-policy-check-design.md` (spec committed at d2ad81d; the Engineering review section, the ledger D1 to D17 and `TODOS.md` entry are uncommitted). The ledger overrides the spec text above it.
+- Key decisions: AMS file rendered to a PDF at upload and facts mapped by code (D4, D5); roles via `RunDocument.slot`/`input_slots` (D8); `DiscrepancyBlock` in the `Block` union (D7); forms from one combined extraction pass, no second read (D13, ceiling is 500k per document); deterministic discrepancy text (D14); renewal-centered compare (D10); Needs review for conflicting/unverified values (D15); Not read for failed optional documents (D11); eval gate also blocks on recall below 0.80 and wrong-field values (D16); bulk endpoint and `accepted` status cut (D1, D2).
+- Next: build lanes T1 to T8 (backend, Opus per model policy), then T9 UI through the design stack. Task list in the spec; test plan in `~/.gstack/projects/aakas/aakas-main-eng-review-test-plan-20261102-163144.md`.
+- Fresh session recommended: this one is long.

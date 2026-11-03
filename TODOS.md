@@ -27,3 +27,10 @@
 - **Why:** windows are read independently, so references across windows are not followed (known gap, not yet measured).
 - **Context:** needed before Policy Check and Coverage Gap workflows. Not retrieval for everything, only a fallback for fields that need it.
 - **Depends on:** slice 1 pipeline (windows.py, merge.py).
+
+## Coverage identity for multi-location and multi-schedule policies
+- **What:** give scalar coverage keys (`coverage_a_limit`, `deductible_wind_hail`, ...) a location or schedule scope, so a policy with several insured locations or coverage schedules aligns correctly across expiring and renewal.
+- **Why:** slice 3 Policy Check (D17 of the eng review) supports single-location policies only; with several locations the diff cannot tell which Coverage A limit is which.
+- **Pros:** correct comparisons on real commercial and multi-property policies. **Cons:** extraction must emit a scope per fact, and alignment gets a second dimension.
+- **Context:** `docs/specs/2026-11-02-policy-check-design.md` section 8 and the Engineering review section. Related: the cross-reference TODO above (long policies).
+- **Depends on:** slice 3 Policy Check diff engine (`pipeline/diff.py`).
