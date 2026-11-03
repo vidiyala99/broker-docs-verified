@@ -1,5 +1,5 @@
 import type { GlyphName } from "../voice/marks";
-import { RailGlyph, railVariant } from "../voice/railMarks";
+import { RailGlyph } from "../voice/railMarks";
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
 
@@ -17,6 +17,7 @@ interface RailItem {
 // DG1: the full rail from the reference. Live: Workflows (slice 1), Proposals (slice 2, the wizard),
 // Policy check (slice 3, the new-check wizard), Integrations (slice 3b, a static mock), Personal lines (slice 3b T6,
 // runs tagged personal) and Tasks (slice 3b T7). `tip` is the tooltip and accessible name of a live item.
+// Marks: `voice/railMarks.tsx` (one outline per item, RAIL-BRIEF.md).
 const GROUPS: RailItem[][] = [
   [
     { label: "Workflows", glyph: "compare", href: "#/", section: "workflows" },
@@ -37,10 +38,8 @@ const GROUPS: RailItem[][] = [
 ];
 
 export function Rail({ section }: { section: Section }) {
-  // `?rail=a|b|c`: dev-only glyph previews (RAIL-BRIEF.md); null renders the shipped marks.
-  const variant = railVariant();
   return (
-    <nav className="rail" aria-label="Main" data-rail={variant ?? undefined}>
+    <nav className="rail" aria-label="Main">
       <a href="#/" className="rail__home" aria-label={`${APP_NAME} home`}>
         <span className="glyph" aria-hidden />
       </a>
@@ -56,7 +55,7 @@ export function Rail({ section }: { section: Section }) {
                     aria-current={item.section === section ? "page" : undefined}
                     aria-label={item.tip ? item.tip.replace(": ", ", ") : item.label}
                   >
-                    <RailGlyph name={item.glyph} variant={variant} />
+                    <RailGlyph name={item.glyph} />
                   </a>
                 </Tip>
               ) : (
@@ -68,7 +67,7 @@ export function Rail({ section }: { section: Section }) {
                     tabIndex={-1}
                     aria-label={`${item.label}, coming in a later slice`}
                   >
-                    <RailGlyph name={item.glyph} variant={variant} />
+                    <RailGlyph name={item.glyph} />
                   </span>
                 </Tip>
               )}
@@ -79,7 +78,7 @@ export function Rail({ section }: { section: Section }) {
       <div className="rail__bottom">
         <Tip text="Documents: coming in a later slice" side="right">
           <span className="rail__item is-disabled" role="button" aria-disabled="true" tabIndex={-1} aria-label="Documents, coming in a later slice">
-            <RailGlyph name="documents" variant={variant} />
+            <RailGlyph name="documents" />
           </span>
         </Tip>
       </div>

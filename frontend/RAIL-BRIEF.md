@@ -5,13 +5,18 @@ size"). Goal: every rail item is identifiable at a glance at its real size (20px
 and in the 390 layout, inside the Paper trail voice and the reference product's rail structure. Phase A only: three directions
 behind a dev-only flag; the default rail is unchanged. The owner picks before anything becomes the default.
 
+> **Phase B (2026-11-03): the owner picked A, "Silhouettes".** It is now the rail's only set; the `?rail=` flag and
+> directions B and C were removed from the code. The Phase A sections below are kept as the record of the choice
+> (their B and C screenshots stay in `qa-screenshots/rail/`); "How to see a direction" no longer applies. Phase B
+> decisions, rounds and results are in "Phase B" at the end.
+
 Sources: `PRODUCT.md`, `DESIGN.md` (Voice, Motion, "Focus, disabled, rail"), `VOICE-BRIEF.md` (why C won, the
 sheet rules, Phase B), `src/voice/marks.tsx`, `src/shell/Shell.tsx`, `HANDOFF.md` 09:30 entry.
 
 Skills loaded before the first decision: gstack, ui-ux-pro-max, taste-core, taste-redesign, impeccable (context
 ran: PRODUCT.md and DESIGN.md found; scoped refinement, Operate mode), emil-design-eng, frontend-design.
 
-## How to see a direction
+## How to see a direction (Phase A only; removed in Phase B)
 
 Dev server only (`import.meta.env.DEV`): add `?rail=a`, `?rail=b` or `?rail=c` before the hash, for example
 `http://localhost:5210/?rail=a#/tasks`. Hash links keep the query string, so the choice holds while you click
@@ -153,7 +158,47 @@ icons (panel, upload, chat; visible beside the rail at 1024 and 390) join the vo
    overlay open beside the rail (shipped, A, B, C). Axe (wcag2a/aa, 21aa): 0 violations with each flag on `#/` and
    `#/tasks` at 1440 and 390 (12 checks). No open findings beyond the Phase B questions above.
 
-## Not verified
+## Not verified (Phase A)
 - The squint metric is a proxy (translation-sensitive cosine on a blurred raster); the owner's eye decides.
 - Windows ClearType and non-Chromium rendering of the 20px glyphs were not checked.
 - Dark theme is out of scope (PRODUCT.md).
+
+## Phase B: A as the rail (2026-11-03)
+
+Skills reloaded and applied per decision: gstack, ui-ux-pro-max, taste-core, taste-redesign, impeccable,
+emil-design-eng, frontend-design. The rule is recorded in `DESIGN.md` "Voice" (rail marks).
+
+### What changed
+- `src/voice/railMarks.tsx`: only A's drawings remain. `RailGlyph` draws the eight redrawn items and falls back to the
+  shared `Glyph` for the four whose shipped outline was already unique (Workflows, Personal lines, Policy check,
+  Integrations). The `?rail=` flag, `railVariant`, and B and C's mark set are gone.
+- `src/shell/Shell.tsx`: rail items name a glyph and render `RailGlyph`; no `data-rail`, no flag.
+- Scope held to the rail. Not changed (owner did not take these; still open): the Proposal workflow mark on queue rows,
+  wizard titles and start buttons (still the bound sheet with lines, so the rail's Proposals cover and the row mark
+  differ); the left panel strip's icons (panel, upload, chat).
+
+### Decisions and what each skill said
+
+| Decision | gstack | ui-ux-pro-max | taste-core | taste-redesign | impeccable | emil-design-eng | frontend-design |
+|---|---|---|---|---|---|---|---|
+| Remove the flag, B and C; A unscoped | Name the files and the impact | n/a | One icon family per project | Do not leave dead variants | Refinement now preserves A | n/a | n/a |
+| Keep A's Assistant and Insights as approved (tweaks measured, none kept) | n/a | Distinct at size, measured not guessed | Do not change what the owner approved without a reason | Small targeted changes only | Verify in bounded passes; stop polishing | Taste is checked at real size, not argued | Remove one accessory: a tweak that adds a new collision is worse |
+| Rail-only scope; Proposal row mark and left strip untouched | Plain words about what is open | Same mark for the same thing (flagged as open, not fixed) | Nothing changes silently | Keep changes reviewable | The owner decides scope | n/a | n/a |
+| States unchanged (active tint, disabled grey, hover, focus) | n/a | Active state and focus visible; 44px area | Shape lock | Honour accessibility wins | Operate: native expectations | Hover gated to fine pointers | Quality floor |
+
+### Phase B rounds (2 of 3 used, Playwright MCP)
+1. A as the default at 1440, 1024 and 390. Squint metric unchanged from Phase A (mean 0.781, 1 pair at 0.90 or
+   above: Assistant / Insights 0.920). Tried three tweaks for that pair, measured live: Insights' fold moved to the
+   top right (that pair drops, but Personal lines / Insights rises to 0.902); a flatter balloon (0.917, no real gain);
+   Insights without its line and a stronger tint (0.926, worse). None kept: the pair is two compact shapes to the
+   metric, and a round balloon against a folded square by eye.
+2. States, driven live in a clean context: active on all six live items at 1440, 1024 and 390 (`--color-primary` on
+   `--color-primary-tint` every time; `final-a-1440-active-states.png`), hover on Integrations with its tooltip while
+   Tasks is active, keyboard Tab to Proposals (2px primary focus ring, tooltip), disabled Vault on hover (grey
+   `#9CA3AF`, no tint, `not-allowed`, tooltip "Vault: coming in a later slice"), 1024 run page with the left panel
+   overlay open. Found and fixed in the capture only: the first 1440 state shots inherited the squint blur because
+   hash routes keep the document; retaken in a fresh context. No design findings.
+
+Final screenshots (regenerated): `final-a-{1440,1024,390}-rail@2x.png`, `final-a-1440-rail-squint.png`,
+`final-a-390-page.png`, `final-a-1024-run-overlay.png`, `final-a-1440-tasks-active-hover.png`,
+`final-a-1440-tasks-focus.png`, `final-a-1440-disabled-hover.png`, `final-a-1440-active-states.png`.

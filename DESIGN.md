@@ -207,8 +207,17 @@ the meaning. Each needs its own silhouette at 20 to 28px:
 - Queue states: In progress = sheet with the reading line; Needs review = sheet with the dashed citation box (the
   viewer's passage highlight); Ready = sheet with a ribbon bookmark; Needs attention = sheet with its corner missing;
   Done = sheet under a seal.
-- Rail: the same family (house for Personal lines, clipboard for Tasks, joined sheets for Integrations, drawer for
-  Vault, and so on). Monochrome there; active/disabled colours as before.
+- Rail ("Silhouettes", owner-picked 2026-11-03, see `frontend/RAIL-BRIEF.md`; drawings in
+  `frontend/src/voice/railMarks.tsx`): at 20px interior lines carry nothing, so **each rail item has its own outline
+  and mass**, never a plain sheet with lines. Same material (sheet fill, 1.5 stroke, round joins, monochrome).
+  Workflows = two sheets side by side; Proposals = bound cover with a solid spine and a label window; Personal lines =
+  house; Policy check = renewal over the dashed expiring sheet, ticked; Certificates = landscape certificate with a
+  rosette breaking its lower edge; Tasks = clipboard with a solid clip; Integrations = two small sheets joined;
+  Assistant = round balloon with one line; Market search = loupe with the lines inside the lens; Analytics = axes,
+  rising line, a dot on the latest figure; Insights = tinted sticky note with a folded corner; Vault = archive box with
+  an overhanging lid; Documents = file folder with its tab. A new rail item must not share an outline with an existing
+  one (check it blurred at 20px). Active/disabled colours, hover and focus as in "Focus, disabled, rail". The rail
+  marks are rail-only: the Proposal workflow mark on queue rows, wizard titles and start buttons stays the bound sheet.
 - Colour inside marks: `currentColor` for the drawing; document hues (`--doc-N-mark`) only as small sheet tabs;
   `--color-primary` only for the citation box, the reading line and the ribbon.
 
