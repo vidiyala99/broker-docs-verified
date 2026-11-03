@@ -105,7 +105,13 @@ Phone 390: slots 2 x 2 on cards; dialog full screen, source stacked under the de
    the dialog (now the "Discrepancy n of N" heading takes it); at 390 values broke mid-number in a 2 x 2 slot
    grid (slots now reflow by the list's own width: 4 columns, 2 x 2, then one per row); the narrow-screen
    notice talked about tables on a view without tables (hidden on Policy Check runs); "Not read" now shows
-   the failed document's reason so the notice "their columns show why" holds.
+   the failed document's reason (the run notice now reads "the Upload panel shows why", true for both views).
+
+Fix pass after round 3 (not a design round): the source viewer drew the new chip's box over the previous
+document's page while the new file loaded (seen in `1440-review-ams.png`: AMS name and box over the renewal
+page). `PdfViewer` now pairs the loaded document with its id and shows the skeleton until this document's
+page is drawn; e2e holds the AMS file back to prove the gap, then checks the drawn document is the
+rendered AMS export and the box matches the cited line. The AMS conflict notice names the field label.
 2. Fresh-eyes pass: opening a source from a card reflowed the list into the split and scrolled the card
    away (the card is brought back into view once the split settles). Contrast figures re-measured
    (High tier 7.52:1).

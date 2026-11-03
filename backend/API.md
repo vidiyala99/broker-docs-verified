@@ -300,7 +300,8 @@ Policy Check field, so they are not compared (the effective date and expiration
 date on their own, carrier and similar); `notices` is the list of record-level
 notices (replaced characters). In a Policy Check report, run `notices` of kind
 `info` carry the record notices, "AMS fields not compared (...)" and any
-"AMS fields ... give different values for <key>" conflict.
+"AMS fields ... give different values for <field label>" conflict (for example
+"Coverage E (Personal Liability)").
 
 ### `GET /api/documents`
 

@@ -35,13 +35,18 @@ function loadDoc(documentId: number): Promise<PDFDocumentProxy> {
  * when the page was read from a scan.
  */
 export function PdfViewer({ target }: { target: PdfTarget }) {
-  const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
+  // The loaded document and the id it was loaded for, set together, so a page is never drawn
+  // (or highlighted) under another document's name.
+  const [loaded, setLoaded] = useState<{ id: number; doc: PDFDocumentProxy } | null>(null);
+  const doc = loaded && loaded.id === target.documentId ? loaded.doc : null;
   const [error, setError] = useState(false);
   const [page, setPage] = useState(target.page);
   const [zoom, setZoom] = useState<number | "fit">("fit");
   const [pageInput, setPageInput] = useState(String(target.page));
   const [attempt, setAttempt] = useState(0);
   const [rendering, setRendering] = useState(true);
+  /** What the canvas currently shows. The highlight is drawn only over the page it belongs to. */
+  const [drawn, setDrawn] = useState<{ id: number; page: number } | null>(null);
   const [size, setSize] = useState<{ w: number; h: number; scale: number } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const frame = useRef<HTMLDivElement>(null);
@@ -54,10 +59,11 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
 
   useEffect(() => {
     let live = true;
-    setDoc(null);
+    const id = target.documentId;
+    setRendering(true);
     setError(false);
-    loadDoc(target.documentId).then(
-      (d) => live && setDoc(d),
+    loadDoc(id).then(
+      (d) => live && setLoaded({ id, doc: d }),
       () => live && setError(true),
     );
     return () => {
@@ -77,8 +83,10 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
     if (!doc || !canvas.current || !frameWidth) return;
     let task: RenderTask | null = null;
     let live = true;
+    const id = target.documentId;
+    const n = Math.min(Math.max(1, page), doc.numPages);
     setRendering(true);
-    doc.getPage(Math.min(Math.max(1, page), doc.numPages)).then((p) => {
+    doc.getPage(n).then((p) => {
       if (!live || !canvas.current) return;
       const base = p.getViewport({ scale: 1 });
       const scale = zoom === "fit" ? Math.max(0.3, (frameWidth - 32) / base.width) : zoom;
@@ -96,6 +104,7 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
         () => {
           if (!live) return;
           setSize({ w: vp.width, h: vp.height, scale: vp.width / base.width });
+          setDrawn({ id, page: n });
           setRendering(false);
         },
         () => undefined,
@@ -105,14 +114,19 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
       live = false;
       task?.cancel();
     };
+    // target.documentId is read only to label the drawing; `doc` already follows it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, page, zoom, frameWidth]);
+
+  // Drawn and current: the canvas shows this document's page, not the previous target's.
+  const ready = !rendering && drawn != null && drawn.id === target.documentId && drawn.page === page;
 
   // Scroll the highlight into view once the page is drawn.
   useEffect(() => {
-    if (rendering || !frame.current) return;
+    if (!ready || !frame.current) return;
     const hl = frame.current.querySelector<HTMLElement>(".pdf-highlight");
     if (hl) scrollWithin(frame.current, hl);
-  }, [rendering]);
+  }, [ready]);
 
   const total = doc?.numPages ?? 0;
   const goto = useCallback(
@@ -182,10 +196,10 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
           </div>
         ) : (
           <div className="pdf__page-wrap" style={size ? { width: size.w, height: size.h } : undefined}>
-            {rendering && <div className="pdf__skeleton" aria-hidden />}
-            {rendering && <span className="sr-only" role="status">Loading page</span>}
-            <canvas ref={canvas} className={rendering ? "is-hidden" : ""} />
-            {!rendering && size && chip && (
+            {!ready && <div className="pdf__skeleton" aria-hidden />}
+            {!ready && <span className="sr-only" role="status">Loading page</span>}
+            <canvas ref={canvas} className={ready ? "" : "is-hidden"} data-drawn={drawn && ready ? `${drawn.id}:${drawn.page}` : undefined} />
+            {ready && size && chip && (
               chip.verified && chip.rects.length ? (
                 // One dashed box around the cited passage (the union of its line rects).
                 (() => {

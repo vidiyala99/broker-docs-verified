@@ -178,14 +178,50 @@ test("policy check: list, filters, resolve, note, review dialog", async ({ page 
   await expect(dialog.getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
   await expect(dialog.locator(".source-pane__name")).toHaveText("Renewal: pc_homeowners_renewal.pdf");
   await expect(dialog.locator(".pdf-highlight")).toBeVisible({ timeout: 20_000 });
+  // Regression (T9 fix pass): switching the pane to the AMS file must not draw the AMS box over the
+  // previous document's page while the AMS file loads. Hold the AMS file back to make the gap visible.
+  const item = (await (await page.request.get(`${API}/api/runs/${full}/discrepancies`)).json()).items.find(
+    (i: { id: string }) => i.id === "disc-coverage-c-limit",
+  ) as { slots: { ams: { passage_ids: number[] } }; sources: { ams: { rects: number[][] }[] } };
+  const run = (await (await page.request.get(`${API}/api/runs/${full}`)).json()) as { documents: { slot: string; document_id: number }[] };
+  const amsId = run.documents.find((d) => d.slot === "ams")!.document_id;
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route(`**/api/documents/${amsId}/file`, async (route) => {
+    await held;
+    await route.continue();
+  });
   await dialog.locator("[data-role=ams] .chip").click();
   await expect(dialog.locator(".source-pane__name")).toHaveText("AMS: pc_homeowners_ams.json");
   await expect(dialog.locator(".pdf__caption")).toHaveText("Source AMS · Cov C, page 1");
-  await expect(dialog.locator(".pdf-highlight:not(.pdf-highlight--page)")).toBeVisible({ timeout: 20_000 });
-  // The box is one field line, not the whole page.
-  const box = await dialog.locator(".pdf-highlight").boundingBox();
-  const pageBox = await dialog.locator(".pdf__page-wrap").boundingBox();
-  expect(box!.height).toBeLessThan(pageBox!.height / 10);
+  // While the AMS file is loading: no box, and the renewal page is not shown under the AMS name.
+  await expect(dialog.locator(".pdf__skeleton")).toBeVisible();
+  await expect(dialog.locator(".pdf-highlight")).toHaveCount(0);
+  await expect(dialog.locator("canvas[data-drawn]")).toHaveCount(0);
+  release();
+  // The canvas now shows the AMS document's page 1, and that page is the rendered AMS export
+  // ("field: value" lines), not a declarations page.
+  await expect(dialog.locator(`canvas[data-drawn="${amsId}:1"]`)).toBeVisible({ timeout: 20_000 });
+  await page.unroute(`**/api/documents/${amsId}/file`);
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const bytes = new Uint8Array(await (await page.request.get(`${API}/api/documents/${amsId}/file`)).body());
+  const pdf = await getDocument({ data: bytes }).promise;
+  const text = ((await (await pdf.getPage(1)).getTextContent()).items as { str: string }[]).map((t) => t.str).join("\n");
+  expect(text).toContain("Cov C: $170,000");
+  expect(text).not.toContain("Declarations");
+  // The box covers the whole cited line ("Cov C: $170,000"): the fact's rect plus the 6px pad.
+  const hl = dialog.locator(".pdf-highlight:not(.pdf-highlight--page)");
+  await expect(hl).toBeVisible();
+  const [x0, y0, x1, y1] = item.sources.ams[0]!.rects[0]!;
+  const box = (await hl.boundingBox())!;
+  const canvasBox = (await dialog.locator(`canvas[data-drawn="${amsId}:1"]`).boundingBox())!;
+  const k = canvasBox.width / 612; // rendered AMS pages are US Letter (ams.PAGE_W)
+  expect(Math.abs(box.width - ((x1 - x0) * k + 12))).toBeLessThan(2);
+  expect(Math.abs(box.x - (canvasBox.x + x0 * k - 6))).toBeLessThan(2);
+  expect(Math.abs(box.y - (canvasBox.y + y0 * k - 6))).toBeLessThan(2);
+  expect(box.height).toBeLessThan(canvasBox.height / 10);
+  expect(y1).toBeGreaterThan(y0);
+  expect(x0).toBeLessThan(60); // starts at the line's left margin (ams.MARGIN 54), so the field name is inside
   await shot(page, "1440-review-ams");
   await axe(page, "review 1440");
   await dialog.getByRole("button", { name: "Next", exact: true }).click();
@@ -247,6 +283,8 @@ test("policy check: Not read, N/A, and 1024 / 390 layouts", async ({ page }) => 
   await expect(dialog).toBeVisible();
   // Full screen on a phone (polled: a pointer open settles from scale 0.98 over 200ms).
   await expect.poll(async () => Math.round((await dialog.boundingBox())!.width)).toBe(390);
+  await expect(dialog.locator("canvas[data-drawn]")).toBeVisible({ timeout: 20_000 });
+  await expect(dialog.locator(".pdf-highlight")).toBeVisible();
   await shot(page, "390-review");
   await axe(page, "review 390");
   await page.keyboard.press("Escape");

@@ -493,7 +493,7 @@ def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactFie
             "read. The report covers the rest.")))
     if other_failed:
         notices.append(Notice(kind="documents_failed", retryable=True, message=(
-            f"{other_failed} of {len(columns)} documents could not be read; their columns show why.")))
+            f"{other_failed} of {len(columns)} documents could not be read; the Upload panel shows why.")))
     return compose.ComposeInput(title=title, fields=list(fields), sections=list(sections),
                                 columns=columns, facts=facts, instructions=instructions,
                                 notices=notices, edits=list(edits), outline=tuple(outline),
