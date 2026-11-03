@@ -109,6 +109,13 @@
   --color-tooltip-bg: #35383B;
   --color-tooltip-fg: #FFFFFF;
 
+  /* ---------- Policy Check severity (slice 3: word + tick meter, colour second) ---------- */
+  --severity-critical-fg: #B42318;  /* = danger; 6.57:1 on white */
+  --severity-high-fg: #93370D;      /* = stale fg; 7.52:1 on white */
+  --severity-medium-fg: #35383B;    /* = text */
+  --severity-low-fg: #4B5563;       /* = muted */
+  --severity-tick-off: #D1D5DB;     /* empty meter tick; decoration, the word carries the tier */
+
   /* ---------- Focus (DG10) ---------- */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;

@@ -1,7 +1,10 @@
 import { API_BASE } from "../config";
 import type {
   Artifact,
+  DiscrepancyItem,
+  DiscrepancyList,
   DocumentInfo,
+  PolicyRole,
   EditResult,
   Message,
   ProposalParameters,
@@ -112,6 +115,21 @@ export const api = {
       method: "POST",
       body: json({ document_ids: documentIds, workflow: "proposal-builder", parameters }),
     }),
+  startPolicyCheck: (slots: { documentId: number; role: PolicyRole }[]) =>
+    request<{ run: Run; created: boolean }>("/api/runs", {
+      method: "POST",
+      body: json({
+        document_ids: slots.map((s) => s.documentId),
+        workflow: "policy-check",
+        slots: Object.fromEntries(slots.map((s) => [String(s.documentId), s.role])),
+      }),
+    }),
+  discrepancies: (runId: number) => request<DiscrepancyList>(`/api/runs/${runId}/discrepancies`),
+  patchDiscrepancy: (runId: number, itemId: string, body: { status?: "open" | "resolved"; note?: string | null }) =>
+    request<DiscrepancyItem>(`/api/runs/${runId}/discrepancies/${encodeURIComponent(itemId)}`, {
+      method: "PATCH",
+      body: json(body),
+    }),
   fileUrl: (documentId: number) => `${API_BASE}/api/documents/${documentId}/file`,
   eventsUrl: (runId: number, lastEventId?: number) =>
     `${API_BASE}/api/runs/${runId}/events${lastEventId != null ? `?last_event_id=${lastEventId}` : ""}`,
@@ -145,10 +163,11 @@ export async function downloadExport(artifactId: number, format: ExportFormat, v
 export function uploadFile(
   file: File,
   onProgress: (fraction: number) => void,
+  path: "/api/documents" | "/api/documents/ams" = "/api/documents",
 ): Promise<{ documents: DocumentInfo[]; rejected: Rejection[] }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_BASE}/api/documents`);
+    xhr.open("POST", `${API_BASE}${path}`);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total);
     };

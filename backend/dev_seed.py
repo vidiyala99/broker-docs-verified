@@ -16,6 +16,11 @@ seed   uploads fixture PDFs from tests/fixtures/quotes and runs these comparison
          5. partial run (one corrupt document, one multi-option document, a conflicting value)
          6. main run (A clean, B scanned, C clean with one unverifiable value, D clean), with one
             cell edit so the edited state and a stale section show
+         7. Policy Check, all four roles from tests/fixtures/policy (pc_homeowners: expiring,
+            renewal, a scanned quote read from scan, an AMS JSON whose two liability fields
+            disagree so its slot needs review); one item resolved with a note, one flagged
+            "changed since resolved"
+         8. Policy Check with a corrupt quote (its slots read Not read) and no AMS export (N/A)
 serve  runs the real API with the same scripted model, slowed down (BROKERDOCS_DEV_DELAY seconds
        per call, default 1.2) so run progress is visible. Upload a file whose name contains
        "compose_fail" to force the template fallback; ask a chat question containing "fail" to
@@ -40,6 +45,7 @@ from backend.providers.types import TextPart
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "tests" / "fixtures" / "quotes"
+POLICY_FIXTURES = ROOT / "tests" / "fixtures" / "policy"
 
 # Label in the fixture PDFs -> fact key in the Compare Quotes schema.
 ALIASES = {
@@ -216,6 +222,36 @@ def chat(text: str) -> object:
     return {"answer": segs, "proposed_edits": edits}
 
 
+def _policy_truth(filename: str) -> dict[str, Any] | None:
+    """Ground truth of a tests/fixtures/policy document, by its upload name (pc_<case>_<role>.pdf)."""
+    if not filename.startswith("pc_"):
+        return None
+    path = POLICY_FIXTURES / (Path(filename).stem + ".truth.json")
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def policy_extract(text: str, truth: dict[str, Any] | None) -> dict[str, Any]:
+    """The Policy Check combined pass (D13), scripted from the fixture's ground truth: scalar facts
+    plus a forms array, only for the pages this window shows. Unknown documents state nothing."""
+    pages = {int(n) for n in re.findall(r"\[page (\d+)\]", text)}
+    facts, forms = [], []
+    for key, f in ((truth or {}).get("facts") or {}).items():
+        if not f or f.get("page") not in pages:
+            continue
+        if key.startswith("form:"):
+            parts = f["value"].split(" ")
+            forms.append({"number": " ".join(parts[:-2]), "edition": " ".join(parts[-2:]), "title": None,
+                          "page": f["page"], "quote": f["quote"]})
+        else:
+            value, quote = f["value"], f["quote"]
+            if (truth or {}).get("fixture_id") == "pc_homeowners_renewal" and key == "deductible_wind_hail":
+                # A value the model "saw" that is not on the page: verify drops it, so the renewal
+                # slot needs review (D15) and the dev UI shows that item state.
+                value, quote = "3%", "Wind/Hail Deductible 3% of Coverage A"
+            facts.append({"field": key, "value": value, "page": f["page"], "quote": quote})
+    return {"facts": facts, "forms": forms, "options_detected": 1, "option_compared": None}
+
+
 class DevProvider(FakeProvider):
     """FakeProvider with a per-call delay and OCR text taken from the clean twin of a scanned fixture."""
 
@@ -232,6 +268,9 @@ class DevProvider(FakeProvider):
     def respond(self, req: ProviderRequest):
         text = _user_text(req)
         if req.role is CallRole.EXTRACT:
+            if "Also return forms" in text:  # the policy-check combined schema
+                m = re.match(r"extract:(\d+)", req.label or "")
+                return policy_extract(text, _policy_truth(self.filename_of(int(m.group(1)))) if m else None)
             return extract(text)
         if req.role is CallRole.COMPOSE:
             return compose(text)
@@ -250,6 +289,9 @@ class DevProvider(FakeProvider):
         import fitz  # PyMuPDF
 
         name = self.filename_of(doc_id)
+        truth = _policy_truth(name)
+        if truth:  # a scanned policy fixture: its printed lines, as a scan would read them
+            return "\n".join(f["quote"] for f in (truth.get("facts") or {}).values() if f and f.get("page") == page_no)
         twin = FIXTURES / name.replace("_scanned", "_clean")
         if "_scanned" not in name or not twin.exists():
             return ""
@@ -304,14 +346,28 @@ class Seeder:
     def close(self) -> None:
         self.client.__exit__(None, None, None)
 
-    def upload(self, *names: str, as_names: dict[str, str] | None = None) -> list[int]:
-        files = [("files", ((as_names or {}).get(n, n), (FIXTURES / n).read_bytes(), "application/pdf")) for n in names]
+    def upload(self, *names: str, as_names: dict[str, str] | None = None, folder: Path = FIXTURES) -> list[int]:
+        files = [("files", ((as_names or {}).get(n, n), (folder / n).read_bytes(), "application/pdf")) for n in names]
         r = self.client.post("/api/documents", files=files)
         r.raise_for_status()
         body = r.json()
         if body["rejected"]:
             print("  rejected:", [x["filename"] for x in body["rejected"]])
         return [d["id"] for d in body["documents"]]
+
+    def upload_ams(self, name: str) -> int:
+        r = self.client.post("/api/documents/ams", files=[
+            ("files", (name, (POLICY_FIXTURES / name).read_bytes(), "application/json"))])
+        r.raise_for_status()
+        return r.json()["documents"][0]["id"]
+
+    def policy_check(self, slots: dict[int, str]) -> dict:
+        r = self.client.post("/api/runs", json={"document_ids": list(slots), "workflow": "policy-check",
+                                                "slots": {str(k): v for k, v in slots.items()}})
+        r.raise_for_status()
+        run = self.wait(r.json()["run"]["id"])
+        print(f"  run {run['id']}: {run['status']}")
+        return run
 
     def start(self, ids: list[int]) -> int:
         r = self.client.post("/api/runs", json={"document_ids": ids})
@@ -381,9 +437,43 @@ def seed() -> None:
             "value": "$1,120.00", "base_version": art["version"]})
         print("  edit:", r.status_code, r.json().get("stale_sections") if r.is_success else r.text)
         print("  counts:", art["counts"])
+        seed_policy_checks(s)
     finally:
         s.close()
     print("Done. Start the dev server with: python -m backend.dev_seed serve")
+
+
+def seed_policy_checks(s: Seeder) -> None:
+    from sqlalchemy import select
+
+    from backend import db, models
+
+    print("7. policy check, four roles")
+    exp, ren, quo = s.upload("pc_homeowners_expiring.pdf", "pc_homeowners_renewal.pdf", "pc_homeowners_quote.pdf",
+                             folder=POLICY_FIXTURES)
+    ams_id = s.upload_ams("pc_homeowners_ams.json")
+    run = s.policy_check({exp: "expiring", quo: "quote", ren: "renewal", ams_id: "ams"})
+    items = s.client.get(f"/api/runs/{run['id']}/discrepancies").json()["items"]
+    print("  items:", [(i["key"], i["severity"], i["item_state"]) for i in items])
+    by_key = {i["key"]: i for i in items}
+    resolve = by_key.get("form:HO0481")
+    if resolve:
+        s.client.patch(f"/api/runs/{run['id']}/discrepancies/{resolve['id']}", json={
+            "status": "resolved", "note": "Insured asked for actual cash value on the roof."}).raise_for_status()
+    flagged = by_key.get("total_premium")
+    if flagged:
+        # Dev-only: a decision whose values moved (normally set when a regenerate changes them).
+        s.client.patch(f"/api/runs/{run['id']}/discrepancies/{flagged['id']}", json={
+            "note": "Carrier confirmed the premium on 10/28."}).raise_for_status()
+        with db.session_scope(s.app.state.ctx.factory) as session:
+            row = session.scalar(select(models.DiscrepancyState).where(
+                models.DiscrepancyState.run_id == run["id"], models.DiscrepancyState.item_id == flagged["id"]))
+            row.changed_since_resolved = True
+
+    print("8. policy check, quote not read, no AMS")
+    exp2, ren2 = s.upload("pc_homeowners_expiring.pdf", "pc_homeowners_renewal.pdf", folder=POLICY_FIXTURES)
+    bad = s.upload("corrupt_truncated.pdf", as_names={"corrupt_truncated.pdf": "carrier_quote_scan.pdf"})[0]
+    s.policy_check({exp2: "expiring", bad: "quote", ren2: "renewal"})
 
 
 def serve() -> None:

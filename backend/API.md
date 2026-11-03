@@ -583,6 +583,13 @@ or a comma list of `critical | high | medium | low` (`422` for another). `counts
             "updated_at": "2026-11-02T10:00:00+00:00"}]}
 ```
 
+Each item also carries `sources` (slice 3 T9, read-only, not part of the artifact): per role, the
+cited facts behind that slot's chips, `[{"passage_id": 53, "page_no": 1, "rects": [[x0, y0, x1, y1]],
+"field": "Cov C"}]`. `rects` are the fact's own highlight boxes (a chip's `rects` cover every fact
+on its page); `field` is set for an AMS document only: the field name, read from the verified quote
+(the rendered AMS line `field_name: value`), so the UI labels that chip "AMS · Cov C" and boxes only
+that line. A role without a cited value has no entry. PATCH returns the same shape.
+
 A role missing from `slots` is N/A (no document). `404 not_found` for an unknown run,
 `404 no_report` before the run has an artifact. A run of another workflow lists no items.
 

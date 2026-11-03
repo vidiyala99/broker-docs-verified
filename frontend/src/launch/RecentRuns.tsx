@@ -16,7 +16,9 @@ export function statusText(s: Run["status"]): string {
 }
 
 export function runTitle(run: Run): string {
-  return run.workflow_name === "Proposal Builder" ? `Proposal, run ${run.id}` : `Run ${run.id}`;
+  if (run.workflow_name === "Proposal Builder") return `Proposal, run ${run.id}`;
+  if (run.workflow_name === "Policy Check") return `Policy check, run ${run.id}`;
+  return `Run ${run.id}`;
 }
 
 export function formatWhen(iso: string): string {
@@ -49,7 +51,9 @@ export function RecentRuns({ runs, compact, currentId }: { runs: Run[]; compact?
               </span>
             )}
             <span className="run-link__meta">
-              {r.documents.length} {r.documents.length === 1 ? "quote" : "quotes"}, {formatWhen(r.created_at)}
+              {r.documents.length}{" "}
+              {r.workflow_name === "Policy Check" ? (r.documents.length === 1 ? "document" : "documents") : r.documents.length === 1 ? "quote" : "quotes"},{" "}
+              {formatWhen(r.created_at)}
             </span>
           </a>
         </li>

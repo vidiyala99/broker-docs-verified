@@ -31,12 +31,22 @@ export function DropZone({
   large,
   disabled,
   title = "Drop quote PDFs to compare",
+  accept = "application/pdf,.pdf",
+  limitsLine,
+  buttonLabel = "Choose files",
+  multiple = true,
 }: {
   limits: Limits;
   onFiles: (files: File[]) => void;
   large?: boolean;
   disabled?: boolean;
   title?: string;
+  /** File picker filter; the server still checks the content (policy check AMS: .json,.csv). */
+  accept?: string;
+  /** Replaces the PDF limits line (AMS exports have their own caps). */
+  limitsLine?: string;
+  buttonLabel?: string;
+  multiple?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -59,15 +69,15 @@ export function DropZone({
     >
       <UploadSimple size={large ? 28 : 20} aria-hidden className="dropzone__icon" />
       <p className="dropzone__title">{title}</p>
-      <p className="dropzone__limits">{limitsText(limits)}</p>
+      <p className="dropzone__limits">{limitsLine ?? limitsText(limits)}</p>
       <button type="button" className="btn btn--primary" disabled={disabled} onClick={() => input.current?.click()}>
-        Choose files
+        {buttonLabel}
       </button>
       <input
         ref={input}
         type="file"
-        accept="application/pdf,.pdf"
-        multiple
+        accept={accept}
+        multiple={multiple}
         hidden
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);

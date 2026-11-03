@@ -13,6 +13,7 @@ export function Chat({
   runId,
   artifact,
   proposal = false,
+  policy = false,
   onOpen,
   onEdited,
   open: controlledOpen,
@@ -20,6 +21,8 @@ export function Chat({
 }: {
   runId: number;
   proposal?: boolean;
+  /** Policy Check run: copy talks about the documents, not quotes. */
+  policy?: boolean;
   artifact: Artifact | null;
   onOpen: OpenSource;
   onEdited: (res: EditResult) => void;
@@ -118,7 +121,9 @@ export function Chat({
         ? `${messages.length} ${messages.length === 1 ? "message" : "messages"}`
         : proposal
           ? "Ask about this proposal"
-          : "Ask about these quotes";
+          : policy
+            ? "Ask about these documents"
+            : "Ask about these quotes";
 
   return (
     <section className={`chat${hasReport ? "" : " chat--idle"}${open ? "" : " chat--collapsed"}`} aria-labelledby={`${bodyId}-title`}>
@@ -132,7 +137,7 @@ export function Chat({
       </h2>
       <div id={bodyId} className={`chat__body${viaPointer ? " fade-in" : ""}`} hidden={!open}>
       <div className="chat__log" ref={list} aria-live="polite" aria-relevant="additions">
-        {!hasReport && <p className="chat__empty">{proposal ? "Generate a proposal to ask questions about its sources." : "Run a comparison to ask questions."}</p>}
+        {!hasReport && <p className="chat__empty">{proposal ? "Generate a proposal to ask questions about its sources." : policy ? "Run the check to ask questions." : "Run a comparison to ask questions."}</p>}
         {hasReport && !messages.length && !pending && !error && !showSuggestions && (
           <p className="chat__empty">Answers cite the page they come from.</p>
         )}
@@ -231,7 +236,7 @@ export function Chat({
           className="chat__input"
           rows={1}
           maxLength={4000}
-          placeholder={hasReport ? (proposal ? "Ask about this proposal's sources" : "Ask about these quotes") : proposal ? "Generate a proposal to ask questions" : "Run a comparison to ask questions"}
+          placeholder={hasReport ? (proposal ? "Ask about this proposal's sources" : policy ? "Ask about these documents" : "Ask about these quotes") : proposal ? "Generate a proposal to ask questions" : "Run a comparison to ask questions"}
           value={draft}
           disabled={!hasReport}
           onChange={(e) => setDraft(e.target.value)}

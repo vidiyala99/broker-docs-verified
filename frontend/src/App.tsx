@@ -4,16 +4,17 @@ import type { Run, Workspace } from "./api/types";
 import { LaunchView } from "./launch/LaunchView";
 import { RunView } from "./run/RunView";
 import { NarrowNotice, Rail, TopBar, type Crumb } from "./shell/Shell";
-import { PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "./config";
+import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "./config";
 import { useViewport } from "./shell/layout";
 import { ToastProvider } from "./ui/Toast";
 import { ProposalWizard } from "./wizard/ProposalWizard";
+import { PolicyWizard } from "./policy/PolicyWizard";
 
-type Route = { runId: number | null; wizard: boolean };
+type Route = { runId: number | null; wizard: boolean; policy: boolean };
 
 function parseRoute(hash: string): Route {
   const m = /^#\/runs\/(\d+)/.exec(hash);
-  return { runId: m ? Number(m[1]) : null, wizard: /^#\/proposals\/new/.test(hash) };
+  return { runId: m ? Number(m[1]) : null, wizard: /^#\/proposals\/new/.test(hash), policy: /^#\/policy-check\/new/.test(hash) };
 }
 
 export function App() {
@@ -59,27 +60,34 @@ export function App() {
   }, [route.runId, listed]);
   const runOfRoute = listed ?? (routeRun?.id === route.runId ? routeRun : null);
   const proposalRun = runOfRoute?.workflow_name === PROPOSAL_WORKFLOW;
+  const policyRun = runOfRoute?.workflow_name === POLICY_WORKFLOW;
 
   useEffect(() => {
     loadRuns();
-  }, [route.runId, route.wizard, loadRuns]);
+  }, [route.runId, route.wizard, route.policy, loadRuns]);
 
   useEffect(() => {
     document.title = route.wizard
       ? "New proposal"
-      : route.runId
-        ? `Run ${route.runId}, ${proposalRun ? "Proposal" : "Compare Quotes"}`
-        : "Compare Quotes";
-  }, [route.runId, route.wizard, proposalRun]);
+      : route.policy
+        ? "New policy check"
+        : route.runId
+          ? `Run ${route.runId}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
+          : "Compare Quotes";
+  }, [route.runId, route.wizard, route.policy, proposalRun, policyRun]);
 
-  const section = route.wizard || proposalRun ? "proposals" : "workflows";
+  const section = route.wizard || proposalRun ? "proposals" : route.policy || policyRun ? "policy-check" : "workflows";
   const crumbs: Crumb[] = route.wizard
     ? [{ label: "Proposals" }, { label: "New proposal" }]
-    : route.runId
-      ? proposalRun
-        ? [{ label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
-        : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: `Run ${route.runId}` }]
-      : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME }];
+    : route.policy
+      ? [{ label: "Policy check" }, { label: "New check" }]
+      : route.runId
+        ? proposalRun
+          ? [{ label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
+          : policyRun
+            ? [{ label: "Policy check", href: "#/policy-check/new" }, { label: `Run ${route.runId}` }]
+            : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: `Run ${route.runId}` }]
+        : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME }];
 
   return (
     <ToastProvider>
@@ -93,7 +101,7 @@ export function App() {
         <Rail section={section} />
         <div className="app__main">
           <TopBar crumbs={crumbs} />
-          {viewport === "narrow" && !route.wizard && <NarrowNotice />}
+          {viewport === "narrow" && !route.wizard && !route.policy && !policyRun && <NarrowNotice />}
           {wsError ? (
             <main className="pane" id="main" tabIndex={-1}>
               <div className="pane__body pane__body--center">
@@ -115,6 +123,8 @@ export function App() {
             </main>
           ) : route.wizard ? (
             <ProposalWizard workspace={workspace} viewport={viewport} />
+          ) : route.policy ? (
+            <PolicyWizard workspace={workspace} viewport={viewport} />
           ) : route.runId ? (
             <RunView key={route.runId} runId={route.runId} workspace={workspace} runs={runs} viewport={viewport} onRunsChanged={loadRuns} />
           ) : (

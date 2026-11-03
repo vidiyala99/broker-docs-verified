@@ -19,7 +19,7 @@ from backend.pipeline.runner import SlotError, format_sse
 from backend.routes.common import ApiError, get_ctx, not_found
 from backend.routes.workspace import find_workflow
 from backend.schemas import DiscrepancyBlock, ParameterErrors, Severity
-from backend.views import run_out
+from backend.views import discrepancy_sources, run_out
 
 router = APIRouter(tags=["runs"])
 
@@ -114,9 +114,11 @@ _NOTE_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 MAX_NOTE_CHARS = 2000
 
 
-def _item_out(block: DiscrepancyBlock, row: models.DiscrepancyState | None) -> dict[str, Any]:
+def _item_out(block: DiscrepancyBlock, row: models.DiscrepancyState | None,
+              sources: dict[str, dict[str, list]] | None = None) -> dict[str, Any]:
     out = block.model_dump(mode="json")
     out.update({
+        "sources": (sources or {}).get(block.id, {}),
         "status": row.status if row else "open",
         "note": row.note if row else None,
         "changed_since_resolved": bool(row.changed_since_resolved) if row else False,
@@ -159,7 +161,8 @@ async def list_discrepancies(run_id: int, severity: str | None = Query(None, max
     with ctx.factory() as s:
         run, blocks = _current_blocks(s, run_id)
         rows = _discrepancy_rows(s, run_id)
-        all_items = [_item_out(b, rows.get(b.id)) for b in blocks]
+        sources = discrepancy_sources(s, run, blocks)
+        all_items = [_item_out(b, rows.get(b.id), sources) for b in blocks]
         counts = {k: 0 for k in _SEVERITIES}
         open_counts = {k: 0 for k in _SEVERITIES}
         for it in all_items:
@@ -200,7 +203,7 @@ async def patch_discrepancy(run_id: int, item_id: str, body: DiscrepancyPatch,
                             ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
     """Set one item's status and/or note (`note: null` clears it)."""
     with db.session_scope(ctx.factory) as s:
-        _, blocks = _current_blocks(s, run_id)
+        run, blocks = _current_blocks(s, run_id)
         block = next((b for b in blocks if b.id == item_id), None)
         if block is None:
             raise ApiError(404, "discrepancy_not_found", "This report has no such discrepancy.")
@@ -212,7 +215,7 @@ async def patch_discrepancy(run_id: int, item_id: str, body: DiscrepancyPatch,
         if "note" in body.model_fields_set:
             kwargs["note"] = body.note
         row = models.update_discrepancy_state(s, run_id, item_id, **kwargs)
-        return _item_out(block, row)
+        return _item_out(block, row, discrepancy_sources(s, run, [block]))
 
 
 @router.get("/runs/{run_id}/events")
