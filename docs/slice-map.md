@@ -1,29 +1,31 @@
 # Slice map
 
-Date: 2026-11-02. Owner decisions recorded here; each item still gets its own design pass
+Date: 2026-11-02, updated 2026-11-03. Owner decisions recorded here; each item still gets its own design pass
 (brainstorm, spec, design stack for UI) before any code.
 Evidence: `docs/reference/brokerdocs-workflows-evidence.md`, `../BrokerDocs-REA-Teardown.md`, `rea-out/shots/`.
 
-## Built
-| Slice | Workflow | Rail item | Status |
+## Built (all merged to main)
+| Slice | Workflow | Rail item | Notes |
 |---|---|---|---|
-| 1 | Compare Quotes (core engine) | Workflows | merged |
-| 2 | Proposal Builder | Proposals | merged |
-| 3 | Policy Check | Policy check | backend merged; UI (T9) in final bug-fix pass |
+| 1 | Compare Quotes (core engine) | Workflows | Verified citations, long documents (300 pages), live eval 268/286, 0 hard fails |
+| 2 | Proposal Builder | Proposals | Wizard, outline editing, DOCX export; live eval 0.939 |
+| 3 | Policy Check | Policy check | Expiring / renewal / quote / AMS discrepancies; live recall 13/13 |
+| 3b | Rail completion | Personal lines, Tasks, Integrations | Personal lines = filtered entry; broker-defined Tasks; Integrations is a labelled mock |
+| (extra) | Work queue + Activity | Workflows, Personal lines | Queue is home (`docs/specs/2026-11-02-work-queue-design.md`); raw runs live in Activity |
+| (extra) | Voice "Paper trail" + motion | everywhere | Serif for people, drawn marks, rail Silhouettes; DESIGN.md Voice/Motion |
 
-## Next: slice 3b, rail completion (owner decision 2026-11-02)
-Goal: every rail item is either a working screen or an honest mock. No invented data presented as real.
+## In flight
+- Line move (Commercial / Personal): owner found the move static and the two lines hard to tell apart (2026-11-03).
+  Design lane Phase A (directions only), branch `line-move`.
 
-| Rail item | Plan | Evidence |
+## Next: slice 4 (owner decision 2026-11-03)
+| Slice | Workflow | Rail item |
 |---|---|---|
-| Personal lines | Filtered entry into existing workflows (Compare Quotes, Policy Check) for homeowners and auto documents. No new engine. | Marketing page screenshot: homeowners quote comparison with citation chips (`rea-out/shots/personal-lines.png`) |
-| Tasks | Broker-defined tasks: the broker creates and manages their own items. Proposed shape (to confirm in design): title, optional due date, optional link to a run or discrepancy, status open/done; "create task" from a Policy Check discrepancy. | No screen observed; app endpoint string `/automations/needs-you` only |
-| Integrations | Mock page: connect cards (Applied Epic, AMS360, Nexsure, ImageRight, HawkSoft, Gmail, Google Drive, OneDrive, Outlook, SharePoint) with a visible note that integrations are not designed yet and this page is a mock. Connect buttons do nothing real. | `rea-out/shots/integrations.png` |
+| 4 | COI and form filler (own layout first, no observed screen) | Certificates |
 
 ## Later slices (from the evidence ranking)
 | Slice | Workflow | Rail item |
 |---|---|---|
-| 4 | COI and form filler (own layout first) | Certificates |
 | 5 | Loss Run (spreadsheet parsing, aggregation, dashboards) | Analytics / Insights |
 | 6 | Market Search and Vault-wide assistant | Market search, Assistant |
 | unscheduled | Data-only pack: Contract Requirements, Coverage Gap, Tower Analysis | Workflows |
@@ -32,3 +34,6 @@ Goal: every rail item is either a working screen or an honest mock. No invented 
 
 Insights/Analytics: the only observed screen (Data Intelligence forecast, `yt/frame_0033` to `0035`) needs
 agency-wide data the clone does not have; tie it to Loss Run data in slice 5 rather than invent numbers.
+
+## Open owner decisions (not slices)
+Template library, extraction cache (2c), Standard-template live eval, Proposal mark everywhere, left-panel strip icons.
