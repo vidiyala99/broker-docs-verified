@@ -58,6 +58,11 @@ def run_out(run: models.Run, *, active: bool) -> dict[str, Any]:
         "workflow_id": run.workflow_id,
         "workflow_name": run.workflow.name if run.workflow else None,
         "line": run.line or "commercial",  # slice 3b; REST only, the SSE snapshot is unchanged (O9)
+        # work queue (REST only, like line): broker client name, queue state, linked proposal
+        "client_name": run.client_name,
+        "queue_state": run.queue_state or "open",
+        "proposal_run_id": run.proposal_run_id,
+        "queue_changed_at": _ts(run.queue_changed_at),
         "status": str(run.status),
         "active": active,
         "terminal": str(run.status) in TERMINAL_RUN_STATUSES and not active,

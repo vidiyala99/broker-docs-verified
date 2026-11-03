@@ -80,25 +80,40 @@ class SchemaOutdated(RuntimeError):
     """The database predates a schema change; there are no migrations, so it must be recreated."""
 
 
+QUEUE_COLUMNS = ("client_name", "queue_state", "proposal_run_id", "queue_changed_at")  # work queue (M8)
+QUEUE_STATE_CONSTRAINT = "ck_run_queue_state"
+QUEUE_INDEX = "ix_run_line_queue_state"
+
+
 def check_schema(engine: Engine) -> None:
-    """Fail fast on a database made before slice 3b (D10): `create_all` adds missing tables but
-    never a missing column, so an old `run` table without `line` would start and then fail on the
-    first runs query. A new (empty) database passes."""
-    names = set(inspect(engine).get_table_names())
+    """Fail fast on a database made before a schema change (D10 of slice 3b, extended for the work
+    queue by M8): `create_all` adds missing tables and never a missing column, constraint or index
+    on an existing table, so an old `run` table would start and then fail on the first runs query
+    (or silently lack the queue_state rule). Required on `run`: `line`, the four work-queue columns,
+    the queue_state check constraint and the (line, queue_state) index; plus the `task` table.
+    A new (empty) database passes."""
+    insp = inspect(engine)
+    names = set(insp.get_table_names())
     if "run" not in names:
         return
     missing = []
-    if "line" not in {c["name"] for c in inspect(engine).get_columns("run")}:
-        missing.append("the run.line column")
+    columns = {c["name"] for c in insp.get_columns("run")}
+    for column in ("line", *QUEUE_COLUMNS):
+        if column not in columns:
+            missing.append(f"the run.{column} column")
+    if QUEUE_STATE_CONSTRAINT not in {c.get("name") for c in insp.get_check_constraints("run")}:
+        missing.append(f"the run.queue_state check constraint ({QUEUE_STATE_CONSTRAINT})")
+    if QUEUE_INDEX not in {i.get("name") for i in insp.get_indexes("run")}:
+        missing.append(f"the run (line, queue_state) index ({QUEUE_INDEX})")
     if "task" not in names:
         missing.append("the task table")
     if not missing:
         return
     where = engine.url.database or "the in-memory database"
     raise SchemaOutdated(
-        f"The database {where} was created before the 2026-11-02 schema change (slice 3b) and lacks "
-        f"{' and '.join(missing)}. There are no migrations: stop the server, delete {where} (and its -wal and "
-        f"-shm files if present), then start again for an empty database, or reseed dev data with: "
+        f"The database {where} was created before a 2026-11-02 schema change (slice 3b or the work queue) "
+        f"and lacks {', '.join(missing)}. There are no migrations: stop the server, delete {where} (and its "
+        f"-wal and -shm files if present), then start again for an empty database, or reseed dev data with: "
         f"{RESEED_COMMAND} (with BROKERDOCS_DATA_DIR set to a scratch folder).")
 
 

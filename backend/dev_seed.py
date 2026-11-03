@@ -21,7 +21,11 @@ seed   uploads fixture PDFs from tests/fixtures/quotes and runs these comparison
             disagree so its slot needs review); one item resolved with a note, one flagged
             "changed since resolved"
          8. Policy Check with a corrupt quote (its slots read Not read) and no AMS export (N/A)
+         9. Proposal Builder built from run 4 (`source_run_id`) whose document is corrupt: it fails,
+            so run 4 shows in the work queue's Ready group with "Proposal didn't finish"
        Runs 7 and 8 (homeowners) are tagged `line: personal`, the others commercial (slice 3b).
+       Client names (work queue): runs 2, 4, 6, 7 and 8 have a broker-typed name (CLIENTS); runs 3
+       and 5 use the extracted named insured; run 1 has no name at all ("Unnamed client").
        Two tasks: one free-standing, due three days ago (overdue), and one linked to run 7's
        first discrepancy.
 serve  runs the real API with the same scripted model, slowed down (BROKERDOCS_DEV_DELAY seconds
@@ -61,6 +65,16 @@ ALIASES = {
     "General Aggregate Limit": "aggregate_limit", "Aggregate Limit": "aggregate_limit",
     "Deductible": "retention", "Amended Deductible": "retention", "Quote Valid Until": "quote_expiration",
 }
+# Broker-typed client names (work queue, W4). Run 1 (failed) and runs 3 and 5 have none: run 1 reads
+# "Unnamed client" (nothing was extracted), runs 3 and 5 fall back to the extracted named insured.
+CLIENTS = {
+    "cancelled": "Brightwater Logistics Inc.",  # run 2
+    "fallback": "Copperfield Marine Services",  # run 4
+    "main": "Cedar Hollow Hospitality LLC",  # run 6
+    "policy_check": "Avery and Jordan Pellham",  # run 7
+    "policy_check_quote_unread": "Jordan Pellham (lake house)",  # run 8
+}
+
 SECTION_OF = {
     "carrier_name": "common_declarations", "named_insured": "common_declarations", "address": "common_declarations",
     "admitted_status": "common_declarations", "am_best_rating": "common_declarations",
@@ -364,16 +378,17 @@ class Seeder:
         r.raise_for_status()
         return r.json()["documents"][0]["id"]
 
-    def policy_check(self, slots: dict[int, str], line: str = "commercial") -> dict:
+    def policy_check(self, slots: dict[int, str], line: str = "commercial", client: str | None = None) -> dict:
         r = self.client.post("/api/runs", json={"document_ids": list(slots), "workflow": "policy-check",
-                                                "slots": {str(k): v for k, v in slots.items()}, "line": line})
+                                                "slots": {str(k): v for k, v in slots.items()}, "line": line,
+                                                "client_name": client})
         r.raise_for_status()
         run = self.wait(r.json()["run"]["id"])
         print(f"  run {run['id']}: {run['status']}")
         return run
 
-    def start(self, ids: list[int]) -> int:
-        r = self.client.post("/api/runs", json={"document_ids": ids})
+    def start(self, ids: list[int], client: str | None = None) -> int:
+        r = self.client.post("/api/runs", json={"document_ids": ids, "client_name": client})
         r.raise_for_status()
         return r.json()["run"]["id"]
 
@@ -386,8 +401,8 @@ class Seeder:
             time.sleep(0.2)
         raise TimeoutError(f"run {run_id} did not finish")
 
-    def run(self, ids: list[int]) -> dict:
-        run = self.wait(self.start(ids))
+    def run(self, ids: list[int], client: str | None = None) -> dict:
+        run = self.wait(self.start(ids, client))
         print(f"  run {run['id']}: {run['status']} tokens={run['tokens_in'] + run['tokens_out']}")
         return run
 
@@ -409,7 +424,8 @@ def seed() -> None:
     s = Seeder(delay=1.0)
     try:
         print("2. cancelled run")
-        rid = s.start(s.upload("carrier_c_clean.pdf", "carrier_d_clean.pdf", "long_120.pdf"))
+        rid = s.start(s.upload("carrier_c_clean.pdf", "carrier_d_clean.pdf", "long_120.pdf"),
+                      client=CLIENTS["cancelled"])
         time.sleep(1.6)
         s.client.post(f"/api/runs/{rid}/cancel").raise_for_status()
         print(f"  run {rid}: {s.wait(rid)['status']}")
@@ -426,14 +442,15 @@ def seed() -> None:
     s = Seeder()
     try:
         print("4. compose fallback run")
-        s.run(s.upload("carrier_a_clean.pdf", "carrier_d_clean.pdf",
-                       as_names={"carrier_d_clean.pdf": "compose_fail_copperfield.pdf"}))
+        fallback = s.run(s.upload("carrier_a_clean.pdf", "carrier_d_clean.pdf",
+                                  as_names={"carrier_d_clean.pdf": "compose_fail_copperfield.pdf"}),
+                         client=CLIENTS["fallback"])
         print("5. partial run")
         s.run(s.upload("carrier_a_clean.pdf", "multi_option.pdf", "conflicting_endorsement.pdf",
                        "corrupt_truncated.pdf", "long_120.pdf"))
         print("6. main run")
         run = s.run(s.upload("carrier_a_clean.pdf", "carrier_b_scanned.pdf", "carrier_c_clean.pdf",
-                             "carrier_d_clean.pdf"))
+                             "carrier_d_clean.pdf"), client=CLIENTS["main"])
         art = s.client.get(f"/api/runs/{run['id']}/artifact").json()
         r = s.client.patch(f"/api/artifacts/{art['id']}/cells", json={
             "block_id": "premium-table", "row_key": "taxes_and_fees", "column_key": "D",
@@ -442,6 +459,7 @@ def seed() -> None:
         print("  counts:", art["counts"])
         first, _ = seed_policy_checks(s)
         seed_tasks(s, first)
+        seed_failed_proposal(s, fallback["id"])
     finally:
         s.close()
     print("Done. Start the dev server with: python -m backend.dev_seed serve")
@@ -457,7 +475,8 @@ def seed_policy_checks(s: Seeder) -> tuple[int, int]:
     exp, ren, quo = s.upload("pc_homeowners_expiring.pdf", "pc_homeowners_renewal.pdf", "pc_homeowners_quote.pdf",
                              folder=POLICY_FIXTURES)
     ams_id = s.upload_ams("pc_homeowners_ams.json")
-    run = s.policy_check({exp: "expiring", quo: "quote", ren: "renewal", ams_id: "ams"}, line="personal")
+    run = s.policy_check({exp: "expiring", quo: "quote", ren: "renewal", ams_id: "ams"}, line="personal",
+                         client=CLIENTS["policy_check"])
     items = s.client.get(f"/api/runs/{run['id']}/discrepancies").json()["items"]
     print("  items:", [(i["key"], i["severity"], i["item_state"]) for i in items])
     by_key = {i["key"]: i for i in items}
@@ -478,8 +497,25 @@ def seed_policy_checks(s: Seeder) -> tuple[int, int]:
     print("8. policy check, quote not read, no AMS (personal lines)")
     exp2, ren2 = s.upload("pc_homeowners_expiring.pdf", "pc_homeowners_renewal.pdf", folder=POLICY_FIXTURES)
     bad = s.upload("corrupt_truncated.pdf", as_names={"corrupt_truncated.pdf": "carrier_quote_scan.pdf"})[0]
-    second = s.policy_check({exp2: "expiring", bad: "quote", ren2: "renewal"}, line="personal")
+    second = s.policy_check({exp2: "expiring", bad: "quote", ren2: "renewal"}, line="personal",
+                            client=CLIENTS["policy_check_quote_unread"])
     return run["id"], second["id"]
+
+
+def seed_failed_proposal(s: Seeder, comparison_id: int) -> int:
+    """Run 9 of a full seed (work queue, D3): a Proposal Builder run built from comparison
+    `comparison_id` (run 4) whose only document cannot be read, so it fails and the comparison sits
+    in Ready with "Proposal didn't finish"."""
+    print("9. failed proposal built from run", comparison_id)
+    bad = s.upload("corrupt_truncated.pdf", as_names={"corrupt_truncated.pdf": "copperfield_quote_scan.pdf"})[0]
+    r = s.client.post("/api/runs", json={
+        "document_ids": [bad], "workflow": "proposal-builder", "source_run_id": comparison_id,
+        "parameters": {"template_id": "standard", "client_name": CLIENTS["fallback"],
+                       "broker_name": "Dana Ruiz", "brokerage_name": "Ruiz and Partners"}})
+    r.raise_for_status()
+    run = s.wait(r.json()["run"]["id"])
+    print(f"  run {run['id']}: {run['status']}")
+    return run["id"]
 
 
 def seed_tasks(s: Seeder, policy_run_id: int) -> None:

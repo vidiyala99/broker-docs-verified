@@ -81,7 +81,36 @@ export interface Run {
   finished_at: string | null;
   documents: RunDocument[];
   artifact: { id: number; version: number } | null;
+  /** Work queue (backend/API.md "Run"): broker client name, queue state, linked proposal. */
+  client_name: string | null;
+  queue_state: QueueState;
+  proposal_run_id: number | null;
+  queue_changed_at: string | null;
 }
+
+/** Work queue (backend/API.md "Work queue"). */
+export type QueueState = "open" | "done" | "dismissed";
+export type QueueGroup = "in_progress" | "needs_review" | "ready" | "needs_attention" | "done_recently";
+
+export interface QueueItem {
+  run_id: number;
+  workflow_slug: string;
+  workflow_name: string;
+  line: Line;
+  client: string | null;
+  client_source: "broker" | "extracted" | null;
+  summary: string;
+  open_counts: Record<"critical" | "high" | "medium" | "low", number> | null;
+  reasons: string[] | null;
+  status: RunStatus;
+  retryable: boolean;
+  finished_at: string | null;
+  queue_state: QueueState;
+  queue_changed_at: string | null;
+  proposal_run_id: number | null;
+}
+
+export type Queue = { line: Line; truncated: boolean } & Record<QueueGroup, QueueItem[]>;
 
 export interface Segment {
   text: string;

@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -28,6 +29,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -42,6 +44,7 @@ from backend.schemas import (
     EvidenceState,
     RunDocumentStatus,
     RunStatus,
+    Severity,
 )
 
 MAX_DOCUMENTS_PER_RUN = 8  # D3; letters A to H (DG11)
@@ -148,11 +151,17 @@ class Page(Base):
 
 
 RUN_LINES = ("commercial", "personal")  # slice 3b: household cover is "personal" (R1, R2)
+QUEUE_STATES = ("open", "done", "dismissed")  # work queue (spec 2026-11-02-work-queue-design 1.1)
+MAX_CLIENT_NAME_CHARS = 120
 
 
 class Run(Base):
     __tablename__ = "run"
-    __table_args__ = (CheckConstraint("line IN ('commercial', 'personal')", name="ck_run_line"),)
+    __table_args__ = (
+        CheckConstraint("line IN ('commercial', 'personal')", name="ck_run_line"),
+        CheckConstraint("queue_state IN ('open', 'done', 'dismissed')", name="ck_run_queue_state"),
+        Index("ix_run_line_queue_state", "line", "queue_state"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"), index=True)
@@ -172,6 +181,17 @@ class Run(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Work queue (backend/queue.py). Tags outside the duplicate-run identity, like `line`.
+    # client_name: the broker-typed client, 1 to 120 chars, null when not given (W4).
+    client_name: Mapped[str | None] = mapped_column(String(MAX_CLIENT_NAME_CHARS), nullable=True)
+    queue_state: Mapped[str] = mapped_column(String(20), default="open", server_default="open")
+    # Compare Quotes: the Proposal Builder run last started from this comparison. A plain
+    # integer with no foreign key, the same rule as Task.run_id.
+    proposal_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # When the item last left (or was put back in) the queue: PATCH queue_state, linked proposal
+    # done, last open discrepancy resolved (D2). Done recently counts 14 days from the later of
+    # this and finished_at.
+    queue_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     workflow: Mapped[Workflow] = relationship()
     documents: Mapped[list[RunDocument]] = relationship(
@@ -698,6 +718,54 @@ def reconcile_discrepancy_states(session: Session, run_id: int, content: Artifac
     session.flush()
 
 
+SEVERITY_KEYS = tuple(s.value for s in Severity)
+
+
+@dataclass(frozen=True)
+class DiscrepancyCounts:
+    """Per-severity counts over the current report's items (R7, M6)."""
+
+    counts: dict[str, int]  # every item
+    open_counts: dict[str, int]  # items whose status is open (an item without a state row is open)
+    total: int
+    resolved: int
+
+    @property
+    def open_total(self) -> int:
+        return sum(self.open_counts.values())
+
+
+def discrepancy_counts(session: Session, run: Run, *, blocks: Iterable[DiscrepancyBlock] | None = None,
+                       rows: dict[str, DiscrepancyState] | None = None) -> DiscrepancyCounts | None:
+    """Counts for `run`'s current artifact version, or None when the run has no report.
+
+    Iterates the current version's DiscrepancyBlocks joined to their state rows (M6), never all
+    state rows: an item gone from the latest version is not counted, and counts again if it comes
+    back. `blocks` and `rows` let a caller that already loaded them (list_discrepancies, the queue's
+    batched load) skip the queries."""
+    if blocks is None:
+        if run.artifact is None:
+            return None
+        blocks = discrepancy_blocks(run.artifact.latest_content())
+    if rows is None:
+        rows = {r.item_id: r for r in session.scalars(select(DiscrepancyState)
+                                                    .where(DiscrepancyState.run_id == run.id))}
+    counts = dict.fromkeys(SEVERITY_KEYS, 0)
+    open_counts = dict.fromkeys(SEVERITY_KEYS, 0)
+    total = resolved = 0
+    for block in blocks:
+        severity = str(block.severity)
+        row = rows.get(block.id)
+        status = row.status if row else "open"
+        total += 1
+        counts[severity] += 1
+        if status == "open":
+            open_counts[severity] += 1
+        elif status == "resolved":
+            resolved += 1
+    return DiscrepancyCounts(counts=counts, open_counts=open_counts, total=total, resolved=resolved)
+
+
 _UNSET: Any = object()
 
 
@@ -712,6 +780,7 @@ def update_discrepancy_state(session: Session, run_id: int, item_id: str, *, sta
                                                         DiscrepancyState.item_id == item_id))
     if row is None:
         raise LookupError(f"run {run_id} has no discrepancy {item_id!r}")
+    was_open = row.status == "open"
     if status is not None:
         row.status = status
         row.changed_since_resolved = False
@@ -720,6 +789,14 @@ def update_discrepancy_state(session: Session, run_id: int, item_id: str, *, sta
         row.note = note
     row.updated_at = utcnow()
     session.flush()
+    if was_open and status == "resolved":
+        # Work queue (D2): resolving the last open item of the current report is the moment the
+        # check leaves Needs review, so Done recently counts its 14 days from now.
+        run = session.get(Run, run_id)
+        tally = discrepancy_counts(session, run) if run is not None else None
+        if tally is not None and tally.open_total == 0:
+            run.queue_changed_at = row.updated_at
+            session.flush()
     return row
 
 
