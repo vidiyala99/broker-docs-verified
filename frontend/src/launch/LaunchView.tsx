@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ClockCounterClockwise } from "@phosphor-icons/react";
 import { api, ApiError } from "../api/client";
-import type { Run, Workspace } from "../api/types";
+import type { Line, Run, Workspace } from "../api/types";
+import { LineChoice } from "../personal/LineChoice";
 import { Accordion } from "../ui/Accordion";
 import { LeftPanel, type Viewport } from "../shell/layout";
 import { Chat } from "../run/Chat";
@@ -14,14 +15,20 @@ export function LaunchView({
   runsError,
   onRetryRuns,
   viewport,
+  line: entryLine,
 }: {
   workspace: Workspace;
   runs: Run[] | null;
   runsError: string | null;
   onRetryRuns: () => void;
   viewport: Viewport;
+  /** Preset from the entry point (`#/?line=personal` from Personal lines; the rail means commercial). */
+  line: Line;
 }) {
   const uploads = useUploads(workspace.limits);
+  // O5: Compare Quotes has no wizard, so the line choice sits on this upload screen, defaulted from the entry point.
+  const [line, setLine] = useState<Line>(entryLine);
+  useEffect(() => setLine(entryLine), [entryLine]);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const ready = uploads.rows.filter((r) => r.status === "ready" && r.doc);
@@ -31,7 +38,7 @@ export function LaunchView({
     setStarting(true);
     setStartError(null);
     try {
-      const res = await api.startRun(ready.map((r) => r.doc!.id));
+      const res = await api.startRun(ready.map((r) => r.doc!.id), line);
       uploads.clear();
       window.location.hash = `#/runs/${res.run.id}`;
     } catch (e) {
@@ -55,6 +62,7 @@ export function LaunchView({
                 uploads.rows.length === 0 && <p className="hint">Add quote PDFs with the drop zone on the right.</p>
               )}
               <FileRows rows={uploads.rows} onRemove={uploads.remove} />
+              <LineChoice value={line} onChange={setLine} />
               {startError && (
                 <p className="inline-error" role="alert">
                   {startError}

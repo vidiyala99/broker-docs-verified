@@ -30,9 +30,10 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   // Slices 2 and 3: Proposals and Policy check are live; the rest of the rail still says "coming in a later slice".
   await expect(page.getByRole("link", { name: "Proposals, new proposal" })).toHaveAttribute("href", "#/proposals/new");
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("href", "#/policy-check/new");
-  await expect(page.getByRole("button", { name: /Personal lines, coming in a later slice/ })).toHaveAttribute("aria-disabled", "true");
-  // 10 before slice 3b; Integrations (T5) is live now. Personal lines and Tasks lanes lower it again.
-  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(9);
+  // Slice 3b T6 (D7 allowed edit): Personal lines is live now, so its "coming in a later slice" check became this link check.
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Personal lines" })).toHaveAttribute("href", "#/personal-lines");
+  // 10 before slice 3b; Integrations (T5) and Personal lines (T6) are live now (D7 allowed edit, 9 -> 8). The Tasks lane lowers it again.
+  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(8);
   await shot(page, "1440-01-launch");
   await axe(page, "launch");
 

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Database, FilePdf, Trash, WarningCircle } from "@phosphor-icons/react";
 import { api, ApiError, uploadFile } from "../api/client";
-import type { DocumentInfo, PolicyRole, Workspace } from "../api/types";
+import type { DocumentInfo, Line, PolicyRole, Workspace } from "../api/types";
+import { LineChoice } from "../personal/LineChoice";
 import { DropZone, formatBytes } from "../launch/Upload";
 import { hueOf } from "../report/Chip";
 import type { Viewport } from "../shell/layout";
@@ -29,8 +30,11 @@ import "./policy.css";
 const AMS_LIMITS = "JSON or CSV, up to 512 KB and 400 fields, one export per check";
 
 /** Slice 3 T9: the new Policy Check flow. Run check posts a policy-check run and opens the run view (step 3). */
-export function PolicyWizard({ workspace, viewport }: { workspace: Workspace; viewport: Viewport }) {
+export function PolicyWizard({ workspace, viewport, line: entryLine }: { workspace: Workspace; viewport: Viewport; line: Line }) {
   const toast = useToast();
+  // Slice 3b T6: line choice on step 1, defaulted from the entry point (URL preset, not part of the saved draft).
+  const [line, setLine] = useState<Line>(entryLine);
+  useEffect(() => setLine(entryLine), [entryLine]);
   const [draft, setDraft] = useState<PcDraft>(loadPcDraft);
   const [stepError, setStepError] = useState<string | null>(null);
   const [roleErrors, setRoleErrors] = useState<Partial<Record<PolicyRole, string>>>({});
@@ -116,7 +120,7 @@ export function PolicyWizard({ workspace, viewport }: { workspace: Workspace; vi
         .sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b))
         .filter((role) => draft.roles[role] != null)
         .map((role) => ({ documentId: draft.roles[role]!, role }));
-      const res = await api.startPolicyCheck(slots);
+      const res = await api.startPolicyCheck(slots, line);
       started.current = true;
       clearPcDraft();
       setDraft(EMPTY_PC_DRAFT);
@@ -163,7 +167,13 @@ export function PolicyWizard({ workspace, viewport }: { workspace: Workspace; vi
               {draft.step === 0 ? "Add the documents" : "Assign a role to each document"}
             </h2>
             {draft.step === 0 ? (
-              <StepDocuments draft={draft} workspace={workspace} setDocs={setDocs} onBusy={(k, b) => setBusy((s) => (s[k] === b ? s : { ...s, [k]: b }))} />
+              <StepDocuments
+                draft={draft}
+                workspace={workspace}
+                setDocs={setDocs}
+                onBusy={(k, b) => setBusy((s) => (s[k] === b ? s : { ...s, [k]: b }))}
+                lineChoice={<LineChoice value={line} onChange={setLine} />}
+              />
             ) : (
               <StepRoles
                 draft={draft}
@@ -188,7 +198,7 @@ export function PolicyWizard({ workspace, viewport }: { workspace: Workspace; vi
               <ArrowLeft size={16} aria-hidden /> Back
             </button>
           ) : (
-            <a href="#/" className="btn btn--ghost">
+            <a href={entryLine === "personal" ? "#/personal-lines" : "#/"} className="btn btn--ghost">
               Cancel
             </a>
           )}
@@ -285,11 +295,13 @@ function StepDocuments({
   workspace,
   setDocs,
   onBusy,
+  lineChoice,
 }: {
   draft: PcDraft;
   workspace: Workspace;
   setDocs: (kind: "pdfs" | "ams", docs: DocumentInfo[]) => void;
   onBusy: (kind: "pdf" | "ams", busy: boolean) => void;
+  lineChoice: ReactNode;
 }) {
   const pdf = useUploadList("pdfs", draft.pdfs, MAX_PDFS, (d) => setDocs("pdfs", d));
   const ams = useUploadList("ams", draft.ams, MAX_AMS, (d) => setDocs("ams", d));
@@ -298,6 +310,8 @@ function StepDocuments({
   const l = workspace.limits;
   return (
     <div className="details">
+      {/* Not a .details__group: that class indexes the upload groups (Policy PDFs, AMS export). */}
+      <div className="details__line">{lineChoice}</div>
       <section className="details__group" aria-labelledby="pdfs-h">
         <h3 id="pdfs-h" className="group-title">
           Policy PDFs

@@ -59,10 +59,14 @@ export interface RunDocument {
   option_label: string | null;
 }
 
+/** Slice 3b: a run's book of business. Personal lines = household cover (R1); a tag only (R2). */
+export type Line = "commercial" | "personal";
+
 export interface Run {
   id: number;
   workflow_id: number;
   workflow_name: string;
+  line: Line;
   status: RunStatus;
   active: boolean;
   terminal: boolean;
