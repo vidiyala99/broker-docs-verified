@@ -1,4 +1,4 @@
-"""Document routes: upload (T7 checks), list, get, serve the PDF, delete."""
+"""Document routes: upload (T7 checks), AMS upload (slice 3 T1), list, get, serve the PDF, delete."""
 
 from __future__ import annotations
 
@@ -17,7 +17,17 @@ from backend.context import AppContext
 from backend.pipeline.parse import ParseError, ParseErrorCode
 from backend.pipeline.runner import DocumentRef, load_stored_bytes
 from backend.routes.common import ApiError, get_ctx, not_found
-from backend.uploads import inspect_pdf, new_stored_name, remove_stored, safe_display_name, store_bytes
+from backend.ams import DEFAULT_AMS_LIMITS, AmsError
+from backend.uploads import (
+    PreparedAms,
+    inspect_pdf,
+    new_stored_name,
+    prepare_ams,
+    remove_stored,
+    safe_display_name,
+    store_bytes,
+    store_original,
+)
 from backend.views import document_out
 
 log = logging.getLogger("brokerdocs.api")
@@ -37,8 +47,15 @@ async def _read_capped(upload: UploadFile, cap: int) -> bytes | None:
             return None
 
 
-def _reject(filename: str, exc: ParseError) -> dict[str, Any]:
+def _reject(filename: str, exc: ParseError | AmsError) -> dict[str, Any]:
     return {"filename": filename, "code": str(exc.code), "message": exc.message, "limit": exc.limit}
+
+
+def _too_many_documents(limits) -> ParseError:
+    return ParseError(ParseErrorCode.TOO_MANY_DOCUMENTS,
+                      f"Only {limits.max_documents_per_run} files can be added at once; the limit is "
+                      f"{limits.max_documents_per_run} documents per run.",
+                      limit=limits.max_documents_per_run)
 
 
 @router.post("/documents")
@@ -50,10 +67,7 @@ async def upload_documents(files: list[UploadFile] = File(...), ctx: AppContext 
         name = safe_display_name(upload.filename)
         try:
             if len(accepted) >= limits.max_documents_per_run:
-                raise ParseError(ParseErrorCode.TOO_MANY_DOCUMENTS,
-                                 f"Only {limits.max_documents_per_run} files can be added at once; the limit is "
-                                 f"{limits.max_documents_per_run} documents per run.",
-                                 limit=limits.max_documents_per_run)
+                raise _too_many_documents(limits)
             data = await _read_capped(upload, limits.max_bytes)
             if data is None:
                 mb = f"{limits.max_bytes / (1024 * 1024):g} MB"
@@ -81,6 +95,63 @@ async def upload_documents(files: list[UploadFile] = File(...), ctx: AppContext 
             remove_stored(stored)
             raise
     log.info("upload accepted=%d rejected=%d", len(accepted), len(rejected))
+    return {"documents": accepted, "rejected": rejected}
+
+
+AMS_KIND = "ams"
+
+
+def _store_ams(prepared: PreparedAms, stored: str) -> None:
+    store_bytes(prepared.pdf, stored)
+    store_original(prepared.original, stored)
+
+
+@router.post("/documents/ams")
+async def upload_ams(files: list[UploadFile] = File(...), ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """AMS exports (JSON or CSV), rendered to a PDF at upload (Policy Check, R1 D4 A).
+
+    The stored PDF takes the normal file, parse and verify path; the original is kept
+    beside it. Document kind is "ams"; each accepted item also carries an "ams" summary.
+    """
+    limits = ctx.settings.limits
+    accepted: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    for upload in files:
+        name = safe_display_name(upload.filename)
+        try:
+            if len(accepted) >= limits.max_documents_per_run:
+                raise _too_many_documents(limits)
+            cap = min(DEFAULT_AMS_LIMITS.max_bytes, limits.max_bytes)
+            data = await _read_capped(upload, cap)
+            if data is None:
+                kb = f"{cap / 1024:g} KB"
+                raise AmsError("too_large", f"This file is larger than {kb}; the limit is {kb} per AMS export.",
+                               limit=cap)
+            prepared = await asyncio.to_thread(prepare_ams, data, name, limits)
+        except (ParseError, AmsError) as exc:
+            rejected.append(_reject(name, exc))
+            continue
+        finally:
+            await upload.close()
+        stored = new_stored_name()
+        try:
+            await asyncio.to_thread(_store_ams, prepared, stored)
+            with db.session_scope(ctx.factory) as s:
+                doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=name, stored_name=stored,
+                                      size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest(),
+                                      page_count=prepared.page_count, kind=AMS_KIND)
+                s.add(doc)
+                s.flush()
+                out = document_out(doc)
+        except Exception:
+            remove_stored(stored)
+            raise
+        out["ams"] = {"format": prepared.rendered.record.format,
+                      "field_count": len(prepared.rendered.record.fields),
+                      "unmapped": list(prepared.facts.unmapped),
+                      "notices": list(prepared.rendered.record.notices)}
+        accepted.append(out)
+    log.info("ams upload accepted=%d rejected=%d", len(accepted), len(rejected))
     return {"documents": accepted, "rejected": rejected}
 
 

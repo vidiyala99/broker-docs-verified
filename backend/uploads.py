@@ -13,6 +13,15 @@ Order for one uploaded file:
 
 The client's filename is display text only: it is reduced to a base name,
 stripped of control and path characters, and never used to build a path.
+
+AMS exports (slice 3 T1, R1 D4 A) take a separate path, so the one above stays
+PDF-only:
+
+    name ends .json or .csv, and the content agrees (JSON opens with { or [) ──no──► not_ams
+    ams.parse_ams: caps, screening, flat record ──bad──► reject (code names the limit)
+    ams.render_pdf ─► inspect_pdf on the rendered bytes (page cap) ─► store the PDF under
+    <uuid4 hex> (served, parsed and verified like any PDF) and the original under
+    <uuid4 hex>.orig (kept, read by load_original)
 """
 
 from __future__ import annotations
@@ -26,6 +35,7 @@ from pathlib import Path
 
 import fitz
 
+from backend import ams
 from backend.pipeline import parse
 from backend.pipeline.parse import ParseError, ParseErrorCode, ParseLimits
 from backend.pipeline.runner import files_dir
@@ -77,30 +87,84 @@ def inspect_pdf(data: bytes, limits: ParseLimits) -> Inspection:
     return Inspection(pages)
 
 
+@dataclass(frozen=True)
+class PreparedAms:
+    pdf: bytes  # rendered record: what is stored, served, parsed and verified
+    original: bytes  # the uploaded file, kept unchanged
+    page_count: int
+    rendered: ams.RenderedAms
+    facts: ams.MappedFacts
+
+
+_AMS_EXTENSIONS: dict[str, ams.AmsFormat] = {".json": "json", ".csv": "csv"}
+
+
+def prepare_ams(data: bytes, filename: str, limits: ParseLimits,
+                ams_limits: ams.AmsLimits = ams.DEFAULT_AMS_LIMITS) -> PreparedAms:
+    """Upload-time AMS checks and rendering. Raises AmsError or ParseError (message names the limit)."""
+    ext = os.path.splitext(filename)[1].lower()
+    fmt = _AMS_EXTENSIONS.get(ext)
+    if fmt is None:
+        raise ams.AmsError("not_ams", ams.NOT_AMS_MESSAGE)
+    if not data:
+        raise ams.AmsError("empty", "This file is empty.")
+    if parse.is_pdf_bytes(data) or ams.sniff_format(data) != fmt:
+        raise ams.AmsError("not_ams", ams.NOT_AMS_MESSAGE)
+    rendered = ams.render_pdf(ams.parse_ams(data, ams_limits))
+    info = inspect_pdf(rendered.pdf, limits)  # the rendered PDF meets the same caps as any PDF
+    return PreparedAms(rendered.pdf, data, info.page_count or rendered.page_count, rendered,
+                       ams.map_facts(rendered))
+
+
 def new_stored_name() -> str:
     return uuid.uuid4().hex
 
 
-def store_bytes(data: bytes, stored_name: str) -> Path:
-    """Write under files_dir() with a generated name only (D4). Atomic: temp file then rename."""
-    if not re.fullmatch(r"[0-9a-f]{32}", stored_name):
-        raise ValueError("stored names are generated UUIDs")
-    directory = files_dir().resolve()
-    target = (directory / stored_name).resolve()
-    if target.parent != directory:  # pragma: no cover - guaranteed by the name check
-        raise ValueError("stored file must live in the files folder")
-    tmp = directory / f"{stored_name}.part"
+_ORIGINAL_SUFFIX = ".orig"
+
+
+def _write_atomic(target: Path, data: bytes) -> None:
+    tmp = target.with_name(f"{target.name}.part")
     with open(tmp, "wb") as fh:
         fh.write(data)
         fh.flush()
         os.fsync(fh.fileno())
     os.replace(tmp, target)
+
+
+def _target(stored_name: str, suffix: str = "") -> Path:
+    if not re.fullmatch(r"[0-9a-f]{32}", stored_name or ""):
+        raise ValueError("stored names are generated UUIDs")
+    directory = files_dir().resolve()
+    target = (directory / f"{stored_name}{suffix}").resolve()
+    if target.parent != directory:  # pragma: no cover - guaranteed by the name check
+        raise ValueError("stored file must live in the files folder")
     return target
+
+
+def store_bytes(data: bytes, stored_name: str) -> Path:
+    """Write under files_dir() with a generated name only (D4). Atomic: temp file then rename."""
+    target = _target(stored_name)
+    _write_atomic(target, data)
+    return target
+
+
+def store_original(data: bytes, stored_name: str) -> Path:
+    """Keep an AMS export's uploaded file beside its rendered PDF (R1 D4 A)."""
+    target = _target(stored_name, _ORIGINAL_SUFFIX)
+    _write_atomic(target, data)
+    return target
+
+
+def load_original(stored_name: str) -> bytes:
+    """The kept original of an AMS document (feed it to ams.facts_from_original)."""
+    return _target(stored_name, _ORIGINAL_SUFFIX).read_bytes()
 
 
 def remove_stored(stored_name: str) -> None:
     if re.fullmatch(r"[0-9a-f]{32}", stored_name or ""):
-        try:
-            (files_dir() / stored_name).unlink()
-        except FileNotFoundError:
-            pass
+        for suffix in ("", _ORIGINAL_SUFFIX):
+            try:
+                (files_dir() / f"{stored_name}{suffix}").unlink()
+            except FileNotFoundError:
+                pass
