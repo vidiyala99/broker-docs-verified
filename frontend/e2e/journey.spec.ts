@@ -31,7 +31,8 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Proposals, new proposal" })).toHaveAttribute("href", "#/proposals/new");
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("href", "#/policy-check/new");
   await expect(page.getByRole("button", { name: /Personal lines, coming in a later slice/ })).toHaveAttribute("aria-disabled", "true");
-  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(10);
+  // 10 before slice 3b; Integrations (T5) is live now. Personal lines and Tasks lanes lower it again.
+  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(9);
   await shot(page, "1440-01-launch");
   await axe(page, "launch");
 

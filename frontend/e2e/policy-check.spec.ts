@@ -56,7 +56,8 @@ test("policy check: rail entry, wizard with AMS, run, list", async ({ page }) =>
   // The rail item is live (slice 3); the other placeholders stay disabled.
   const rail = page.getByRole("link", { name: "Policy check, new check" });
   await expect(rail).toHaveAttribute("href", "#/policy-check/new");
-  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(10);
+  // 10 before slice 3b; Integrations (T5) is live now. Personal lines and Tasks lanes lower it again.
+  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(9);
   await rail.click();
   await expect(page).toHaveURL(/#\/policy-check\/new/);
   await expect(rail).toHaveAttribute("aria-current", "page");

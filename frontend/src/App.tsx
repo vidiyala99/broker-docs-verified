@@ -3,18 +3,24 @@ import { api, ApiError } from "./api/client";
 import type { Run, Workspace } from "./api/types";
 import { LaunchView } from "./launch/LaunchView";
 import { RunView } from "./run/RunView";
-import { NarrowNotice, Rail, TopBar, type Crumb } from "./shell/Shell";
+import { NarrowNotice, Rail, TopBar, type Crumb, type Section } from "./shell/Shell";
+import { IntegrationsPage } from "./integrations/IntegrationsPage";
 import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "./config";
 import { useViewport } from "./shell/layout";
 import { ToastProvider } from "./ui/Toast";
 import { ProposalWizard } from "./wizard/ProposalWizard";
 import { PolicyWizard } from "./policy/PolicyWizard";
 
-type Route = { runId: number | null; wizard: boolean; policy: boolean };
+type Route = { runId: number | null; wizard: boolean; policy: boolean; integrations: boolean };
 
 function parseRoute(hash: string): Route {
   const m = /^#\/runs\/(\d+)/.exec(hash);
-  return { runId: m ? Number(m[1]) : null, wizard: /^#\/proposals\/new/.test(hash), policy: /^#\/policy-check\/new/.test(hash) };
+  return {
+    runId: m ? Number(m[1]) : null,
+    wizard: /^#\/proposals\/new/.test(hash),
+    policy: /^#\/policy-check\/new/.test(hash),
+    integrations: /^#\/integrations\b/.test(hash),
+  };
 }
 
 export function App() {
@@ -67,17 +73,27 @@ export function App() {
   }, [route.runId, route.wizard, route.policy, loadRuns]);
 
   useEffect(() => {
-    document.title = route.wizard
+    document.title = route.integrations
+      ? "Integrations"
+      : route.wizard
       ? "New proposal"
       : route.policy
         ? "New policy check"
         : route.runId
           ? `Run ${route.runId}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
           : "Compare Quotes";
-  }, [route.runId, route.wizard, route.policy, proposalRun, policyRun]);
+  }, [route.runId, route.wizard, route.policy, route.integrations, proposalRun, policyRun]);
 
-  const section = route.wizard || proposalRun ? "proposals" : route.policy || policyRun ? "policy-check" : "workflows";
-  const crumbs: Crumb[] = route.wizard
+  const section: Section = route.integrations
+    ? "integrations"
+    : route.wizard || proposalRun
+      ? "proposals"
+      : route.policy || policyRun
+        ? "policy-check"
+        : "workflows";
+  const crumbs: Crumb[] = route.integrations
+    ? [{ label: "Integrations" }]
+    : route.wizard
     ? [{ label: "Proposals" }, { label: "New proposal" }]
     : route.policy
       ? [{ label: "Policy check" }, { label: "New check" }]
@@ -101,8 +117,11 @@ export function App() {
         <Rail section={section} />
         <div className="app__main">
           <TopBar crumbs={crumbs} />
-          {viewport === "narrow" && !route.wizard && !route.policy && !policyRun && <NarrowNotice />}
-          {wsError ? (
+          {viewport === "narrow" && !route.wizard && !route.policy && !route.integrations && !policyRun && <NarrowNotice />}
+          {route.integrations ? (
+            // Static mock: needs nothing from the server, so it renders even when the backend is down.
+            <IntegrationsPage />
+          ) : wsError ? (
             <main className="pane" id="main" tabIndex={-1}>
               <div className="pane__body pane__body--center">
                 <div className="state-block" role="alert">
