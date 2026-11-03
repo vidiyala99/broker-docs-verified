@@ -6,6 +6,7 @@ import type {
   DocumentInfo,
   PolicyRole,
   EditResult,
+  Line,
   Message,
   ProposalParameters,
   Rejection,
@@ -67,13 +68,17 @@ const json = (body: unknown) => JSON.stringify(body);
 
 export const api = {
   workspace: () => request<Workspace>("/api/workspace"),
-  runs: (limit = 20) => request<{ runs: Run[] }>(`/api/runs?limit=${limit}`).then((r) => r.runs),
+  /** Newest first. `line` filters (D9: Workflows = commercial; D5: Personal lines = personal, limit 100); omitted = all runs. */
+  runs: (limit = 20, line?: Line) =>
+    request<{ runs: Run[] }>(`/api/runs?limit=${limit}${line ? `&line=${line}` : ""}`).then((r) => r.runs),
   run: (id: number) => request<Run>(`/api/runs/${id}`),
-  startRun: (documentIds: number[]) =>
+  startRun: (documentIds: number[], line?: Line) =>
     request<{ run: Run; created: boolean }>("/api/runs", {
       method: "POST",
-      body: json({ document_ids: documentIds, workflow: "compare-quotes" }),
+      body: json({ document_ids: documentIds, workflow: "compare-quotes", ...(line ? { line } : {}) }),
     }),
+  /** Re-tag a run (run header control). The body is exactly {"line": ...} (API.md). */
+  setRunLine: (id: number, line: Line) => request<Run>(`/api/runs/${id}`, { method: "PATCH", body: json({ line }) }),
   cancelRun: (id: number) => request<{ run: Run; cancelled: boolean }>(`/api/runs/${id}/cancel`, { method: "POST" }),
   retryRun: (id: number) => request<{ run: Run }>(`/api/runs/${id}/retry`, { method: "POST" }),
   deleteDocument: (id: number) => request<void>(`/api/documents/${id}`, { method: "DELETE" }),
@@ -115,13 +120,14 @@ export const api = {
       method: "POST",
       body: json({ document_ids: documentIds, workflow: "proposal-builder", parameters }),
     }),
-  startPolicyCheck: (slots: { documentId: number; role: PolicyRole }[]) =>
+  startPolicyCheck: (slots: { documentId: number; role: PolicyRole }[], line?: Line) =>
     request<{ run: Run; created: boolean }>("/api/runs", {
       method: "POST",
       body: json({
         document_ids: slots.map((s) => s.documentId),
         workflow: "policy-check",
         slots: Object.fromEntries(slots.map((s) => [String(s.documentId), s.role])),
+        ...(line ? { line } : {}),
       }),
     }),
   discrepancies: (runId: number) => request<DiscrepancyList>(`/api/runs/${runId}/discrepancies`),

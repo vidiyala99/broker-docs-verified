@@ -18,7 +18,8 @@ import {
 import { api, ApiError, downloadExport, type ExportFormat } from "../api/client";
 import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW } from "../config";
 import { useRunEvents } from "../api/useRunEvents";
-import type { Artifact, Chip, EditResult, Run, RunDocument, Workspace } from "../api/types";
+import type { Artifact, Chip, EditResult, Line, Run, RunDocument, Workspace } from "../api/types";
+import { LineChoice } from "../personal/LineChoice";
 import { Accordion } from "../ui/Accordion";
 import { useToast } from "../ui/Toast";
 import { Tip } from "../ui/Tip";
@@ -43,12 +44,15 @@ export function RunView({
   runs,
   viewport,
   onRunsChanged,
+  onRunChanged,
 }: {
   runId: number;
   workspace: Workspace;
   runs: Run[] | null;
   viewport: Viewport;
   onRunsChanged: () => void;
+  /** The shell's copy of this run (rail, crumbs, side list line); told about a re-tag at once and on rollback. */
+  onRunChanged?: (run: Run) => void;
 }) {
   const toast = useToast();
   const [run, setRun] = useState<Run | null>(null);
@@ -127,6 +131,34 @@ export function RunView({
     setFilter(null);
     void loadRun();
   }, [loadRun]);
+
+  // Slice 3b T6: re-tag Commercial / Personal (the only place to). Optimistic: the control, crumbs and side list switch
+  // at once; a failed PATCH puts the old line back and says why. Changes while one is in flight are ignored.
+  const retagging = useRef(false);
+  const retag = useCallback(
+    async (line: Line) => {
+      if (!run || retagging.current || run.line === line) return;
+      const before = run;
+      const optimistic = { ...run, line };
+      retagging.current = true;
+      setRun(optimistic);
+      onRunChanged?.(optimistic);
+      try {
+        const saved = await api.setRunLine(before.id, line);
+        setRun((r) => (r ? { ...r, line: saved.line } : r));
+        onRunChanged?.({ ...optimistic, line: saved.line });
+        toast({ message: saved.line === "personal" ? "Moved to Personal lines." : "Moved to Commercial.", hold: 4000 });
+      } catch (e) {
+        setRun((r) => (r ? { ...r, line: before.line } : r));
+        onRunChanged?.(before);
+        toast({ message: e instanceof ApiError ? e.message : "Couldn't change the line. Retry.", tone: "error" });
+      } finally {
+        // The shell reloads its run list itself when the run's line changes (App.tsx listLine).
+        retagging.current = false;
+      }
+    },
+    [run, onRunChanged, toast],
+  );
 
   const updateDoc = (doc: RunDocument) =>
     setRun((r) => (r ? { ...r, documents: r.documents.map((d) => (d.run_document_id === doc.run_document_id ? { ...d, ...doc } : d)) } : r));
@@ -368,6 +400,7 @@ export function RunView({
   const running = Boolean(run?.active);
   const isProposal = run?.workflow_name === PROPOSAL_WORKFLOW;
   const isPolicy = run?.workflow_name === POLICY_WORKFLOW;
+  const personal = run?.line === "personal";
 
   const reportBody = (
     <div className="report-scroll" ref={setScrollRoot} data-filter={(isProposal && preview ? undefined : filter) ?? undefined} data-preview={isProposal && preview ? "" : undefined}>
@@ -421,7 +454,10 @@ export function RunView({
           <Accordion title="Recent runs" count={runs?.length}>
             {runs && <RecentRuns runs={runs} compact currentId={runId} />}
           </Accordion>
-          <a href={isProposal ? "#/proposals/new" : isPolicy ? "#/policy-check/new" : "#/"} className="btn btn--ghost btn--block new-run">
+          <a
+            href={isProposal ? "#/proposals/new" : `${isPolicy ? "#/policy-check/new" : "#/"}${personal ? "?line=personal" : ""}`}
+            className="btn btn--ghost btn--block new-run"
+          >
             <Plus size={16} aria-hidden /> {isProposal ? "New proposal" : isPolicy ? "New check" : "New comparison"}
           </a>
         </div>
@@ -441,7 +477,7 @@ export function RunView({
 
       <main className="pane" id="main" tabIndex={-1} aria-labelledby="pane-title">
         <nav className="tabs" aria-label="Report and sources">
-          <a href="#/" className="tab">
+          <a href={personal ? "#/personal-lines" : "#/"} className="tab">
             <ClockCounterClockwise size={16} aria-hidden /> All runs
           </a>
           <button
@@ -491,6 +527,7 @@ export function RunView({
               </span>
             )}
           </h1>
+          {run && <LineChoice compact value={run.line} onChange={(l) => void retag(l)} />}
           <div className="toolbar__actions" role="toolbar" aria-label="Report actions">
             <Tip text="Good report">
               <button type="button" className="icon-btn" aria-label="Good report" aria-pressed={artifact?.feedback?.rating === 1} disabled={!artifact} onClick={() => void rate(1)}>
