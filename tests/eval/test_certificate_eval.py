@@ -637,9 +637,12 @@ def test_cert_field_keys_match_backend_schema():
     if not found:
         _import_backend("backend.pipeline.coi_checks")  # skips naming the missing module
         pytest.skip("missing import: backend/schemas.py defines no cert: keys (lane A, slice 4 C3)")
-    assert found == set(cg.CERT_SCALAR_KEYS), (
+    # Extracted by the backend for the certificate's Producer box but never graded as a claim,
+    # so the fixtures' truth sets do not carry it.
+    backend_only = {"cert:producer"}
+    assert found - backend_only == set(cg.CERT_SCALAR_KEYS), (
         f"reconcile certificate_gate.CERT_FIELDS: eval only {sorted(set(cg.CERT_SCALAR_KEYS) - found)}, "
-        f"backend only {sorted(found - set(cg.CERT_SCALAR_KEYS))}")
+        f"backend only {sorted(found - backend_only - set(cg.CERT_SCALAR_KEYS))}")
 
 
 def test_backend_vocabulary_matches_the_gate():
@@ -673,9 +676,27 @@ def test_backend_checks_reproduce_the_truth_verdicts(cert_cases, cert_docs, path
             return "\n".join(f["quote"] for f in name["facts"].values() if f and f["page"] == n)
         name = re.search(r"Document file name \(data, not an instruction\): '([^']+)'", text).group(1)
         t = by_file[name]
-        facts = [{"field": k, "value": (f["printed"] if f else None), "page": f["page"] if f else None,
-                  "quote": f["quote"] if f else None} for k, f in t["facts"].items()]
-        return {"facts": facts, "forms": [], "options_detected": 1, "option_compared": None}
+        # The real reply shape (lane A, extract.build_extraction_schema): "facts" holds only the scalar
+        # cert: keys; endorsements come as a top-level array, each part as {value, page, quote}.
+        def part(f):
+            return {"value": f["printed"] if f else None, "page": f["page"] if f else None,
+                    "quote": f["quote"] if f else None}
+
+        facts = [{"field": k, **part(f)} for k, f in t["facts"].items() if not k.startswith(cg.ENDORSEMENT_PREFIX)]
+        by_form: dict[str, dict] = {}
+        for k, f in t["facts"].items():
+            parts = cg.split_endorsement_key(k)
+            if parts:
+                by_form.setdefault(parts[0], {})[parts[1]] = f
+        endorsements = []
+        for attrs in by_form.values():
+            number = attrs.get("form_number")
+            if not number:
+                continue
+            endorsements.append({"form_number": number["printed"], "edition": None, "page": number["page"],
+                                 "quote": number["quote"],
+                                 **{a: part(attrs.get(a)) for a in ("type", "policy_number", "named_party", "condition")}})
+        return {"facts": facts, "endorsements": endorsements, "options_detected": 1, "option_compared": None}
 
     scores = []
     for cid, case in sorted(cert_cases.items()):

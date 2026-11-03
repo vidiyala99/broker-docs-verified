@@ -13,12 +13,9 @@ Evidence: `docs/reference/brokerdocs-workflows-evidence.md`, `../BrokerDocs-REA-
 | 3b | Rail completion | Personal lines, Tasks, Integrations | Personal lines = filtered entry; broker-defined Tasks; Integrations is a labelled mock |
 | (extra) | Work queue + Activity | Workflows, Personal lines | Queue is home (`docs/specs/2026-11-02-work-queue-design.md`); raw runs live in Activity |
 | (extra) | Voice "Paper trail" + motion | everywhere | Serif for people, drawn marks, rail Silhouettes; DESIGN.md Voice/Motion |
+| (extra) | Line move (Commercial / Personal) | run header | Book tab + "Move to ..." button, book-first crumbs, Undo |
 
-## In flight
-- Line move (Commercial / Personal): owner found the move static and the two lines hard to tell apart (2026-11-03).
-  Design lane Phase A (directions only), branch `line-move`.
-
-## Next: slice 4 (owner decision 2026-11-03)
+## In flight: slice 4 (owner decision 2026-11-03)
 | Slice | Workflow | Rail item |
 |---|---|---|
 | 4 | COI and form filler (own layout first, no observed screen) | Certificates |
@@ -27,9 +24,11 @@ Evidence: `docs/reference/brokerdocs-workflows-evidence.md`, `../BrokerDocs-REA-
 | Slice | Workflow | Rail item |
 |---|---|---|
 | 5 | Loss Run (spreadsheet parsing, aggregation, dashboards) | Analytics / Insights |
-| 6 | Market Search and Vault-wide assistant | Market search, Assistant |
+| 6 | Market Search, Vault (document store with folders over uploaded files) and Vault-wide assistant | Market search, Assistant, Vault |
 | unscheduled | Data-only pack: Contract Requirements, Coverage Gap, Tower Analysis | Workflows |
-| unscheduled | Vault (document store with folders) | Vault, Documents |
+
+Vault joins slice 6 (owner decision 2026-11-03): the assistant needs a document store underneath, and with it every
+rail item is live once slice 6 ships.
 | deferred | ACORD application fill beyond COI (after slice 4) | Certificates |
 
 Data for slices 5 and 6 (owner decision 2026-11-03): real carrier appetite, loss runs and agency history are beyond
@@ -41,4 +40,4 @@ Insights/Analytics: the only observed screen (Data Intelligence forecast, `yt/fr
 agency-wide data the clone does not have; tie it to Loss Run data in slice 5 rather than invent numbers.
 
 ## Open owner decisions (not slices)
-Template library, extraction cache (2c), Standard-template live eval, Proposal mark everywhere, left-panel strip icons.
+Template library, Standard-template live eval, Proposal mark everywhere, left-panel strip icons.
