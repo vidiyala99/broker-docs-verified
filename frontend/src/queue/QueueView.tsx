@@ -1,0 +1,501 @@
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  ArrowSquareOut,
+  ArrowsLeftRight,
+  CaretRight,
+  CheckCircle,
+  FilePlus,
+  Handshake,
+  HourglassMedium,
+  ListMagnifyingGlass,
+  Prohibit,
+  Scales,
+  SealCheck,
+  ShieldCheck,
+  Warning,
+  WarningDiamond,
+  type Icon,
+} from "@phosphor-icons/react";
+import { api, ApiError } from "../api/client";
+import type { Line, Queue, QueueGroup, QueueItem, QueueState } from "../api/types";
+import { useToast } from "../ui/Toast";
+import { Collapse, Count, usePresence } from "../ui/motion";
+import { RowMenu, type MenuItem } from "../tasks/RowMenu";
+import { discrepancyHref } from "../tasks/taskUtil";
+import { draftFromComparison, restoreDraft } from "./buildProposal";
+import type { QueueData } from "./useQueue";
+import {
+  activityHref,
+  clientOf,
+  doneText,
+  GROUP_LABEL,
+  GROUPS,
+  groupOf,
+  moveLabel,
+  movedText,
+  openTotal,
+  otherLine,
+  progressText,
+  secondaryLine,
+  SEVERITIES,
+} from "./queueUtil";
+import "./queue.css";
+
+const runHref = (id: number) => `#/runs/${id}`;
+
+/** One glyph per group: what the broker does there (duotone, the queue's product voice; QUEUE-BRIEF.md). */
+const GROUP_ICON: Record<QueueGroup, Icon> = {
+  in_progress: HourglassMedium,
+  needs_review: ListMagnifyingGlass,
+  ready: Handshake,
+  needs_attention: WarningDiamond,
+  done_recently: SealCheck,
+};
+
+/** One mark per workflow, the same glyphs as the Personal lines start actions. */
+const WORKFLOW_ICON: Record<string, Icon> = { "compare-quotes": Scales, "policy-check": ShieldCheck };
+
+const SEV_TICKS: Record<(typeof SEVERITIES)[number], number> = { critical: 4, high: 3, medium: 2, low: 1 };
+
+/** Remove a run from every group; `into` puts it at the top of one group (optimistic moves). */
+function moveItem(q: Queue, runId: number, into?: { group: QueueGroup; patch: Partial<QueueItem> }): Queue {
+  let found: QueueItem | null = null;
+  const next = { ...q };
+  for (const g of GROUPS) {
+    const hit = q[g].find((i) => i.run_id === runId);
+    if (hit) found = hit;
+    next[g] = q[g].filter((i) => i.run_id !== runId);
+  }
+  if (found && into) next[into.group] = [{ ...found, ...into.patch }, ...next[into.group]];
+  return next;
+}
+
+/** A Ready comparison whose proposal did not finish and can be retried (owner feedback 2026-11-03). */
+const canRetryProposal = (item: QueueItem) => item.proposal_run_id != null && item.proposal_retryable === true;
+
+interface Actions {
+  leave: (item: QueueItem, state: Exclude<QueueState, "open">) => void;
+  reopen: (item: QueueItem) => void;
+  move: (item: QueueItem) => void;
+  retry: (item: QueueItem) => Promise<void>;
+  retryProposal: (item: QueueItem) => Promise<void>;
+  review: (item: QueueItem) => Promise<void>;
+  buildProposal: (item: QueueItem) => Promise<void>;
+}
+
+/**
+ * The broker work queue (spec section 2, QUEUE-BRIEF.md): In progress strip, Needs review, Ready, Needs attention and
+ * a collapsed Done recently, rows named by client with one next action. Used by Personal lines and the Compare screen.
+ */
+export function QueueView({ data, line, empty }: { data: QueueData; line: Line; empty: ReactNode }) {
+  const { queue, error, reload, update } = data;
+  const toast = useToast();
+  const [announce, setAnnounce] = useState("");
+  // Rows animate only after the queue was first shown (DESIGN.md: no entrance staggers on load).
+  const shown = useRef(false);
+  const animate = shown.current;
+  useEffect(() => {
+    if (queue) shown.current = true;
+  }, [queue]);
+
+  // A row that leaves In progress (polling, D5) is announced once, in one polite region.
+  const prevActive = useRef<Map<number, string> | null>(null);
+  useEffect(() => {
+    if (!queue) return;
+    const before = prevActive.current;
+    if (before) {
+      const moved: string[] = [];
+      for (const [id, name] of before) {
+        if (queue.in_progress.some((i) => i.run_id === id)) continue;
+        const g = groupOf(queue, id);
+        if (g) moved.push(`${name} moved to ${GROUP_LABEL[g]}.`);
+      }
+      if (moved.length) setAnnounce(moved.join(" "));
+    }
+    prevActive.current = new Map(queue.in_progress.map((i) => [i.run_id, clientOf(i)]));
+  }, [queue]);
+
+  const failToast = useCallback(
+    (e: unknown, fallback: string) => toast({ message: e instanceof ApiError ? e.message : fallback, tone: "error" }),
+    [toast],
+  );
+
+  const reopen = useCallback(
+    (item: QueueItem) => {
+      api.patchRun(item.run_id, { queue_state: "open" }).then(
+        () => {
+          reload();
+          toast({ message: "Back in the queue.", hold: 4000 });
+        },
+        (e: unknown) => failToast(e, "Couldn't move it back to the queue. Retry."),
+      );
+    },
+    [reload, toast, failToast],
+  );
+
+  const actions: Actions = {
+    // D9: no confirm; the row moves to Done recently at once and the toast offers Undo.
+    leave: (item, state) => {
+      update((q) => moveItem(q, item.run_id, { group: "done_recently", patch: { queue_state: state, queue_changed_at: new Date().toISOString() } }));
+      api.patchRun(item.run_id, { queue_state: state }).then(
+        () => {
+          reload();
+          toast({
+            message: state === "done" ? "Marked done." : "Dismissed.",
+            action: { label: "Undo", run: () => reopen(item) },
+          });
+        },
+        (e: unknown) => {
+          reload();
+          failToast(e, state === "done" ? "Couldn't mark it done. Retry." : "Couldn't dismiss it. Retry.");
+        },
+      );
+    },
+    reopen,
+    move: (item) => {
+      const to = otherLine(item.line);
+      update((q) => moveItem(q, item.run_id));
+      api.patchRun(item.run_id, { line: to }).then(
+        () => {
+          reload();
+          toast({
+            message: movedText(to),
+            action: {
+              label: "Undo",
+              run: () =>
+                api.patchRun(item.run_id, { line: item.line }).then(
+                  () => reload(),
+                  (e: unknown) => failToast(e, "Couldn't move it back. Retry."),
+                ),
+            },
+          });
+        },
+        (e: unknown) => {
+          reload();
+          failToast(e, "Couldn't change the line. Retry.");
+        },
+      );
+    },
+    retry: async (item) => {
+      try {
+        await api.retryRun(item.run_id);
+        update((q) => moveItem(q, item.run_id, { group: "in_progress", patch: { status: "queued", retryable: false } }));
+        setAnnounce(`Retrying ${clientOf(item)}.`);
+      } catch (e) {
+        failToast(e, "Couldn't retry. Retry again in a moment.");
+      }
+      reload();
+    },
+    // Reruns the failed proposal itself (template, details and outline kept); D3 then shows "Building proposal".
+    retryProposal: async (item) => {
+      if (item.proposal_run_id == null) return;
+      try {
+        await api.retryRun(item.proposal_run_id);
+        update((q) =>
+          moveItem(q, item.run_id, { group: "in_progress", patch: { summary: "Building proposal", reasons: null, proposal_retryable: false } }),
+        );
+        setAnnounce(`Retrying the proposal for ${clientOf(item)}.`);
+      } catch (e) {
+        failToast(e, "Couldn't retry the proposal. Retry again in a moment.");
+      }
+      reload();
+    },
+    // Review opens the run at its first open discrepancy (`?discrepancy=`, Tasks lane deep link).
+    review: async (item) => {
+      let href = runHref(item.run_id);
+      try {
+        const list = await api.discrepancies(item.run_id);
+        const first = list.items.find((i) => i.status === "open");
+        if (first) href = discrepancyHref(item.run_id, first.id);
+      } catch {
+        /* the run itself still opens */
+      }
+      window.location.hash = href;
+    },
+    buildProposal: async (item) => {
+      try {
+        const { replaced } = await draftFromComparison(item);
+        window.location.hash = "#/proposals/new";
+        if (replaced) {
+          toast({ message: "Replaced your unfinished proposal draft.", action: { label: "Undo", run: () => restoreDraft(replaced) } });
+        }
+      } catch (e) {
+        failToast(e, "Couldn't open the proposal. Retry.");
+      }
+    },
+  };
+
+  let body: ReactNode;
+  if (error) {
+    body = (
+      <div className="notice notice--error" role="alert">
+        <span className="notice__text">{error}</span>
+        <button type="button" className="btn btn--secondary btn--sm" onClick={reload}>
+          Retry
+        </button>
+      </div>
+    );
+  } else if (!queue) {
+    body = (
+      <>
+        <div className="runs-skeleton queue-skeleton" aria-hidden>
+          <span />
+          <span />
+          <span />
+        </div>
+        <span className="sr-only" role="status">
+          Loading the work queue
+        </span>
+      </>
+    );
+  } else if (GROUPS.every((g) => queue[g].length === 0)) {
+    body = empty;
+  } else {
+    body = (
+      <>
+        {queue.truncated && (
+          <p className="hint queue__note">Showing the first 500 items. Older finished work is in Activity.</p>
+        )}
+        {GROUPS.map((g) => (
+          <Group key={g} group={g} items={queue[g]} actions={actions} animate={animate} />
+        ))}
+        <p className="queue__footer">
+          <a href={activityHref(line)} className="link-btn">
+            See every run in Activity
+          </a>
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <div className="queue" data-line={line}>
+      {body}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announce}
+      </p>
+    </div>
+  );
+}
+
+function Group({ group, items, actions, animate }: { group: QueueGroup; items: QueueItem[]; actions: Actions; animate: boolean }) {
+  const id = useId();
+  const collapsible = group === "done_recently";
+  const [open, setOpen] = useState<{ value: boolean; animate: boolean }>({ value: !collapsible, animate: false });
+  const rows = usePresence(items, (i) => i.run_id, animate);
+  if (rows.length === 0) return null;
+  const GroupIcon = GROUP_ICON[group];
+  const title = (
+    <>
+      <GroupIcon size={20} weight="duotone" className="queue-group__icon" aria-hidden />
+      <span className="queue-group__label">{GROUP_LABEL[group]}</span>
+      <Count value={items.length} animate={animate} className="queue-group__count" />
+    </>
+  );
+  const list = (
+    <ul className={`queue-list${group === "in_progress" ? " queue-list--slim" : ""}`}>
+      {rows.map(({ item, leaving, entering }) => (
+        <QueueRow key={`${item.run_id}${leaving ? "-leaving" : ""}`} item={item} group={group} actions={actions} leaving={leaving} entering={entering} />
+      ))}
+    </ul>
+  );
+  return (
+    <section className={`queue-group queue-group--${group}`} aria-labelledby={`${id}-h`} data-group={group}>
+      <h2 id={`${id}-h`} className="queue-group__title">
+        {collapsible ? (
+          <button
+            type="button"
+            className="queue-group__toggle"
+            aria-expanded={open.value}
+            aria-controls={`${id}-list`}
+            // Pointer opens animate; keyboard opens are instant (DESIGN.md motion).
+            onClick={(e) => setOpen((o) => ({ value: !o.value, animate: e.detail > 0 }))}
+          >
+            {title}
+            <CaretRight size={14} weight="bold" className="queue-group__caret" aria-hidden />
+          </button>
+        ) : (
+          title
+        )}
+      </h2>
+      {collapsible ? (
+        <Collapse open={open.value} animate={open.animate} id={`${id}-list`}>
+          {list}
+        </Collapse>
+      ) : (
+        list
+      )}
+    </section>
+  );
+}
+
+function QueueRow({
+  item,
+  group,
+  actions,
+  leaving,
+  entering,
+}: {
+  item: QueueItem;
+  group: QueueGroup;
+  actions: Actions;
+  leaving: boolean;
+  entering: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const name = clientOf(item);
+  const forName = <span className="sr-only"> {name}</span>;
+  const run = (fn: () => Promise<void>) => async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const retryProposal = group === "ready" && canRetryProposal(item);
+
+  let primary: ReactNode;
+  if (group === "needs_review") {
+    primary = (
+      <a
+        href={runHref(item.run_id)}
+        className="btn btn--primary btn--sm"
+        aria-busy={busy || undefined}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          void run(() => actions.review(item))();
+        }}
+      >
+        Review{forName}
+      </a>
+    );
+  } else if (retryProposal) {
+    primary = (
+      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={run(() => actions.retryProposal(item))}>
+        <ArrowClockwise size={16} weight="bold" aria-hidden />
+        {busy ? "Retrying..." : "Retry proposal"}
+        {forName}
+      </button>
+    );
+  } else if (group === "ready") {
+    primary = (
+      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={run(() => actions.buildProposal(item))}>
+        <FilePlus size={16} weight="bold" aria-hidden />
+        {busy ? "Opening..." : "Build proposal"}
+        {forName}
+      </button>
+    );
+  } else if (group === "needs_attention" && item.retryable) {
+    primary = (
+      <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={run(() => actions.retry(item))}>
+        <ArrowClockwise size={16} weight="bold" aria-hidden />
+        {busy ? "Retrying..." : "Retry"}
+        {forName}
+      </button>
+    );
+  } else {
+    primary = (
+      <a href={runHref(item.run_id)} className="link-btn queue-row__open">
+        Open{forName}
+      </a>
+    );
+  }
+
+  const open = (id: number) => () => (window.location.hash = runHref(id));
+  const menu: MenuItem[] = [];
+  if (group === "done_recently") {
+    menu.push({ label: "Open run", icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.run_id) });
+    if (item.queue_state !== "open") {
+      menu.push({ label: "Move back to queue", icon: <ArrowCounterClockwise size={16} aria-hidden />, run: () => actions.reopen(item) });
+    }
+  } else {
+    // M1: an active run cannot be marked done or dismissed.
+    if (group !== "in_progress") {
+      menu.push({ label: "Mark done", icon: <CheckCircle size={16} aria-hidden />, run: () => actions.leave(item, "done") });
+      menu.push({ label: "Dismiss", icon: <Prohibit size={16} aria-hidden />, run: () => actions.leave(item, "dismissed") });
+    }
+    if (retryProposal && item.proposal_run_id != null) {
+      menu.push({ label: "Open failed proposal", icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.proposal_run_id) });
+      menu.push({ label: "Start new proposal", icon: <FilePlus size={16} aria-hidden />, run: () => void actions.buildProposal(item) });
+    }
+    menu.push({ label: "Open run", icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.run_id) });
+  }
+  menu.push({ label: moveLabel(otherLine(item.line)), icon: <ArrowsLeftRight size={16} aria-hidden />, run: () => actions.move(item) });
+
+  const WorkflowIcon = WORKFLOW_ICON[item.workflow_slug] ?? Scales;
+  return (
+    <li
+      className={`queue-item${leaving ? " motion-exit" : entering ? " motion-enter" : ""}`}
+      data-run-id={leaving ? undefined : item.run_id}
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
+    >
+      <div className={`queue-row queue-row--${group}${group === "in_progress" ? " motion-live" : ""}`}>
+        {group === "in_progress" && <span className="motion-live__line" aria-hidden />}
+        <span className="queue-row__mark" aria-hidden>
+          {group === "in_progress" ? <span className="spinner spinner--sm" /> : <WorkflowIcon size={20} weight="duotone" />}
+        </span>
+        <div className="queue-row__who">
+          <span className={`queue-row__client${item.client == null ? " is-unnamed" : ""}`}>{name}</span>
+          <span className="queue-row__what">
+            {secondaryLine(item)}
+            {item.client_source === "extracted" && <span className="queue-row__source">name from the documents</span>}
+          </span>
+        </div>
+        <div className="queue-row__status">
+          <Status item={item} group={group} />
+        </div>
+        <div className="queue-row__actions">
+          {primary}
+          <RowMenu label={`Actions for ${name}`} items={menu} />
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function Status({ item, group }: { item: QueueItem; group: QueueGroup }) {
+  if (group === "in_progress") return <span className="queue-row__progress">{progressText(item)}</span>;
+  if (group === "done_recently") return <span className="queue-row__done">{doneText(item)}</span>;
+  const total = openTotal(item);
+  const top = item.open_counts ? SEVERITIES.find((s) => item.open_counts![s] > 0) : undefined;
+  return (
+    <>
+      {item.reasons && item.reasons.length > 0 && (
+        <span className="queue-row__reason">
+          <Warning size={16} weight="bold" aria-hidden />
+          <span>{item.reasons.join(". ")}</span>
+        </span>
+      )}
+      {total > 0 && item.open_counts && top && (
+        <span className="queue-row__counts">
+          {/* The Policy Check severity meter, set to the worst open item: tier reads without colour. */}
+          <span className={`sev sev--${top} queue-row__meter`} aria-hidden>
+            <span className="sev__meter">
+              {[1, 2, 3, 4].map((i) => (
+                <span key={i} className={i <= SEV_TICKS[top] ? "is-on" : undefined} />
+              ))}
+            </span>
+          </span>
+          <span>
+            <strong>{total} open:</strong>{" "}
+            {SEVERITIES.filter((s) => item.open_counts![s] > 0).map((s, i, arr) => (
+              <span key={s}>
+                <span className={`queue-sev queue-sev--${s}`}>
+                  <b>{item.open_counts![s]}</b> {s}
+                </span>
+                {i < arr.length - 1 ? ", " : ""}
+              </span>
+            ))}
+          </span>
+        </span>
+      )}
+      {group === "ready" && !item.reasons?.length && <span className="queue-row__ready">Ready for a proposal</span>}
+    </>
+  );
+}

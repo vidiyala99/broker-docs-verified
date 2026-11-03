@@ -441,7 +441,21 @@ def test_proposal_failed_returns_the_comparison_to_ready(api_factory):
     assert a.client.get(f"/api/runs/{r.json()['run']['id']}").json()["status"] == "failed"
     group, it = _where(_queue(a), source["id"])
     assert group == "ready" and it["reasons"] == ["Proposal didn't finish"]
+    assert it["proposal_retryable"] is True  # the queue's "Retry proposal" (owner feedback 2026-11-03)
     assert a.client.get(f"/api/runs/{source['id']}").json()["queue_changed_at"] is None
+
+    # Retry proposal: the failed proposal run reruns and, done, moves the comparison to Done recently (D3).
+    mode["refuse"] = False
+    assert a.client.post(f"/api/runs/{r.json()['run']['id']}/retry").status_code == 202
+    a.events(r.json()["run"]["id"])
+    assert a.client.get(f"/api/runs/{r.json()['run']['id']}").json()["status"] == "done"
+    group, it = _where(_queue(a), source["id"])
+    assert group == "done_recently" and it["proposal_retryable"] is False
+
+
+def test_proposal_retryable_is_null_without_a_proposal(api):
+    fresh = _compare(api)
+    assert _where(_queue(api), fresh["id"])[1]["proposal_retryable"] is None
 
 
 def test_proposal_running_then_cancelled(api_factory):

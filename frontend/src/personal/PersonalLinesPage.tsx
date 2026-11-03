@@ -1,10 +1,9 @@
 import { Scales, ShieldCheck } from "@phosphor-icons/react";
-import type { Run } from "../api/types";
-import { RecentRuns } from "../launch/RecentRuns";
+import { QueueView } from "../queue/QueueView";
+import { useQueue } from "../queue/useQueue";
+import { isEmpty } from "../queue/queueUtil";
 import "./personal.css";
 
-/** The Personal lines list reads the newest 100 runs (D5); there is no paging. */
-export const PERSONAL_LIMIT = 100;
 export const PERSONAL_COMPARE_HREF = "#/?line=personal";
 export const PERSONAL_CHECK_HREF = "#/policy-check/new?line=personal";
 
@@ -22,11 +21,13 @@ function Actions() {
 }
 
 /**
- * Slice 3b T6 (spec 2.1): runs tagged `personal` (R2) in the shared Workflows run list, plus two entry points that
- * open the Compare Quotes and Policy Check screens with Personal preselected. Decisions in PERSONAL-LINES-BRIEF.md.
+ * Slice 3b T6 page, work queue lane (spec section 2): the personal-lines work queue under the header and the two entry
+ * points that open the Compare Quotes and Policy Check screens with Personal preselected. The raw run list lives in
+ * Activity (`#/activity`). Decisions in PERSONAL-LINES-BRIEF.md and QUEUE-BRIEF.md.
  */
-export function PersonalLinesPage({ runs, runsError, onRetry }: { runs: Run[] | null; runsError: string | null; onRetry: () => void }) {
-  const empty = runs != null && runs.length === 0 && !runsError;
+export function PersonalLinesPage() {
+  const data = useQueue("personal");
+  const empty = data.queue != null && !data.error && isEmpty(data.queue);
   return (
     <div className="workspace">
       <main className="pane personal" id="main" tabIndex={-1} aria-labelledby="personal-title">
@@ -40,50 +41,17 @@ export function PersonalLinesPage({ runs, runsError, onRetry }: { runs: Run[] | 
             {!empty && <Actions />}
           </header>
 
-          <section className="personal__list" aria-labelledby="personal-runs">
-            {runsError ? (
-              <>
-                <h2 id="personal-runs" className="pane__subtitle">
-                  Recent runs
-                </h2>
-                <div className="notice notice--error" role="alert">
-                  <span className="notice__text">{runsError}</span>
-                  <button type="button" className="btn btn--secondary btn--sm" onClick={onRetry}>
-                    Retry
-                  </button>
-                </div>
-              </>
-            ) : runs == null ? (
-              <>
-                <h2 id="personal-runs" className="pane__subtitle">
-                  Recent runs
-                </h2>
-                <div className="runs-skeleton" aria-hidden>
-                  <span />
-                  <span />
-                </div>
-                <span className="sr-only" role="status">
-                  Loading runs
-                </span>
-              </>
-            ) : empty ? (
-              <div className="personal__empty">
-                <h2 id="personal-runs" className="state-block__title">
-                  No personal-lines runs yet.
-                </h2>
-                <p className="hint">Start one here. A run can also be moved to Personal lines from its own page.</p>
+          <QueueView
+            data={data}
+            line="personal"
+            empty={
+              <div className="queue-empty">
+                <h2 className="queue-empty__title">No personal-lines work yet.</h2>
+                <p className="hint">Start a comparison or a renewal check. A run can also be moved here from its own page.</p>
                 <Actions />
               </div>
-            ) : (
-              <>
-                <h2 id="personal-runs" className="pane__subtitle">
-                  Recent runs
-                </h2>
-                <RecentRuns runs={runs} />
-                {runs.length >= PERSONAL_LIMIT && <p className="hint">Showing the newest {PERSONAL_LIMIT} runs.</p>}
-              </>
-            )}
-          </section>
+            }
+          />
         </div>
       </main>
     </div>

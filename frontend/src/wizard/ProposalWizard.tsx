@@ -7,6 +7,7 @@ import type { Viewport } from "../shell/layout";
 import {
   clearDraft,
   DETAIL_FIELDS,
+  DRAFT_RESTORED_EVENT,
   EMPTY_DRAFT,
   isBlank,
   isLocked,
@@ -69,6 +70,17 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
 
   // ------------------------------------------------------------ draft persistence and leave warning
   useEffect(() => saveDraft(draft), [draft]);
+
+  // Build proposal's Undo (work queue D6) puts the previous draft back in storage; show it.
+  useEffect(() => {
+    const on = () => {
+      setDraft(loadDraft());
+      setErrors({});
+      setSubmitted(false);
+    };
+    window.addEventListener(DRAFT_RESTORED_EVENT, on);
+    return () => window.removeEventListener(DRAFT_RESTORED_EVENT, on);
+  }, []);
 
   useEffect(() => {
     const onUnload = (e: BeforeUnloadEvent) => {
@@ -179,6 +191,7 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
       const res = await api.startProposal(
         draft.docs.map((d) => d.id),
         toParameters(draft),
+        draft.source_run_id != null ? { runId: draft.source_run_id, line: draft.line } : undefined,
       );
       generated.current = true;
       clearDraft();
@@ -222,9 +235,16 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
     <div className="workspace">
       <main className="pane wizard" id="main" tabIndex={-1} aria-labelledby="wizard-title">
         <header className="wizard__head">
-          <h1 id="wizard-title" className="wizard__title">
-            New proposal
-          </h1>
+          <div className="wizard__titles">
+            <h1 id="wizard-title" className="wizard__title">
+              New proposal
+            </h1>
+            {draft.source_run_id != null && (
+              <p className="wizard__source">
+                From the comparison for {draft.source_client ?? "an unnamed client"} (run {draft.source_run_id}).
+              </p>
+            )}
+          </div>
           <Stepper step={draft.step} reached={draft.reached} onGo={goTo} compact={viewport === "narrow"} />
         </header>
 
@@ -285,7 +305,7 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
               <ArrowLeft size={16} aria-hidden /> Back
             </button>
           ) : (
-            <a href="#/" className="btn btn--ghost">
+            <a href={draft.line === "personal" ? "#/personal-lines" : "#/"} className="btn btn--ghost">
               Cancel
             </a>
           )}

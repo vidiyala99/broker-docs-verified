@@ -641,7 +641,7 @@ lines). Missing or any other value is `422 invalid_request`, like `?line=` on
  "client": "Avery and Jordan Pellham", "client_source": "broker", "summary": "Renewal check",
  "open_counts": {"critical": 2, "high": 5, "medium": 1, "low": 1}, "reasons": null,
  "status": "done", "retryable": false, "finished_at": "...", "queue_state": "open",
- "queue_changed_at": null, "proposal_run_id": null}
+ "queue_changed_at": null, "proposal_run_id": null, "proposal_retryable": null}
 ```
 
 - `client`: the run's `client_name` (`client_source` `"broker"`), else the
@@ -663,6 +663,11 @@ lines). Missing or any other value is `422 invalid_request`, like `?line=` on
 - `retryable` is `Run.retryable` (show Retry only when true). `status`,
   `finished_at`, `queue_state`, `queue_changed_at` and `proposal_run_id` are the
   run's own fields.
+- `proposal_retryable`: for a comparison whose `proposal_run_id` names an existing proposal run, that run's
+  `retryable` (true when `POST /api/runs/{proposal_run_id}/retry` would be accepted: it failed, was cancelled or is
+  partial, and is idle); `null` when there is no linked proposal. The queue's Ready row shows "Retry proposal" when
+  true (the retry keeps the template, details and outline; D3 then moves the comparison to In progress and, once the
+  proposal is done, to Done recently).
 
 Groups, first match wins:
 

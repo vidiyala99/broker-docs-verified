@@ -116,6 +116,11 @@ class ProposalLink:
     def unfinished(self) -> bool:
         return not self.active and self.status in PROPOSAL_UNFINISHED
 
+    @property
+    def retryable(self) -> bool:
+        """`Run.retryable` of the proposal run: POST /api/runs/{id}/retry would be accepted."""
+        return not self.active and self.status in NEEDS_ATTENTION
+
 
 def aware(value: datetime | None) -> datetime | None:
     """SQLite returns naive datetimes for what was written as UTC."""
@@ -197,6 +202,8 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
             "queue_state": run.queue_state,
             "queue_changed_at": _iso(run.queue_changed_at),
             "proposal_run_id": run.proposal_run_id,
+            # Work queue UI: "Retry proposal" on a Ready comparison whose proposal did not finish.
+            "proposal_retryable": proposal.retryable if proposal is not None else None,
         }
 
     if run.active:

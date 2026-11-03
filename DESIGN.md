@@ -167,6 +167,18 @@ white), `--severity-high-fg` `#93370D` (7.52:1), `--severity-medium-fg` `#35383B
 - Review dialog: native `<dialog>`, opacity + scale 0.98 at `--dur-base` on pointer open only; full
   screen below 900px with the source stacked under the item.
 
+## Work queue (2026-11-03)
+See `frontend/QUEUE-BRIEF.md`. No new tokens.
+- Rows are named by client and carry one primary action; a hairline list, no cards. Each row starts with the workflow's
+  mark (Phosphor duotone in a 36px primary-tint tab: scales for Compare Quotes, shield-check for Policy Check).
+- Section headers: 20px semibold, -0.01em, a group glyph (duotone) and a plain tabular count; the In progress strip and
+  Done recently stay 16px.
+- Needs review status reuses the Policy Check four-tick severity meter (worst open item) before the open counts.
+- Motion primitives in `ui/motion.tsx` / `ui/motion.css` (for reuse by the motion lane): list enter (opacity +
+  translateY 6px, 200ms ease-out, `backwards` fill so no stacking context is left), list exit (opacity + grid-row fold,
+  190ms), disclosure collapse (grid rows 0fr to 1fr, pointer only), count bump (scale 0.85 + opacity, 200ms), live sweep
+  (2px line, 1.6s linear). First load never animates. Reduced motion: opacity only.
+
 ## Open item: collapsed-outline warning mark (recommendation, not decided)
 Recommend: when the outline is collapsed and any value is scan-read,
 couldn't verify, or failed, the collapse handle shows the triangle glyph from

@@ -10,7 +10,8 @@ import { useViewport } from "./shell/layout";
 import { ToastProvider } from "./ui/Toast";
 import { ProposalWizard } from "./wizard/ProposalWizard";
 import { PolicyWizard } from "./policy/PolicyWizard";
-import { PERSONAL_LIMIT, PersonalLinesPage } from "./personal/PersonalLinesPage";
+import { PersonalLinesPage } from "./personal/PersonalLinesPage";
+import { ActivityPage } from "./activity/ActivityPage";
 import { lineFromHash } from "./personal/LineChoice";
 import { TasksPage } from "./tasks/TasksPage";
 import { taskIdFromHash } from "./tasks/taskUtil";
@@ -24,6 +25,8 @@ type Route = {
   integrations: boolean;
   personal: boolean;
   tasks: boolean;
+  /** Work queue W2: `#/activity` (`?line=` presets its filter). */
+  activity: boolean;
   taskId: number | null;
   line: Line | null;
 };
@@ -37,6 +40,7 @@ function parseRoute(hash: string): Route {
     integrations: /^#\/integrations\b/.test(hash),
     personal: /^#\/personal-lines\b/.test(hash),
     tasks: /^#\/tasks\b/.test(hash),
+    activity: /^#\/activity\b/.test(hash),
     taskId: /^#\/tasks\b/.test(hash) ? taskIdFromHash(hash) : null,
     line: lineFromHash(hash),
   };
@@ -47,7 +51,7 @@ export function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [wsError, setWsError] = useState<string | null>(null);
   const [runs, setRuns] = useState<Run[] | null>(null);
-  const [runsError, setRunsError] = useState<string | null>(null);
+  const [, setRunsError] = useState<string | null>(null);
   const viewport = useViewport();
 
   useEffect(() => {
@@ -81,12 +85,13 @@ export function App() {
   const policyRun = runOfRoute?.workflow_name === POLICY_WORKFLOW;
   const personalRun = runOfRoute?.line === "personal";
   // An entry screen opened from Personal lines (`?line=personal`) belongs to Personal lines.
-  const personalEntry = route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks;
+  const personalEntry =
+    route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks && !route.activity;
 
-  // Which runs the shell lists: Personal lines = personal, newest 100 (D5); a run view = the run's own line (unknown
-  // until the run loads); everywhere else = the entry line, commercial by default (Workflows = commercial, D9).
-  const listLine: Line | null = route.personal ? "personal" : route.runId != null ? (runOfRoute?.line ?? null) : (route.line ?? "commercial");
-  const listLimit = route.personal ? PERSONAL_LIMIT : 20;
+  // Which runs the shell lists: only the run view's "Recent runs" section reads this list now (the run's own line,
+  // unknown until the run loads). Personal lines and the Compare screen show the work queue; Activity loads its own.
+  const listLine: Line | null = route.runId != null ? (runOfRoute?.line ?? null) : null;
+  const listLimit = 20;
   const listSeq = useRef(0);
   const loadRuns = useCallback(() => {
     if (listLine == null) return;
@@ -109,10 +114,12 @@ export function App() {
 
   useEffect(() => {
     loadRuns();
-  }, [route.runId, route.wizard, route.policy, route.personal, loadRuns]);
+  }, [route.runId, loadRuns]);
 
   useEffect(() => {
-    document.title = route.tasks
+    document.title = route.activity
+      ? "Activity"
+      : route.tasks
       ? "Tasks"
       : route.integrations
       ? "Integrations"
@@ -125,11 +132,16 @@ export function App() {
             : route.runId
               ? `Run ${route.runId}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
               : "Compare Quotes";
-  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, proposalRun, policyRun]);
+  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, route.activity, proposalRun, policyRun]);
 
   // Rail: Personal lines for its page and its entry screens; a run view highlights its workflow whatever its line
   // (the rail names the tool, the crumb names the book; PERSONAL-LINES-BRIEF.md).
-  const section: Section = route.tasks
+  // Activity has no rail item: it highlights the book it was opened from (Personal lines preset, else Workflows).
+  const section: Section = route.activity
+    ? route.line === "personal"
+      ? "personal-lines"
+      : "workflows"
+    : route.tasks
     ? "tasks"
     : route.integrations
     ? "integrations"
@@ -150,7 +162,9 @@ export function App() {
       : personalRun
         ? [{ label: WORKFLOW_NAME, href: `#/${preset}` }, { label: `Run ${route.runId}` }]
         : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: `Run ${route.runId}` }];
-  const crumbs: Crumb[] = route.tasks
+  const crumbs: Crumb[] = route.activity
+    ? [{ label: "Activity" }]
+    : route.tasks
     ? [{ label: "Tasks" }]
     : route.integrations
     ? [{ label: "Integrations" }]
@@ -182,7 +196,7 @@ export function App() {
         <Rail section={section} />
         <div className="app__main">
           <TopBar crumbs={crumbs} />
-          {viewport === "narrow" && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !policyRun && <NarrowNotice />}
+          {viewport === "narrow" && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
           {route.integrations ? (
             // Static mock: needs nothing from the server, so it renders even when the backend is down.
             <IntegrationsPage />
@@ -209,8 +223,10 @@ export function App() {
             <ProposalWizard workspace={workspace} viewport={viewport} />
           ) : route.tasks ? (
             <TasksPage targetId={route.taskId} />
+          ) : route.activity ? (
+            <ActivityPage preset={route.line} />
           ) : route.personal ? (
-            <PersonalLinesPage runs={runs} runsError={runsError} onRetry={loadRuns} />
+            <PersonalLinesPage />
           ) : route.policy ? (
             <PolicyWizard workspace={workspace} viewport={viewport} line={route.line ?? "commercial"} />
           ) : route.runId ? (
@@ -225,10 +241,8 @@ export function App() {
             />
           ) : (
             <LaunchView
+              key={route.line ?? "commercial"}
               workspace={workspace}
-              runs={runs}
-              runsError={runsError}
-              onRetryRuns={loadRuns}
               viewport={viewport}
               line={route.line ?? "commercial"}
             />

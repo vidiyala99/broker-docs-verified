@@ -108,6 +108,8 @@ export interface QueueItem {
   queue_state: QueueState;
   queue_changed_at: string | null;
   proposal_run_id: number | null;
+  /** The linked proposal run's `retryable` ("Retry proposal"), null without a linked proposal (API.md). */
+  proposal_retryable: boolean | null;
 }
 
 export type Queue = { line: Line; truncated: boolean } & Record<QueueGroup, QueueItem[]>;
