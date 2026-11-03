@@ -122,3 +122,12 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Owner calls open: AMS chip label "AMS · Cov C" (field name from the cited text) kept vs page chip; chat suggestions on Policy Check runs are quote-oriented (untested live); PRODUCT.md missing; API.md intro still says slice 1.
 - Dev stack running: backend 8000 (seed `scratchpad/dev-data-main2`, runs 1 to 8, Policy Check = runs 7, 8), Vite 5173 from main.
 - Next: slice 3b rail completion per `docs/slice-map.md` (Personal lines filtered entry, broker-defined Tasks, Integrations mock page with "not designed yet, this is a mock" note). Design pass first. Fresh session.
+
+## 2026-11-02 20:55: slice 3b spec approved (no code yet)
+- Spec: `docs/specs/2026-11-02-rail-completion-design.md` (commit 586c79f), owner-approved. Decisions R1 to R7 inside; do not re-ask.
+- Summary: `Run.line` (commercial/personal) + PATCH /api/runs/{id} + `?line=` filter; Personal lines = filtered run list + two pre-tagged wizard entries (runs 7, 8 seeded personal);
+  Task table + CRUD (title, due date, open/done, optional run/discrepancy link), client-side search/sort/filter, "Create task" on discrepancy cards, task and discrepancy states independent;
+  Integrations = static mock with a visible "not designed yet" notice, no logos.
+- Defaults taken in the spec (owner may veto): delete uses undo toast, no confirm; discrepancy card shows first open linked task, else latest.
+- Next: `/plan-eng-review` on the spec (fresh session), then backend lane (Opus), then UI lanes through the design stack (Integrations, Personal lines, Tasks).
+- Dev stack may still be running (backend 8000, Vite 5173).
