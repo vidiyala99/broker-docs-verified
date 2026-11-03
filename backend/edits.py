@@ -20,6 +20,9 @@ Every edit, undo and regeneration snapshots a new artifact version (models).
               ──► snapshot_version (stale flags of known edits cleared, notices recomputed)
     retry run ──► RunManager recompose (no edits in the prompt) ──► merge_edits_after_retry
                   (edits kept, their sections stale)
+    Policy Check (slice 3): regenerate rebuilds the discrepancy list from the stored facts in
+                  code (RunManager.policy_check_content, no model call); every new version
+                  reconciles the discrepancy_state rows (models.reconcile_discrepancy_states)
 """
 
 from __future__ import annotations
@@ -237,6 +240,15 @@ async def regenerate_prose(ctx: AppContext, artifact_id: int, *, base_version: i
             latest = art.latest_content()
             known = edit_keys(latest)
             inp = runner.compose_input_for_run(art.run, compose_edits(latest))
+            # Slice 3 (D14): a Policy Check report is rebuilt from its facts in code, no model call.
+            rebuilt = ctx.manager.policy_check_content(art.run, inp) if runner.is_policy_check(art.run) else None
+        if rebuilt is not None:
+            with db.session_scope(ctx.factory) as s:
+                art = s.get(models.Artifact, artifact_id)
+                previous = art.current_version
+                version = models.snapshot_version(s, art, rebuilt, note="regenerate")
+            ctx.suggestions.pop(artifact_id, None)
+            return Regenerated(artifact_id, version.version, previous, False, None)
         budget = ctx.run_budget(run_id)
         result = await compose.compose_report(ctx.provider, budget, inp, label=f"regenerate:{run_id}")
         with db.session_scope(ctx.factory) as s:

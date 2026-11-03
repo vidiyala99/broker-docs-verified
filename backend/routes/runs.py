@@ -1,14 +1,16 @@
-"""Run routes: create (idempotent), list, get, retry, cancel, and the SSE progress stream."""
+"""Run routes: create (idempotent), list, get, retry, cancel, the SSE progress stream, and the
+Policy Check discrepancy list and its per-item status (slice 3 T6)."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-from typing import Annotated, Any
+import re
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from sqlalchemy import select
 
 from backend import db, models, proposal
@@ -16,7 +18,7 @@ from backend.context import AppContext
 from backend.pipeline.runner import SlotError, format_sse
 from backend.routes.common import ApiError, get_ctx, not_found
 from backend.routes.workspace import find_workflow
-from backend.schemas import ParameterErrors
+from backend.schemas import DiscrepancyBlock, ParameterErrors, Severity
 from backend.views import run_out
 
 router = APIRouter(tags=["runs"])
@@ -100,6 +102,117 @@ async def cancel_run(run_id: int, ctx: AppContext = Depends(get_ctx)) -> dict[st
     _run_json(ctx, run_id)  # 404 first
     cancelled = await ctx.manager.cancel(run_id)
     return {"run": _run_json(ctx, run_id), "cancelled": cancelled}
+
+
+# --------------------------------------------------------------------- discrepancies (slice 3 T6)
+#
+# The list is the current artifact version's DiscrepancyBlocks, in report order, each with
+# its decision from discrepancy_state. No bulk endpoint and no "accepted" status (D1, D2).
+
+_SEVERITIES = tuple(s.value for s in Severity)
+_NOTE_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+MAX_NOTE_CHARS = 2000
+
+
+def _item_out(block: DiscrepancyBlock, row: models.DiscrepancyState | None) -> dict[str, Any]:
+    out = block.model_dump(mode="json")
+    out.update({
+        "status": row.status if row else "open",
+        "note": row.note if row else None,
+        "changed_since_resolved": bool(row.changed_since_resolved) if row else False,
+        "updated_at": _ts(row.updated_at) if row else None,
+    })
+    return out
+
+
+def _ts(value) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _discrepancy_rows(s, run_id: int) -> dict[str, models.DiscrepancyState]:
+    return {r.item_id: r for r in s.scalars(select(models.DiscrepancyState)
+                                           .where(models.DiscrepancyState.run_id == run_id))}
+
+
+def _current_blocks(s, run_id: int) -> tuple[models.Run, list[DiscrepancyBlock]]:
+    run = s.get(models.Run, run_id)
+    if run is None:
+        raise not_found("run", run_id)
+    if run.artifact is None:
+        raise ApiError(404, "no_report", "This run has no report yet.")
+    return run, models.discrepancy_blocks(run.artifact.latest_content())
+
+
+@router.get("/runs/{run_id}/discrepancies")
+async def list_discrepancies(run_id: int, severity: str | None = Query(None, max_length=100),
+                             hide_resolved: bool = Query(False),
+                             ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """Items of the current version with their status; `severity` is one tier or a comma list.
+    `counts` and `open_counts` are per severity over every item (filters do not change them)."""
+    wanted: set[str] | None = None
+    if severity:
+        wanted = {x.strip().lower() for x in severity.split(",") if x.strip()}
+        unknown = sorted(wanted - set(_SEVERITIES))
+        if unknown:
+            raise ApiError(422, "invalid_request", f"Unknown severity {unknown[0]!r}; use one of "
+                           + ", ".join(_SEVERITIES) + ".")
+    with ctx.factory() as s:
+        run, blocks = _current_blocks(s, run_id)
+        rows = _discrepancy_rows(s, run_id)
+        all_items = [_item_out(b, rows.get(b.id)) for b in blocks]
+        counts = {k: 0 for k in _SEVERITIES}
+        open_counts = {k: 0 for k in _SEVERITIES}
+        for it in all_items:
+            counts[it["severity"]] += 1
+            if it["status"] == "open":
+                open_counts[it["severity"]] += 1
+        items = [it for it in all_items
+                 if (wanted is None or it["severity"] in wanted) and not (hide_resolved and it["status"] == "resolved")]
+        return {"run_id": run_id, "artifact_id": run.artifact.id, "version": run.artifact.current_version,
+                "items": items, "counts": counts, "open_counts": open_counts, "total": len(all_items),
+                "resolved": sum(1 for it in all_items if it["status"] == "resolved")}
+
+
+class DiscrepancyPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["open", "resolved"] | None = None
+    note: str | None = Field(None, max_length=MAX_NOTE_CHARS)
+
+    @field_validator("note")
+    @classmethod
+    def _clean(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return re.sub(r" {2,}", " ", _NOTE_CONTROL.sub("", v)).strip() or None
+
+    @model_validator(mode="after")
+    def _something(self) -> DiscrepancyPatch:
+        if not self.model_fields_set:
+            raise ValueError("send a status, a note, or both")
+        if "status" in self.model_fields_set and self.status is None:
+            raise ValueError("status must be open or resolved")
+        return self
+
+
+@router.patch("/runs/{run_id}/discrepancies/{item_id}")
+async def patch_discrepancy(run_id: int, item_id: str, body: DiscrepancyPatch,
+                            ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """Set one item's status and/or note (`note: null` clears it)."""
+    with db.session_scope(ctx.factory) as s:
+        _, blocks = _current_blocks(s, run_id)
+        block = next((b for b in blocks if b.id == item_id), None)
+        if block is None:
+            raise ApiError(404, "discrepancy_not_found", "This report has no such discrepancy.")
+        if not _discrepancy_rows(s, run_id).get(item_id):  # a version stored before T6: reconcile first
+            models.reconcile_discrepancy_states(s, run_id, s.get(models.Run, run_id).artifact.latest_content())
+        kwargs: dict[str, Any] = {}
+        if "status" in body.model_fields_set:
+            kwargs["status"] = body.status
+        if "note" in body.model_fields_set:
+            kwargs["note"] = body.note
+        row = models.update_discrepancy_state(s, run_id, item_id, **kwargs)
+        return _item_out(block, row)
 
 
 @router.get("/runs/{run_id}/events")

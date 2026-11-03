@@ -22,7 +22,7 @@ from backend.pipeline import runner
 from backend.pipeline.runner import SlotError
 from backend.providers import CallRole, FakeProvider
 from backend.providers.fake import FakeRefusal
-from backend.schemas import RunDocumentStatus, RunStatus
+from backend.schemas import DiscrepancyBlock, EvidenceState, PolicyRole, RunDocumentStatus, RunStatus
 from pipeline_fakes import GatedProvider, smart_responder
 from test_runner import Harness, go
 
@@ -32,8 +32,9 @@ QUOTE = ["Carrier: Juniper Peak\nNamed Insured: Cedar Hollow LLC\nTotal Premium:
 
 
 def _usable_policy_check(factory) -> int:
-    """Give the seeded policy-check workflow a readable fact schema and section plan
-    (the real schema arrives with T3), so a run can extract and compose here."""
+    """Swap the seeded policy-check fact schema for the Compare Quotes one, so the slot tests
+    can keep smart_responder (Compare Quotes labels). The real combined schema is covered by
+    test_policy_check_run.py."""
     with db.session_scope(factory) as s:
         wf = s.scalar(select(models.Workflow).where(models.Workflow.slug == db.POLICY_CHECK_SLUG))
         wf.fact_schema = db.COMPARE_QUOTES["fact_schema"]
@@ -262,8 +263,9 @@ def test_failed_optional_document_completes_partial_and_reads_not_read(h):
     assert states == {"expiring": "read", "renewal": "read", "quote": "not_read", "ams": "absent"}
     content = run.artifact.latest_content()
     assert any(n.kind == "documents_failed" and n.retryable for n in content.notices)
-    table = content.find_table("common_declarations-table")
-    assert table.columns[2].warning and "Extraction failed" in table.columns[2].warning
+    # the Policy Check report is the discrepancy list: the failed quote reads Not read in every slot
+    blocks = [b for _, b in content.iter_blocks() if isinstance(b, DiscrepancyBlock)]
+    assert blocks and all(b.slot(PolicyRole.QUOTE).state == EvidenceState.FAILED for b in blocks)
     s.close()
 
 

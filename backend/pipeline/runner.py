@@ -20,6 +20,11 @@ cancel reaches every child and waits for it):
     VERIFYING   pipeline.verify (thread pool), then fact + passage rows
     DONE / FAILED (ParseError code, ProviderError code, cancelled, internal_error)
 
+Policy Check (slice 3, `_Plan.policy_check`): an AMS document skips EXTRACTING's model
+call; its facts come from ams.facts_from_original (the kept original, D5) and verify
+against its rendered PDF. COMPOSING builds the report in code (policy_check_content:
+diff -> DiscrepancyBlocks, D14), so the run makes no compose call.
+
 Concurrency (M6): at most 4 model calls at once is enforced inside the
 Provider (its semaphore); parse, render and verify run in this manager's
 thread pool. The database is only touched from the event loop thread, in
@@ -62,8 +67,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend import db, models
-from backend.pipeline import compose, extract, parse, verify, windows
+from backend import ams, db, models
+from backend.pipeline import compose, extract, parse, policy_check, verify, windows
 from backend.providers import CallRecord, Provider, ProviderError, RunBudget
 from backend.schemas import (
     CITED_STATES,
@@ -177,6 +182,7 @@ class DocumentRef:
     id: int
     filename: str
     stored_name: str
+    kind: str = "quote"  # models.Document.kind; "ams" for an AMS export (slice 3)
 
 
 @dataclass
@@ -205,6 +211,10 @@ class ComposePlan:
     outline: tuple[OutlineBlock, ...] = ()
     fact_sections: tuple[SectionPlanItem, ...] = ()
     brief: compose.ProposalBrief | None = None
+
+
+def is_policy_check(run: models.Run) -> bool:
+    return run.workflow.slug == db.POLICY_CHECK_SLUG
 
 
 def proposal_title(client_name: str) -> str:
@@ -241,6 +251,7 @@ class _Plan:
     compose: ComposePlan
     todo: list[tuple[int, DocumentRef]]  # (run_document id, document)
     budget_limit: int
+    policy_check: bool = False  # slice 3: AMS facts from code, report from the diff (no compose call)
 
     @property
     def fields(self) -> list[FactField]:
@@ -269,6 +280,13 @@ def load_stored_bytes(doc: DocumentRef) -> bytes:
     if not _SAFE_NAME.match(doc.stored_name):
         raise ValueError("stored name is not a generated name")
     return (files_dir() / doc.stored_name).read_bytes()
+
+
+def load_stored_original(doc: DocumentRef) -> bytes:
+    """The kept original of an AMS export (uploads.store_original), for ams.facts_from_original."""
+    from backend import uploads  # uploads imports this module (files_dir)
+
+    return uploads.load_original(doc.stored_name)
 
 
 # --------------------------------------------------------------------- slots (slice 3, D8 / D11)
@@ -345,6 +363,30 @@ def slot_states(run: models.Run) -> dict[str, str]:
         else:
             out[key] = "pending"
     return out
+
+
+_AMS_TYPES = ("application/json", "text/csv")
+
+
+def _accepts(d: dict[str, Any]) -> tuple[bool, bool]:
+    """(takes PDFs, takes AMS exports) for one slot definition; no `accepts` takes PDFs only."""
+    accepts = [a.strip().lower() for a in str(d.get("accepts") or "application/pdf").split(",")]
+    return "application/pdf" in accepts, any(a in accepts for a in _AMS_TYPES)
+
+
+def check_slot_kinds(input_slots: Sequence[Any] | None, kinds: Sequence[str], slot_keys: Sequence[str]) -> None:
+    """Each document fits its slot's `accepts` (slice 3): an AMS export only in a slot that takes
+    JSON or CSV, any other document only in a slot that takes PDFs. Raises SlotError."""
+    defs = {d["key"]: d for d in _slot_defs(input_slots)}
+    for kind, key in zip(kinds, slot_keys, strict=True):
+        d = defs.get(key)
+        if d is None:
+            continue
+        pdf_ok, ams_ok = _accepts(d)
+        if kind == "ams" and not ams_ok:
+            raise SlotError(f"{_label(d)} takes PDF documents; an AMS export goes in the AMS slot.")
+        if kind != "ams" and not pdf_ok:
+            raise SlotError(f"{_label(d)} takes an AMS export (JSON or CSV), not a PDF document.")
 
 
 def unread_required_slots(run: models.Run) -> list[str]:
@@ -485,6 +527,7 @@ class RunManager:
         provider: Provider,
         *,
         load_bytes: Callable[[DocumentRef], bytes] = load_stored_bytes,
+        load_original: Callable[[DocumentRef], bytes] = load_stored_original,
         limits: parse.ParseLimits = parse.DEFAULT_LIMITS,
         verify_config: verify.VerifyConfig = verify.DEFAULT_CONFIG,
         budget_limit: int | None = None,
@@ -500,6 +543,7 @@ class RunManager:
         self._factory = session_factory
         self.provider = provider
         self._load_bytes = load_bytes
+        self._load_original = load_original
         self._limits = limits
         self._verify_config = verify_config
         self._budget_limit = budget_limit or provider.config.run_token_budget
@@ -556,6 +600,9 @@ class RunManager:
             if missing:
                 raise LookupError(f"no document {missing[0]}")
             slot_keys = resolve_slots(workflow.input_slots, ids, slots)
+            kinds = dict(s.execute(select(models.Document.id, models.Document.kind)
+                                   .where(models.Document.id.in_(ids))).all())
+            check_slot_kinds(workflow.input_slots, [kinds[i] or "quote" for i in ids], slot_keys)
             wanted = list(zip(ids, slot_keys))
             active = s.scalars(select(models.Run).where(
                 models.Run.workflow_id == workflow_id,
@@ -652,6 +699,24 @@ class RunManager:
         for run_id in list(self._tasks):
             self._mark_cancelled(run_id)
         await asyncio.to_thread(self._executor.shutdown, True, cancel_futures=True)
+
+    def policy_check_content(self, run: models.Run, inp: compose.ComposeInput | None = None) -> ArtifactContent:
+        """The Policy Check report of a run from its stored facts (slice 3): the diff as
+        DiscrepancyBlocks, deterministic and free (no model call), so the run, a retry and
+        Regenerate all build it the same way. Needs an open session on `run`."""
+        inp = inp or compose_input_for_run(run)
+        extra: list[Notice] = []
+        for rd in run.documents:
+            if rd.document.kind != "ams" or RunDocumentStatus(rd.status) != RunDocumentStatus.DONE:
+                continue
+            ref = DocumentRef(rd.document_id, rd.document.filename, rd.document.stored_name, rd.document.kind)
+            try:
+                mapped = ams.facts_from_original(self._load_original(ref))
+            except (OSError, ValueError, ams.AmsError):  # the facts are stored; only the notice is lost
+                log.warning("run %s: AMS notices unavailable for document %s", run.id, rd.document_id)
+                continue
+            extra.extend(policy_check.ams_notices(mapped))
+        return policy_check.build_content(inp, slot_states(run), extra_notices=extra)
 
     def snapshot(self, run_id: int) -> dict[str, Any]:
         """Current state from the database (first SSE frame after a reconnect or restart)."""
@@ -796,7 +861,8 @@ class RunManager:
             run = s.get(models.Run, run_id)
             models.transition_run(run, RunStatus.RUNNING)
             run.started_at = run.started_at or models.utcnow()
-            todo = [(rd.id, DocumentRef(rd.document_id, rd.document.filename, rd.document.stored_name))
+            todo = [(rd.id, DocumentRef(rd.document_id, rd.document.filename, rd.document.stored_name,
+                                        rd.document.kind or "quote"))
                     for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.QUEUED]
             spent = (run.tokens_in or 0) + (run.tokens_out or 0)
             plan = _Plan(
@@ -804,6 +870,7 @@ class RunManager:
                 compose=compose_plan(run),
                 todo=todo,
                 budget_limit=max(1, self._budget_limit - spent),
+                policy_check=is_policy_check(run),
             )
             payload = _run_payload(run)
         self._emit(run_id, "run.status", {k: payload[k] for k in ("status", "error", "retryable")})
@@ -843,6 +910,18 @@ class RunManager:
         try:
             self._update_doc(run_id, rd_id, RunDocumentStatus.READING, progress="Reading pages")
             pages = await self._read_pages(run_id, rd_id, ref, budget)
+            if plan.policy_check and ref.kind == "ams":
+                # D5: an AMS export's facts come from the key table, no model call; they verify
+                # against its rendered PDF like any document fact.
+                self._update_doc(run_id, rd_id, RunDocumentStatus.EXTRACTING, progress="Mapping AMS fields")
+                original = await self._in_thread(self._load_original, ref)
+                mapped = await self._in_thread(ams.facts_from_original, original)
+                self._update_doc(run_id, rd_id, RunDocumentStatus.VERIFYING, progress="Verifying")
+                verified = await self._in_thread(policy_check.verify_ams_facts, mapped, pages, self._verify_config)
+                self._store_facts(run_id, ref.id, verified)
+                self._update_doc(run_id, rd_id, RunDocumentStatus.DONE, progress=None, option_count=1,
+                                 option_label=None)
+                return
             self._update_doc(run_id, rd_id, RunDocumentStatus.EXTRACTING, progress="Extracting")
             result = await windows.extract_document(
                 self.provider, budget, plan.fields, pages, document_name=ref.filename,
@@ -855,6 +934,9 @@ class RunManager:
                              option_count=result.option_count, option_label=result.option_label)
         except asyncio.CancelledError:
             raise
+        except ams.AmsError as exc:
+            self._update_doc(run_id, rd_id, RunDocumentStatus.FAILED, progress=None,
+                             error_code=str(exc.code), error=exc.message)
         except parse.ParseError as exc:
             self._record_parse_failure(ref.id, exc)
             self._update_doc(run_id, rd_id, RunDocumentStatus.FAILED, progress=None,
@@ -955,6 +1037,7 @@ class RunManager:
         return _input_from_plan(run, plan.compose)
 
     async def _compose(self, run_id: int, plan: _Plan, budget: RunBudget) -> None:
+        built: ArtifactContent | None = None
         with db.session_scope(self._factory) as s:
             run = s.get(models.Run, run_id)
             usable = [rd for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.DONE]
@@ -981,12 +1064,17 @@ class RunManager:
                 s.flush()
                 inp = self._compose_input(run, plan, budget)
                 payload = _run_payload(run)
+                # Slice 3: the Policy Check report is the diff, built in code (D14, no model call).
+                built = self.policy_check_content(run, inp) if plan.policy_check else None
         if inp is None:
             self._end(run_id, payload)
             return
         self._emit(run_id, "run.status", {k: payload[k] for k in ("status", "error", "retryable")})
 
-        result = await compose.compose_report(self.provider, budget, inp, label=f"compose:{run_id}")
+        if built is not None:
+            result = compose.ComposeResult(content=built, fallback=False, attempts=0)
+        else:
+            result = await compose.compose_report(self.provider, budget, inp, label=f"compose:{run_id}")
 
         with db.session_scope(self._factory) as s:
             run = s.get(models.Run, run_id)

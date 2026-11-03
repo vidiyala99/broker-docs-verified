@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend import models
-from backend.schemas import FactField, OutlineBlock, SectionPlanItem
+from backend.schemas import POLICY_CHECK_FIELDS, FactField, OutlineBlock, SectionPlanItem
 
 DEFAULT_WORKSPACE_ID = 1
 COMPARE_QUOTES_SLUG = "compare-quotes"
@@ -255,8 +255,9 @@ PROPOSAL_BUILDER: dict = {
 #
 # Four document roles as input slots (D8 A): a run maps each document to one slot,
 # min and max are enforced at run creation. A required slot (min >= 1) whose document
-# fails fails the run; an optional one shows "Not read" (D11 A). The fact schema is
-# defined by the combined extraction schema (T3) and set here when that lands.
+# fails fails the run; an optional one shows "Not read" (D11 A). The fact schema is the
+# combined extraction schema (T3, schemas.POLICY_CHECK_FIELDS): scalar fields plus the forms
+# field. PDF roles extract it; the AMS role fills the scalar keys from the AMS key table (D5).
 
 POLICY_CHECK_SLUG = "policy-check"
 
@@ -279,7 +280,7 @@ POLICY_CHECK: dict = {
         SectionPlanItem(id="discrepancies", number="1", title="Discrepancies",
                         guidance="Differences between the renewal and the other documents.").model_dump(),
     ],
-    "fact_schema": [],  # T3 (lane C): the policy-check combined extraction schema
+    "fact_schema": [f.model_dump() for f in POLICY_CHECK_FIELDS],
 }
 
 

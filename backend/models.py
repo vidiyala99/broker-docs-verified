@@ -2,7 +2,7 @@
 
 Tables: workspace, workflow, proposal_template, document, page, run,
 run_document, model_call, message, fact, passage, artifact, artifact_version,
-feedback.
+discrepancy_state (slice 3), feedback.
 
 Key rules:
 - `fact` is persisted (M7); each fact carries an EvidenceState (M1).
@@ -14,6 +14,8 @@ Key rules:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
@@ -35,6 +37,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 
 from backend.schemas import (
     ArtifactContent,
+    DiscrepancyBlock,
     EvidenceState,
     RunDocumentStatus,
     RunStatus,
@@ -175,6 +178,9 @@ class Run(Base):
     )
     facts: Mapped[list[Fact]] = relationship(back_populates="run", cascade="all, delete-orphan")
     artifact: Mapped[Artifact | None] = relationship(back_populates="run", uselist=False)
+    discrepancy_states: Mapped[list[DiscrepancyState]] = relationship(
+        back_populates="run", cascade="all, delete-orphan", order_by="DiscrepancyState.id"
+    )
 
 
 class RunDocument(Base):
@@ -333,6 +339,42 @@ class ArtifactVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     artifact: Mapped[Artifact] = relationship(back_populates="versions")
+
+
+DISCREPANCY_STATUSES = ("open", "resolved")  # D2: no "accepted"
+
+
+class DiscrepancyState(Base):
+    """The broker's decision on one Policy Check discrepancy (slice 3 T6, spec section 4).
+
+    Kept outside the artifact, so a regenerate never wipes a decision. `item_id` is the
+    DiscrepancyBlock id (derived from the canonical key, stable across regeneration).
+    `fingerprint` is the hash of the item's compared slot values in the current version;
+    `resolved_fingerprint` the one the broker resolved. Reconciled on every new version
+    (`reconcile_discrepancy_states`):
+
+        resolved and current values differ from the resolved ones ──► open, changed_since_resolved
+        open after such a reset and the values are back (version restore) ──► resolved again
+        an item missing from the current version: row untouched (it may come back)
+    """
+
+    __tablename__ = "discrepancy_state"
+    __table_args__ = (
+        UniqueConstraint("run_id", "item_id"),
+        CheckConstraint("status IN ('open', 'resolved')", name="ck_discrepancy_status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), index=True)
+    item_id: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(20), default="open")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), default="")
+    resolved_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    changed_since_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    run: Mapped[Run] = relationship(back_populates="discrepancy_states")
 
 
 class Feedback(Base):
@@ -563,7 +605,82 @@ def snapshot_version(
     session.add(version)
     artifact.current_version = version.version
     session.flush()
+    # T6: every new version (run, retry, regenerate, restore, edit) is the active comparison now.
+    reconcile_discrepancy_states(session, artifact.run_id, content)
     return version
+
+
+# --------------------------------------------------------------------- discrepancy state (slice 3 T6)
+
+
+def discrepancy_fingerprint(block: DiscrepancyBlock) -> str:
+    """Hash of what the item compares: item state and, per role, the slot's evidence state, value
+    and conflicting values. Citations (passage ids) are left out, so re-reading a document that
+    states the same values on another page keeps a decision."""
+    slots = {
+        str(role): [str(cell.state) if cell.state else None, cell.value,
+                    [c.value for c in cell.conflicts]]
+        for role, cell in sorted(block.slots.items(), key=lambda kv: str(kv[0]))
+    }
+    payload = json.dumps({"item_state": str(block.item_state), "slots": slots}, sort_keys=True,
+                         separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def discrepancy_blocks(content: ArtifactContent) -> list[DiscrepancyBlock]:
+    return [b for _, b in content.iter_blocks() if isinstance(b, DiscrepancyBlock)]
+
+
+def reconcile_discrepancy_states(session: Session, run_id: int, content: ArtifactContent) -> None:
+    """Bring the run's decisions in line with `content`, its current version (see DiscrepancyState).
+    A content without discrepancies (any report but Policy Check) touches nothing."""
+    blocks = discrepancy_blocks(content)
+    if not blocks:
+        return
+    rows = {r.item_id: r for r in session.scalars(select(DiscrepancyState).where(DiscrepancyState.run_id == run_id))}
+    now = utcnow()
+    for block in blocks:
+        fp = discrepancy_fingerprint(block)
+        row = rows.get(block.id)
+        if row is None:
+            row = DiscrepancyState(run_id=run_id, item_id=block.id, status="open", fingerprint=fp,
+                                   changed_since_resolved=False, updated_at=now)
+            session.add(row)
+            rows[block.id] = row
+            continue
+        if row.fingerprint == fp:
+            continue
+        row.fingerprint = fp
+        if row.status == "resolved" and fp != row.resolved_fingerprint:
+            row.status, row.changed_since_resolved, row.updated_at = "open", True, now
+        elif row.status == "open" and row.changed_since_resolved and fp == row.resolved_fingerprint:
+            row.status, row.changed_since_resolved, row.updated_at = "resolved", False, now
+    session.flush()
+
+
+_UNSET: Any = object()
+
+
+def update_discrepancy_state(session: Session, run_id: int, item_id: str, *, status: str | None = None,
+                             note: str | None = _UNSET) -> DiscrepancyState:
+    """Set an item's status and/or note (PATCH). A status change clears "changed since resolved";
+    resolving records the current fingerprint as the resolved one. Raises ValueError for a status
+    outside open | resolved and LookupError for an item with no state row."""
+    if status is not None and status not in DISCREPANCY_STATUSES:
+        raise ValueError(f"status must be one of {DISCREPANCY_STATUSES}")
+    row = session.scalar(select(DiscrepancyState).where(DiscrepancyState.run_id == run_id,
+                                                        DiscrepancyState.item_id == item_id))
+    if row is None:
+        raise LookupError(f"run {run_id} has no discrepancy {item_id!r}")
+    if status is not None:
+        row.status = status
+        row.changed_since_resolved = False
+        row.resolved_fingerprint = row.fingerprint if status == "resolved" else None
+    if note is not _UNSET:
+        row.note = note
+    row.updated_at = utcnow()
+    session.flush()
+    return row
 
 
 def restore_version(session: Session, artifact: Artifact, version: int) -> ArtifactVersion:
