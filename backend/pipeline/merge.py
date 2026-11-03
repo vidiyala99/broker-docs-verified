@@ -165,6 +165,20 @@ Endorsement rule (kept simple on purpose):
    word "endorsement" and was picked over the real form on page 2.
 4. Otherwise the conflict is ambiguous.
 
+Form facts (slice 3 Policy Check, D13 A). merge_document expands a field of kind "forms"
+into the dynamic keys form:<number> found among the candidates (plus any passed in
+dynamic_keys), sorted, in the forms field's place. Each is merged with merge_field like
+any field, with two form rules:
+1. grouping: two values of one form are the same value when their editions agree
+   (form_edition: "HO 00 03 05 11", "HO 00 03 (05/11)" and "HO 00 03 05/2011" are all
+   05/11), so a schedule line and the form's own footer do not conflict;
+2. no_edition: a cited candidate that states the number without an edition is dropped
+   when another cited candidate states one (a schedule that lists only numbers next to a
+   footer that prints the edition). A form only ever listed without an edition keeps it.
+Two different editions of one form still conflict (CONFLICTING, the diff shows Needs
+review). False-positive risk: a value that does not start with the form number (a title
+alone) has no edition and is grouped by its tokens.
+
 Extension point: a page-scoring pass that skips windows with no likely
 facts would plug in before extraction (pipeline.windows.select_windows);
 it is off for now.
@@ -178,7 +192,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from backend.pipeline import verify
-from backend.schemas import EvidenceState, FactField
+from backend.schemas import FORM_KEY_PREFIX, EvidenceState, FactField, is_form_key
 
 log = logging.getLogger("brokerdocs.merge")
 
@@ -524,6 +538,14 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
             for c in undated:
                 reasons[id(c)] = "no_date"
             plausible, dropped = [c for c in plausible if id(c) not in und_ids], dropped + undated
+    if is_form_key(key):  # D13: a form listed without its edition loses to the same form with one
+        cited = [c for c in plausible if c.state in (EvidenceState.VERIFIED, EvidenceState.SCAN_READ)]
+        bare = [c for c in cited if form_edition(key, c.value) is None]
+        if bare and len(bare) < len(cited):
+            bare_ids = {id(c) for c in bare}
+            for c in bare:
+                reasons[id(c)] = "no_edition"
+            plausible, dropped = [c for c in plausible if id(c) not in bare_ids], dropped + bare
     if dropped:
         log.info("merge: %s dropped implausible values %s", key,
                  [(r.value, r.page_no or r.cited_page, reasons[id(r)]) for r in dropped])
@@ -547,7 +569,7 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
 
     groups: dict[tuple[str, ...], list[verify.VerifyResult]] = {}
     for c in sorted(tier, key=_page):  # stable: window order breaks page ties
-        groups.setdefault(value_key(c.value), []).append(c)
+        groups.setdefault(_group_key(key, c.value), []).append(c)
     ordered = sorted(groups.values(), key=lambda g: _page(g[0]))
 
     def with_extras(group: list[verify.VerifyResult], **kw) -> MergedFact:
@@ -585,16 +607,59 @@ def merge_field(fdef: FactField | str, candidates: Sequence[verify.VerifyResult]
 
 
 def merge_document(fields: Sequence[FactField | str], candidates: Iterable[verify.VerifyResult],
-                   page_text: Mapping[int, str] | None = None) -> list[MergedFact]:
-    """One MergedFact per field, in field order."""
+                   page_text: Mapping[int, str] | None = None, *,
+                   dynamic_keys: Iterable[str] = ()) -> list[MergedFact]:
+    """One MergedFact per field, in field order.
+
+    A field of kind "forms" (slice 3, D13) is not a fact itself: in its place come the dynamic
+    form keys (form:<number>), sorted, one MergedFact each. They are every form key among the
+    candidates plus any given in `dynamic_keys` (a key without candidates merges to ABSENT).
+    Without a forms field, form candidates and dynamic keys are ignored, as before slice 3.
+    """
     by_field: dict[str, list[verify.VerifyResult]] = {}
     for c in candidates:
         by_field.setdefault(c.field, []).append(c)
+    form_keys = sorted({k for k in [*by_field, *dynamic_keys] if is_form_key(k)})
     out = []
     for f in fields:
+        if isinstance(f, FactField) and f.kind == "forms":
+            out.extend(merge_field(k, by_field.get(k, []), page_text) for k in form_keys)
+            continue
         k = f.key if isinstance(f, FactField) else str(f)
         out.append(merge_field(f, by_field.get(k, []), page_text))
     return out
+
+
+# Form facts (D13): value "<number> <edition>" as printed, key form:<compact number>.
+_EDITION_RE = re.compile(r"^\W*(\d{1,2})\W*(\d{4}|\d{2})(?!\d)")
+
+
+def form_edition(key: str, value: str | None) -> str | None:
+    """The edition of a form fact's value as "MM/YY" ("HO 00 03 05 11", "HO 00 03 (05/11)" and
+    "HO0003 5/2011" all give "05/11"), or None when the value does not start with the key's form
+    number or states no edition after it."""
+    if not is_form_key(key) or not value:
+        return None
+    number = key[len(FORM_KEY_PREFIX):]
+    i, text = 0, value.upper()
+    for ch in number:
+        while i < len(text) and not text[i].isalnum():
+            i += 1
+        if i >= len(text) or text[i] != ch:
+            return None
+        i += 1
+    mo = _EDITION_RE.match(value[i:])
+    if not mo:
+        return None
+    month, year = int(mo.group(1)), mo.group(2)[-2:]
+    return f"{month:02d}/{year}" if 1 <= month <= 12 else None
+
+
+def _group_key(key: str, value: str | None) -> tuple[str, ...]:
+    """Values that are one value: verify's tokens (value_key); a form's by its edition, so
+    "HO 00 03 05 11" and "HO 00 03 (05/11)" are one value."""
+    edition = form_edition(key, value) if is_form_key(key) else None
+    return ("edition", edition) if edition else value_key(value)
 
 
 def conflict_message(label: str, shown: tuple[str | None, int | None],
@@ -615,6 +680,6 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
 
 
 __all__ = ["AMEND_RE", "DATED_FIELDS", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "TEMPORAL_FIELDS",
-           "MergedFact", "conflict_message", "contained_in", "definition_body", "implausible_reason",
+           "MergedFact", "conflict_message", "contained_in", "definition_body", "form_edition", "implausible_reason",
            "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "states_date", "states_time",
            "value_key"]
