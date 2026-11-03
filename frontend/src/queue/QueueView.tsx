@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowClockwise,
   ArrowCounterClockwise,
@@ -25,13 +25,18 @@ import {
   GROUP_LABEL,
   GROUPS,
   groupOf,
+  isShared,
+  linkContexts,
+  metaParts,
   moveLabel,
   movedText,
+  openLabel,
   openTotal,
   otherLine,
   progressText,
-  secondaryLine,
   SEVERITIES,
+  sharedClients,
+  startedParts,
 } from "./queueUtil";
 import "./queue.css";
 import { GroupMark, ReadingMark, Seal, WorkflowMark } from "../voice/marks";
@@ -59,6 +64,13 @@ function moveItem(q: Queue, runId: number, into?: { group: QueueGroup; patch: Pa
 
 /** A Ready comparison whose proposal did not finish and can be retried (owner feedback 2026-11-03). */
 const canRetryProposal = (item: QueueItem) => item.proposal_run_id != null && item.proposal_retryable === true;
+
+/** Telling rows apart (queue navigation, 2026-11-03): the client names more than one row shows, and each name
+ * link's screen-reader context. Computed once per queue answer. */
+interface Nav {
+  shared: Set<string>;
+  contexts: Map<number, string>;
+}
 
 interface Actions {
   leave: (item: QueueItem, state: Exclude<QueueState, "open">) => void;
@@ -102,6 +114,11 @@ export function QueueView({ data, line, empty }: { data: QueueData; line: Line; 
     }
     prevActive.current = new Map(queue.in_progress.map((i) => [i.run_id, clientOf(i)]));
   }, [queue]);
+
+  const nav = useMemo<Nav>(
+    () => (queue ? { shared: sharedClients(queue), contexts: linkContexts(queue) } : { shared: new Set(), contexts: new Map() }),
+    [queue],
+  );
 
   const failToast = useCallback(
     (e: unknown, fallback: string) => toast({ message: e instanceof ApiError ? e.message : fallback, tone: "error" }),
@@ -245,7 +262,7 @@ export function QueueView({ data, line, empty }: { data: QueueData; line: Line; 
           <p className="hint queue__note">Showing the first 500 items. Older finished work is in Activity.</p>
         )}
         {GROUPS.map((g) => (
-          <Group key={g} group={g} items={queue[g]} actions={actions} animate={animate} />
+          <Group key={g} group={g} items={queue[g]} actions={actions} animate={animate} nav={nav} />
         ))}
         <p className="queue__footer">
           <a href={activityHref(line)} className="link-btn">
@@ -266,7 +283,19 @@ export function QueueView({ data, line, empty }: { data: QueueData; line: Line; 
   );
 }
 
-function Group({ group, items, actions, animate }: { group: QueueGroup; items: QueueItem[]; actions: Actions; animate: boolean }) {
+function Group({
+  group,
+  items,
+  actions,
+  animate,
+  nav,
+}: {
+  group: QueueGroup;
+  items: QueueItem[];
+  actions: Actions;
+  animate: boolean;
+  nav: Nav;
+}) {
   const id = useId();
   const collapsible = group === "done_recently";
   const [open, setOpen] = useState<{ value: boolean; animate: boolean }>({ value: !collapsible, animate: false });
@@ -282,7 +311,15 @@ function Group({ group, items, actions, animate }: { group: QueueGroup; items: Q
   const list = (
     <ul className={`queue-list${group === "in_progress" ? " queue-list--slim" : ""}`}>
       {rows.map(({ item, leaving, entering }) => (
-        <QueueRow key={`${item.run_id}${leaving ? "-leaving" : ""}`} item={item} group={group} actions={actions} leaving={leaving} entering={entering} />
+        <QueueRow
+          key={`${item.run_id}${leaving ? "-leaving" : ""}`}
+          item={item}
+          group={group}
+          actions={actions}
+          leaving={leaving}
+          entering={entering}
+          nav={nav}
+        />
       ))}
     </ul>
   );
@@ -322,12 +359,14 @@ function QueueRow({
   actions,
   leaving,
   entering,
+  nav,
 }: {
   item: QueueItem;
   group: QueueGroup;
   actions: Actions;
   leaving: boolean;
   entering: boolean;
+  nav: Nav;
 }) {
   const [busy, setBusy] = useState(false);
   // The seal lands once per filed row, and only after a pointer action (the archive may open later: it lands then).
@@ -337,6 +376,8 @@ function QueueRow({
     return lands;
   });
   const name = clientOf(item);
+  const started = startedParts(item.created_at);
+  const meta = metaParts(item, isShared(nav.shared, item));
   const forName = <span className="sr-only"> {name}</span>;
   const run = (fn: () => Promise<void>) => async () => {
     if (busy) return;
@@ -349,7 +390,9 @@ function QueueRow({
   };
   const retryProposal = group === "ready" && canRetryProposal(item);
 
-  let primary: ReactNode;
+  // Rows without a next step (In progress, Done recently, a Needs attention row that cannot be retried) have no
+  // primary action: the client name is the link to the report, so a quiet "Open" beside it was the same stop twice.
+  let primary: ReactNode = null;
   if (group === "needs_review") {
     primary = (
       <a
@@ -389,18 +432,12 @@ function QueueRow({
         {forName}
       </button>
     );
-  } else {
-    primary = (
-      <a href={runHref(item.run_id)} className="link-btn queue-row__open">
-        Open{forName}
-      </a>
-    );
   }
 
   const open = (id: number) => () => (window.location.hash = runHref(id));
   const menu: MenuItem[] = [];
   if (group === "done_recently") {
-    menu.push({ label: "Open run", icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.run_id) });
+    menu.push({ label: openLabel(item), icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.run_id) });
     if (item.queue_state !== "open") {
       menu.push({ label: "Move back to queue", icon: <ArrowCounterClockwise size={16} aria-hidden />, run: () => actions.reopen(item) });
     }
@@ -414,7 +451,7 @@ function QueueRow({
       menu.push({ label: "Open failed proposal", icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.proposal_run_id) });
       menu.push({ label: "Start new proposal", icon: <FilePlus size={16} aria-hidden />, run: () => void actions.buildProposal(item) });
     }
-    menu.push({ label: "Open run", icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.run_id) });
+    menu.push({ label: openLabel(item), icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.run_id) });
   }
   menu.push({ label: moveLabel(otherLine(item.line)), icon: <ArrowsLeftRight size={16} aria-hidden />, run: () => actions.move(item) });
 
@@ -433,10 +470,31 @@ function QueueRow({
           {group === "done_recently" && <Seal lands={sealLands} />}
         </span>
         <div className="queue-row__who">
-          <span className={`queue-row__client${item.client == null ? " is-unnamed" : ""}`}>{name}</span>
-          <span className="queue-row__what">
-            {secondaryLine(item)}
+          {/* The name is the way into the report (owner, 2026-11-03): no extra button, icon or line. */}
+          <span className="queue-row__name">
+            <a href={runHref(item.run_id)} className={`queue-row__client${item.client == null ? " is-unnamed" : ""}`}>
+              {name}
+              <span className="sr-only">{nav.contexts.get(item.run_id) ?? ""}</span>
+            </a>
+            {/* Beside the name it qualifies, so the meta line below stays one line (queue navigation). */}
             {item.client_source === "extracted" && <span className="queue-row__source">name from the documents</span>}
+          </span>
+          <span className="queue-row__what">
+            <span className="queue-row__summary">
+              {meta.lead && (
+                <span className={meta.detail ? "queue-row__lead" : undefined}>
+                  {meta.lead}
+                  {meta.detail ? " · " : ""}
+                </span>
+              )}
+              {meta.detail}
+            </span>
+            {started && (
+              <time className="queue-row__when" dateTime={item.created_at ?? undefined}>
+                {started.day}
+                <span className="queue-row__clock">, {started.time}</span>
+              </time>
+            )}
           </span>
         </div>
         <div className="queue-row__status">

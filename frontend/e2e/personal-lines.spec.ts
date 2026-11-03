@@ -153,7 +153,8 @@ test("Starting a comparison and a check from Personal lines makes personal runs"
   await expect(page).toHaveURL(/#\/runs\/\d+$/);
   const compareId = Number(/#\/runs\/(\d+)/.exec(page.url())![1]);
   expect((await (await page.request.get(`${API}/api/runs/${compareId}`)).json()).line).toBe("personal");
-  await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes.*Run \d+$/);
+  // Queue navigation: the last crumb names the client once the documents give one (before that, "Run N").
+  await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes.*(Run \d+|Cedar Hollow Hospitality LLC)$/);
   await expect(page.getByRole("group", { name: "Line", exact: true }).getByRole("radio", { name: "Personal" })).toBeChecked();
   await expect(page.locator(".report")).toBeVisible({ timeout: 60_000 });
 
@@ -187,7 +188,8 @@ test("Re-tag from the run header moves the run between the lists; a failed PATCH
   await page.goto("/#/runs/7");
   const control = page.getByRole("group", { name: "Line", exact: true });
   await expect(control.getByRole("radio", { name: "Personal" })).toBeChecked();
-  await expect(crumbs(page)).toHaveText(/^Personal lines.*Policy check.*Run 7$/);
+  // Queue navigation (deliberate update): a named run's last crumb is its client, not "Run 7".
+  await expect(crumbs(page)).toHaveText(/^Personal lines.*Policy check.*Avery and Jordan Pellham$/);
   // The rail names the tool: Policy check stays current for a personal Policy Check run.
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("aria-current", "page");
   // Work queue lane (D7 allowed edit): the run view's All runs tab opens Activity (spec section 2).
@@ -201,7 +203,7 @@ test("Re-tag from the run header moves the run between the lists; a failed PATCH
   expect(patch.postDataJSON()).toEqual({ line: "commercial" });
   await expect(control.getByRole("radio", { name: "Commercial" })).toBeChecked();
   await expect(page.locator(".toast-region")).toContainText("Moved to Commercial.");
-  await expect(crumbs(page)).toHaveText(/^Policy check.*Run 7$/);
+  await expect(crumbs(page)).toHaveText(/^Policy check.*Avery and Jordan Pellham$/);
   await shot(page, "1440-retag-commercial");
 
   await page.goto("/");

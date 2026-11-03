@@ -718,3 +718,59 @@ def test_a_check_whose_documents_name_no_insured_has_no_client(pc):
     run_id = _policy_run(pc, renewal=[RENEWAL[0].replace("Named Insured: Cedar Hollow LLC\n", "")],
                          expiring=[EXPIRING[0].replace("Named Insured: Cedar Hollow LLC\n", "")])
     assert _where(_queue(pc), run_id)[1]["client"] is None
+
+
+# --------------------------------------------------------------------- queue navigation (2026-11-03)
+# Owner: the same client showed four times with nothing to tell the rows apart, and the report page said "run 10"
+# even when the queue named the client from the documents. Items carry `created_at` and `carriers`; single-run
+# responses carry the resolved `client` / `client_source`, by the same rule as the queue.
+
+
+def test_queue_items_carry_created_at_and_the_carriers_in_column_order(api):
+    a = api.upload_pages(DOC_A, "a.pdf")  # Harborline Specialty
+    b = api.upload_pages(DOC_B, "b.pdf")  # Juniper Peak
+    none = api.upload_pages(["Named Insured: Cedar Hollow LLC\nTotal Premium: $1.00"], "n.pdf")
+    r = api.client.post("/api/runs", json={"document_ids": [b, none, a]})
+    run_id = r.json()["run"]["id"]
+    api.events(run_id)
+    run = api.client.get(f"/api/runs/{run_id}").json()
+    _, it = _where(_queue(api), run_id)
+    assert it["created_at"] == run["created_at"]
+    # one entry per document in column order; a quote without a verified carrier is null (the count stays honest)
+    assert it["carriers"] == ["Juniper Peak", None, "Harborline Specialty"]
+
+
+def test_queue_carriers_are_verified_values_only(api):
+    run = _compare(api, DOC_A, "a.pdf")
+    assert _where(_queue(api), run["id"])[1]["carriers"] == ["Harborline Specialty"]
+    with db.session_scope(api.ctx.factory) as s:
+        for f in s.scalars(select(models.Fact).where(models.Fact.run_id == run["id"],
+                                                     models.Fact.field == "carrier_name")):
+            f.state = "scan_read"
+    assert _where(_queue(api), run["id"])[1]["carriers"] == [None]
+
+
+def test_run_response_carries_the_queue_client_and_follows_a_rename(api):
+    run = _compare(api)
+    assert run["client_name"] is None
+    assert run["client"] == "Cedar Hollow LLC" and run["client_source"] == "extracted"
+    rid = run["id"]
+    out = api.client.patch(f"/api/runs/{rid}", json={"client_name": "Birch Lane"}).json()
+    assert out["client"] == "Birch Lane" and out["client_source"] == "broker"
+    out = api.client.patch(f"/api/runs/{rid}", json={"client_name": ""}).json()
+    assert out["client"] == "Cedar Hollow LLC" and out["client_source"] == "extracted"
+    _, it = _where(_queue(api), rid)
+    assert (it["client"], it["client_source"]) == (out["client"], out["client_source"])
+
+
+def test_run_response_client_is_null_without_any_name(api):
+    run = _compare(api, ["Carrier: Harborline Specialty\nTotal Premium: $26,391.14"])
+    assert run["client"] is None and run["client_source"] is None
+
+
+def test_run_response_client_for_a_policy_check_matches_the_queue(pc):
+    run_id = _policy_run(pc)
+    got = pc.client.get(f"/api/runs/{run_id}").json()
+    _, it = _where(_queue(pc), run_id)
+    assert got["client"] == it["client"] == "Cedar Hollow LLC"
+    assert got["client_source"] == it["client_source"] == "extracted"

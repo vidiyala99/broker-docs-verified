@@ -215,6 +215,77 @@
   line-height: var(--leading-xs);
 }
 
+/* Queue navigation (frontend/QUEUE-NAV-BRIEF.md): the client name is the link to the row's report. It keeps the
+   name's look (serif, text colour) and says "link" with a quiet resting underline that darkens on hover, so a touch
+   screen sees it too. One line of meta under it: what and which carriers (ellipsis), then when, then the tag. */
+.queue-row__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+  min-width: 0;
+}
+
+.queue-row__name > .queue-row__source {
+  color: var(--color-text-muted);
+}
+
+.queue-row__name > a.queue-row__client {
+  display: inline;
+  min-width: 0;
+  color: var(--color-text);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--color-border-input);
+  text-underline-offset: 0.22em;
+  border-radius: 2px;
+}
+
+.queue-row__name > a.queue-row__client.is-unnamed {
+  color: var(--color-text-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .queue-row__name > a.queue-row__client {
+    transition: text-decoration-color var(--dur-fast) ease;
+  }
+  .queue-row__name > a.queue-row__client:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+.queue-row__name > a.queue-row__client:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.queue-row__what {
+  flex-wrap: nowrap;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* What and which carriers give way first (ellipsis); the date never truncates. */
+.queue-row__summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-row__when {
+  flex: none;
+}
+
+/* Phone (status, not review work, PRODUCT.md): the row's mark names the workflow and the day is enough, so the meta
+   line keeps what tells this row from the next one. */
+@media (max-width: 699px) {
+  .queue-row__lead,
+  .queue-row__clock {
+    display: none;
+  }
+}
+
 .queue-row__status {
   display: grid;
   gap: 2px;
@@ -260,10 +331,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
-}
-
-.queue-row__open {
-  padding: 0 var(--space-2);
 }
 
 /* In progress: a slim strip, tinted, one line per item, no primary button. */
@@ -377,6 +444,53 @@
 }
 
 /* ------------------------------------------------------------------ run header client */
+
+/* Queue navigation: the report is titled by its client ("Cedar Hollow Hospitality LLC · Compare Quotes"). One line;
+   a long name gives way (ellipsis, full text in the accessible name), the run number and version stay metadata. */
+/* The name needs room before the report actions do: they wrap to the toolbar's second row (as they did beside the
+   old title at 1440), not the client's name to an ellipsis. */
+.toolbar__title--named {
+  flex: 1 1 24rem;
+  flex-wrap: nowrap;
+}
+
+.toolbar__heading {
+  display: grid;
+  min-width: 0;
+}
+
+.toolbar__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Phone: the name may take two lines rather than lose its end. */
+@media (max-width: 699px) {
+  .toolbar__name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+.toolbar__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+  font-family: var(--font-sans);
+  line-height: var(--leading-xs);
+}
+
+.toolbar__source {
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-regular);
+  white-space: nowrap;
+}
 
 .run-client {
   display: flex;

@@ -118,10 +118,15 @@ export function RunView({
     }
   }, [runId]);
 
+  const runChanged = useRef(onRunChanged);
+  runChanged.current = onRunChanged;
   const loadRun = useCallback(async (): Promise<Run | null> => {
     try {
       const r = await api.run(runId);
       setRun(r);
+      // The shell's copy too: the crumbs name the client once the documents give a name (queue navigation). Through a
+      // ref, so a new callback identity never reloads the run.
+      runChanged.current?.(r);
       setLoadError(null);
       if (r.artifact) await loadArtifact();
       else setArtifact(null);
@@ -175,18 +180,22 @@ export function RunView({
   const rename = useCallback(
     async (name: string) => {
       if (!run) return;
-      const before = run.client_name;
-      setRun((r) => (r ? { ...r, client_name: name || null } : r));
+      const before = { client_name: run.client_name, client: run.client, client_source: run.client_source };
+      // Optimistic: a typed name shows at once; a cleared one waits for the server's fallback (the documents' name).
+      const optimistic = name ? { client_name: name, client: name, client_source: "broker" as const } : { client_name: null };
+      setRun((r) => (r ? { ...r, ...optimistic } : r));
       try {
         const saved = await api.patchRun(run.id, { client_name: name });
-        setRun((r) => (r ? { ...r, client_name: saved.client_name } : r));
+        const names = { client_name: saved.client_name, client: saved.client ?? null, client_source: saved.client_source ?? null };
+        setRun((r) => (r ? { ...r, ...names } : r));
+        onRunChanged?.({ ...run, ...names }); // the crumbs and the tab title name the client too
         toast({ message: saved.client_name ? "Client name saved." : "Client name cleared.", hold: 4000 });
       } catch (e) {
-        setRun((r) => (r ? { ...r, client_name: before } : r));
+        setRun((r) => (r ? { ...r, ...before } : r));
         toast({ message: e instanceof ApiError ? e.message : "Couldn't save the client name. Retry.", tone: "error" });
       }
     },
-    [run, toast],
+    [run, toast, onRunChanged],
   );
 
   const updateDoc = (doc: RunDocument) =>
@@ -458,6 +467,9 @@ export function RunView({
   const running = Boolean(run?.active);
   const isProposal = run?.workflow_name === PROPOSAL_WORKFLOW;
   const isPolicy = run?.workflow_name === POLICY_WORKFLOW;
+  const workflowTitle = isPolicy ? "Policy check" : "Compare Quotes";
+  const headClient = !isProposal ? (run?.client ?? run?.client_name ?? null) : null;
+  const edited = Boolean(artifact?.note?.startsWith("edit") || artifact?.note?.startsWith("chat edit"));
   const personal = run?.line === "personal";
 
   const reportBody = (
@@ -581,18 +593,38 @@ export function RunView({
         </nav>
 
         <div className="toolbar">
-          <h1 id="pane-title" className="toolbar__title">
+          <h1 id="pane-title" className={`toolbar__title${headClient ? " toolbar__title--named" : ""}`}>
             {run && <WorkflowMark slug={isPolicy ? "policy-check" : isProposal ? "proposal" : "compare-quotes"} size={30} />}
-            {isProposal ? (artifact?.title ?? "Proposal") : isPolicy ? "Policy check" : "Compare Quotes"}, run {runId}
-            {artifact && (
-              <span className="toolbar__version">
-                Version {artifact.version}
-                {artifact.note?.startsWith("edit") || artifact.note?.startsWith("chat edit") ? ", edited" : ""}
+            {/* Queue navigation: a named run is titled by its client, as its queue row is, with the run number as
+                small metadata under it. Proposals keep their own title (it already names the client). */}
+            {headClient ? (
+              <span className="toolbar__heading">
+                <span className="toolbar__name" title={`${headClient} · ${workflowTitle}`}>
+                  {headClient} · {workflowTitle}
+                </span>
+                <span className="toolbar__meta">
+                  {run?.client_source === "extracted" && <span className="toolbar__source">name from the documents</span>}
+                  <span className="toolbar__version">
+                    Run {runId}
+                    {artifact ? `, version ${artifact.version}` : ""}
+                    {edited ? ", edited" : ""}
+                  </span>
+                </span>
               </span>
+            ) : (
+              <>
+                {isProposal ? (artifact?.title ?? "Proposal") : workflowTitle}, run {runId}
+                {artifact && (
+                  <span className="toolbar__version">
+                    Version {artifact.version}
+                    {edited ? ", edited" : ""}
+                  </span>
+                )}
+              </>
             )}
           </h1>
           {run && <LineChoice compact value={run.line} onChange={(l) => void retag(l)} />}
-          {run && <RunClient key={run.id} value={run.client_name} onSave={(name) => void rename(name)} />}
+          {run && <RunClient key={run.id} value={run.client ?? run.client_name} onSave={(name) => void rename(name)} />}
           <div className="toolbar__actions" role="toolbar" aria-label="Report actions">
             <Tip text="Good report">
               <button type="button" className="icon-btn" aria-label="Good report" aria-pressed={artifact?.feedback?.rating === 1} disabled={!artifact} onClick={() => void rate(1)}>

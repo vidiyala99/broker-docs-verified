@@ -3,9 +3,13 @@ import { UserCircle } from "@phosphor-icons/react";
 import "../queue/queue.css";
 
 /**
- * Work queue W4: the run header's Client control, next to Line. A quiet button ("Add client" when empty) that becomes
- * an input in place. Enter or leaving the field saves, Esc cancels; an empty value clears the name. Saving is the
- * caller's (optimistic PATCH with rollback, like the Line control).
+ * Work queue W4: the run header's Client control, next to Line. A quiet button that becomes an input in place. Enter
+ * or leaving the field saves, Esc cancels; an empty value clears the name. Saving is the caller's (optimistic PATCH
+ * with rollback, like the Line control).
+ *
+ * Queue navigation (2026-11-03): the client's name is the page title now, so the button only names the action:
+ * "Add client" when the run has no name at all, "Change" when it has one (`value`: typed by the broker, or the name
+ * the queue reads from the documents). The field starts from that name; saving it unchanged saves nothing.
  */
 export function RunClient({ value, onSave }: { value: string | null; onSave: (name: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -75,16 +79,15 @@ export function RunClient({ value, onSave }: { value: string | null; onSave: (na
         <button
           ref={button}
           type="button"
-          className={`run-client__value${value ? "" : " is-empty"}`}
-          aria-label={value ? `Client: ${value}. Edit` : "Add client"}
-          title={value ?? undefined}
+          className={`run-client__value${value ? " is-change" : " is-empty"}`}
+          aria-label={value ? `Change client: ${value}` : "Add client"}
           onClick={() => {
             setText(value ?? "");
             setEditing(true);
           }}
         >
           <UserCircle size={16} aria-hidden />
-          <span>{value ?? "Add client"}</span>
+          <span>{value ? "Change" : "Add client"}</span>
         </button>
       )}
     </div>

@@ -179,6 +179,12 @@ See `frontend/QUEUE-BRIEF.md`. No new tokens.
 - Section headers: serif 22px, a group mark and a plain tabular count (Inter); the In progress strip and Done recently
   stay 17px.
 - Needs review status reuses the Policy Check four-tick severity meter (worst open item) before the open counts.
+- Queue navigation (2026-11-03, `frontend/QUEUE-NAV-BRIEF.md`): the client name is the link to the row's report (text
+  colour, 1px resting underline in `--color-border-input`, `currentColor` on hover); no separate "Open" link. The meta
+  line is one line: what (or, when a client shows on two rows, the carriers' short names), then the start date; the
+  "name from the documents" tag sits beside the name. Phone drops the workflow word and the time. Identity and status
+  columns split 3fr / 2fr. The report header names the client ("<client> · Compare Quotes"), run number and version
+  as text-xs metadata under it; the client button reads "Change" when a name exists.
 - Motion primitives in `ui/motion.tsx` / `ui/motion.css` (for reuse by the motion lane): list enter (opacity +
   translateY 6px, 200ms ease-out, `backwards` fill so no stacking context is left), list exit (opacity + grid-row fold,
   190ms), disclosure collapse (grid rows 0fr to 1fr, pointer only), count bump (scale 0.85 + opacity, 200ms), live sweep

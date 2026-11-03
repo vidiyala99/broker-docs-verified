@@ -80,6 +80,35 @@ def test_seeded_policy_checks_are_personal_and_two_tasks_exist(tmp_path, monkeyp
         s.close()
 
 
+def test_seeded_comparisons_name_distinct_clients_and_keep_one_documents_fallback(tmp_path, monkeypatch):
+    """Queue navigation (2026-11-03): the owner saw Cedar Hollow (every quote fixture's named insured) several
+    times with nothing to tell the rows apart. Every typed name is a different client, only run 6 (the Cedar
+    Hollow file) types that name, and a run without a typed name (run 5) still shows the documents' name with
+    the "extracted" source, its carriers and its date, so the queue can tell it from run 6."""
+    names = list(dev_seed.CLIENTS.values())
+    assert len(set(names)) == len(names)
+    assert [k for k, v in dev_seed.CLIENTS.items() if "Cedar Hollow" in v] == ["main"]
+    assert "budget" in dev_seed.CLIENTS  # run 3 no longer falls back to Cedar Hollow
+
+    monkeypatch.setenv("BROKERDOCS_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    s = dev_seed.Seeder()
+    try:
+        typed = s.run(s.upload("carrier_a_clean.pdf"), client=dev_seed.CLIENTS["budget"])
+        fallback = s.run(s.upload("carrier_c_clean.pdf"))
+        items = {i["run_id"]: i for g in ("ready", "needs_attention")
+                 for i in s.client.get("/api/queue", params={"line": "commercial"}).json()[g]}
+        assert items[typed["id"]]["client"] == dev_seed.CLIENTS["budget"]
+        assert items[typed["id"]]["client_source"] == "broker"
+        fb = items[fallback["id"]]
+        assert fb["client"] == "Cedar Hollow Hospitality LLC" and fb["client_source"] == "extracted"
+        assert fb["carriers"] and fb["created_at"]
+        run = s.client.get(f"/api/runs/{fallback['id']}").json()
+        assert (run["client"], run["client_source"]) == ("Cedar Hollow Hospitality LLC", "extracted")
+    finally:
+        s.close()
+
+
 def test_seeded_queue_names_clients_and_links_a_failed_proposal(tmp_path, monkeypatch):
     """Work queue seed: runs 7/8 and two comparisons carry broker client names, one comparison is
     left unnamed, and a failed proposal built from a comparison puts it in Ready with

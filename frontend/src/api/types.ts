@@ -86,6 +86,9 @@ export interface Run {
   queue_state: QueueState;
   proposal_run_id: number | null;
   queue_changed_at: string | null;
+  /** The name the run's queue row shows (typed, else from the documents); single-run responses only (API.md). */
+  client?: string | null;
+  client_source?: "broker" | "extracted" | null;
 }
 
 /** Work queue (backend/API.md "Work queue"). */
@@ -97,6 +100,10 @@ export interface QueueItem {
   workflow_slug: string;
   workflow_name: string;
   line: Line;
+  /** When the work was started (the run's created_at; queue navigation, API.md). */
+  created_at: string | null;
+  /** One per document in column order: its verified carrier name, or null; shown when two rows share a client. */
+  carriers: (string | null)[];
   client: string | null;
   client_source: "broker" | "extracted" | null;
   summary: string;

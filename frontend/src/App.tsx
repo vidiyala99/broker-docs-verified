@@ -101,6 +101,9 @@ export function App() {
   const proposalRun = runOfRoute?.workflow_name === PROPOSAL_WORKFLOW;
   const policyRun = runOfRoute?.workflow_name === POLICY_WORKFLOW;
   const personalRun = runOfRoute?.line === "personal";
+  // Queue navigation: a run with a client (typed, or read from the documents as the queue shows it) is named by the
+  // client in the crumbs and the tab title; proposals keep "Run N" (their title already names the client).
+  const runClient = !proposalRun ? (runOfRoute?.client ?? runOfRoute?.client_name ?? null) : null;
   // An entry screen opened from Personal lines (`?line=personal`) belongs to Personal lines.
   const personalEntry =
     route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks && !route.activity;
@@ -147,9 +150,9 @@ export function App() {
           : route.policy
             ? "New policy check"
             : route.runId
-              ? `Run ${route.runId}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
+              ? `${runClient ?? `Run ${route.runId}`}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
               : "Compare Quotes";
-  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, route.activity, proposalRun, policyRun]);
+  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, route.activity, proposalRun, policyRun, runClient]);
 
   // Rail: Personal lines for its page and its entry screens; a run view highlights its workflow whatever its line
   // (the rail names the tool, the crumb names the book; PERSONAL-LINES-BRIEF.md).
@@ -172,13 +175,14 @@ export function App() {
   // A personal run's crumbs start with Personal lines; their links keep the personal preset.
   const toPersonal: Crumb = { label: "Personal lines", href: "#/personal-lines" };
   const preset = personalRun ? "?line=personal" : "";
+  const runLabel = runClient ?? `Run ${route.runId}`;
   const runCrumbs: Crumb[] = proposalRun
     ? [{ label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
     : policyRun
-      ? [{ label: "Policy check", href: `#/policy-check/new${preset}` }, { label: `Run ${route.runId}` }]
+      ? [{ label: "Policy check", href: `#/policy-check/new${preset}` }, { label: runLabel }]
       : personalRun
-        ? [{ label: WORKFLOW_NAME, href: `#/${preset}` }, { label: `Run ${route.runId}` }]
-        : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: `Run ${route.runId}` }];
+        ? [{ label: WORKFLOW_NAME, href: `#/${preset}` }, { label: runLabel }]
+        : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: runLabel }];
   const crumbs: Crumb[] = route.activity
     ? [{ label: "Activity" }]
     : route.tasks

@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from sqlalchemy import select
 
-from backend import db, models, proposal
+from backend import db, models, proposal, work_queue
 from backend.context import AppContext
 from backend.pipeline.runner import SlotError, format_sse
 from backend.routes.common import ApiError, get_ctx, not_found
@@ -84,7 +84,11 @@ def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
         run = s.get(models.Run, run_id)
         if run is None:
             raise not_found("run", run_id)
-        return run_out(run, active=ctx.manager.is_active(run_id))
+        out = run_out(run, active=ctx.manager.is_active(run_id))
+        # Queue navigation: the client the queue row shows (broker name, else the extracted named insured), so
+        # the report header and crumbs name the same client. Single-run responses only (API.md "Run").
+        out["client"], out["client_source"] = work_queue.run_client(s, run)
+        return out
 
 
 @router.post("/runs")

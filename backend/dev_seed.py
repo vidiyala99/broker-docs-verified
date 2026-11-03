@@ -24,8 +24,10 @@ seed   uploads fixture PDFs from tests/fixtures/quotes and runs these comparison
          9. Proposal Builder built from run 4 (`source_run_id`) whose document is corrupt: it fails,
             so run 4 shows in the work queue's Ready group with "Proposal didn't finish"
        Runs 7 and 8 (homeowners) are tagged `line: personal`, the others commercial (slice 3b).
-       Client names (work queue): runs 2, 4, 6, 7 and 8 have a broker-typed name (CLIENTS); runs 3
-       and 5 use the extracted named insured; run 1 has no name at all ("Unnamed client").
+       Client names (work queue): runs 2, 3, 4, 6, 7 and 8 have a broker-typed name (CLIENTS), each a
+       different client; run 6 is the Cedar Hollow file itself. Run 5 uses the extracted named insured
+       (Cedar Hollow, tagged "name from the documents"), so Cedar Hollow shows twice and the queue tells
+       the two rows apart by date and carriers. Run 1 has no name at all ("Unnamed client").
        Two tasks: one free-standing, due three days ago (overdue), and one linked to run 7's
        first discrepancy.
 serve  runs the real API with the same scripted model, slowed down (BROKERDOCS_DEV_DELAY seconds
@@ -65,10 +67,13 @@ ALIASES = {
     "General Aggregate Limit": "aggregate_limit", "Aggregate Limit": "aggregate_limit",
     "Deductible": "retention", "Amended Deductible": "retention", "Quote Valid Until": "quote_expiration",
 }
-# Broker-typed client names (work queue, W4). Run 1 (failed) and runs 3 and 5 have none: run 1 reads
-# "Unnamed client" (nothing was extracted), runs 3 and 5 fall back to the extracted named insured.
+# Broker-typed client names (work queue, W4). Run 1 (failed) and run 5 have none: run 1 reads "Unnamed
+# client" (nothing was extracted), run 5 falls back to the extracted named insured. Queue navigation
+# (2026-11-03): run 3 used to fall back too, so Cedar Hollow (every quote fixture's named insured) showed three
+# times with nothing to tell the rows apart; it is now a client of its own.
 CLIENTS = {
     "cancelled": "Brightwater Logistics Inc.",  # run 2
+    "budget": "Halvorsen Dental Partners",  # run 3
     "fallback": "Copperfield Marine Services",  # run 4
     "main": "Cedar Hollow Hospitality LLC",  # run 6
     "policy_check": "Avery and Jordan Pellham",  # run 7
@@ -435,7 +440,8 @@ def seed() -> None:
     s = Seeder(budget=52000)
     try:
         print("3. budget run")
-        s.run(s.upload("carrier_a_clean.pdf", "carrier_b_clean.pdf", "carrier_c_clean.pdf"))
+        s.run(s.upload("carrier_a_clean.pdf", "carrier_b_clean.pdf", "carrier_c_clean.pdf"),
+              client=CLIENTS["budget"])
     finally:
         s.close()
 
