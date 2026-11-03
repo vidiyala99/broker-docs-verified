@@ -1,7 +1,8 @@
-# BrokerDocs local API (slices 1 to 3b)
+# BrokerDocs local API (slices 1 to 3b, work queue)
 
-Covers Compare Quotes (slice 1), Proposal Builder (slice 2), Policy Check (slice 3) and the
-rail completion of slice 3b (run `line` for Personal lines, Tasks).
+Covers Compare Quotes (slice 1), Proposal Builder (slice 2), Policy Check (slice 3), the
+rail completion of slice 3b (run `line` for Personal lines, Tasks) and the broker work queue
+(`GET /api/queue`, run client names and queue state).
 
 Contract between `backend/` and `frontend/`. The live OpenAPI schema is at
 `GET /api/openapi.json` (interactive at `/api/docs`); this file is the
@@ -20,8 +21,11 @@ key is read from the `OPENAI_API_KEY` environment variable on the server and
 never reaches the browser.
 
 There are no migrations. A database created before the slice 3b schema change
-(2026-11-02: `run.line` and the `task` table) stops the server at startup with
-a message naming the file to delete and the reseed command
+(2026-11-02: `run.line` and the `task` table) or before the work queue
+(`run.client_name`, `run.queue_state` with its check constraint
+`ck_run_queue_state`, `run.proposal_run_id`, `run.queue_changed_at` and the
+index `ix_run_line_queue_state` on `run (line, queue_state)`) stops the server at
+startup with a message naming the file, every missing piece, and the reseed command
 (`backend/.venv/Scripts/python -m backend.dev_seed seed`, with
 `BROKERDOCS_DATA_DIR` set to a scratch folder).
 
@@ -55,7 +59,7 @@ Every error has one shape:
 
 | Status | Codes |
 |---|---|
-| 400 | `Invalid host header` (plain text from the host guard), `invalid_run` (slot assignment or `line`, see `POST /api/runs` and `PATCH /api/runs/{id}`), `invalid_task` (see Tasks) |
+| 400 | `Invalid host header` (plain text from the host guard), `invalid_run` (slot assignment, `line`, `client_name`, `source_run_id` or `queue_state`, see `POST /api/runs` and `PATCH /api/runs/{id}`), `invalid_task` (see Tasks) |
 | 403 | `origin_not_allowed` |
 | 404 | `not_found`, `no_report`, `cell_not_found`, `version_not_found`, `file_missing` |
 | 409 | `document_in_use`, `not_retryable`, `run_active`, `version_conflict`, `regenerate_in_progress`, `already_applied`, `chat_busy`, `no_report`, `budget_exhausted` |
@@ -222,6 +226,19 @@ The proposal artifact uses the slice 1 blocks:
   verified facts (with chips), deterministic, no `compose_fallback` notice.
   Retry and Regenerate prose keep the mode.
 
+**Build proposal from a comparison (work queue).** `POST /api/runs` with
+`"workflow": "proposal-builder"` may also take a top-level `source_run_id`: the
+Compare Quotes run the proposal is built from. It must name a Compare Quotes run
+whose `status` is `done`; anything else (unknown id, a Policy Check or proposal
+run, a comparison that is not done, a value that is not an integer, or
+`source_run_id` with another workflow) is `400 invalid_run` and creates nothing.
+The id is stored as `parameters.source_run_id` (after the validated parameters
+and the template snapshot), so it is part of the duplicate-run identity (M3):
+the same documents built from two comparisons are two runs, and a double click
+on one comparison returns the active run. The source comparison's
+`proposal_run_id` is set to the new (or reused) run. Without `line`, the
+proposal takes the comparison's `line` (M5); a `line` sent with the request wins.
+
 ## Documents
 
 ### `POST /api/documents` (multipart)
@@ -382,6 +399,18 @@ reads or compares documents. Any other value (another string, a number, a
 list) is `400 invalid_run` with the message "line must be commercial or
 personal." and creates nothing.
 
+**`client_name` (work queue, optional).** The broker's name for the client
+(the start screens' Client field). Control characters are dropped (the same
+pattern as discrepancy notes), whitespace runs become one space and the ends are
+trimmed; the result is 1 to 120 characters. Omitted, `null` or empty after
+cleaning means no name. A value that is not a string, or longer than 120
+characters after cleaning, is `400 invalid_run` and creates nothing. Like
+`line`, it is outside the duplicate-run identity: a reused active run takes the
+name when one is sent and keeps its own otherwise.
+
+**`source_run_id` (work queue, proposal-builder only).** See "Build proposal
+from a comparison" under Proposal runs.
+
 Responses:
 
 - `201 {"run": Run, "created": true}` for a new run (it starts at once).
@@ -394,8 +423,9 @@ Responses:
 - `400 invalid_run`: the slot assignment does not fit the workflow (missing,
   unknown or extra slot entry, a slot below its min or above its max, a PDF in
   the AMS slot, an AMS export in a PDF slot, or `slots` omitted for a
-  multi-slot workflow), or `line` is not `commercial` or `personal`. `message`
-  is safe to show.
+  multi-slot workflow), `line` is not `commercial` or `personal`, `client_name`
+  is not text or too long, or `source_run_id` breaks its rules. `message` is
+  safe to show.
 - `422 invalid_run`: no documents, a duplicate, or more than 8 (`limit: 8`).
   These are the older cases and stay 422; slot errors are 400.
 - `422 invalid_request`: a malformed body (for example `slots` with more than
@@ -414,6 +444,8 @@ the run; its cells read Not read in the report (see "Policy Check discrepancies"
 ```json
 {
   "id": 12, "workflow_id": 1, "workflow_name": "Compare Quotes", "line": "commercial",
+  "client_name": "Cedar Hollow LLC", "queue_state": "open", "proposal_run_id": null,
+  "queue_changed_at": null,
   "status": "running", "active": true, "terminal": false,
   "error": null, "retryable": false, "parameters": {},
   "tokens_in": 5120, "tokens_out": 830, "cost_usd": 0.0029,
@@ -433,6 +465,16 @@ report exists.
 `line` (slice 3b) is `commercial` or `personal`; every run made before slice 3b
 reads `commercial`. It is in every REST `Run` (create, list, get, patch, retry,
 cancel). The SSE `run.snapshot` payload does not carry it (unchanged, O9).
+
+Work queue fields, in every REST `Run` like `line` (not in SSE payloads):
+`client_name` (the broker's client name, or `null`), `queue_state` (`open`,
+`done` or `dismissed`; `open` for every new run and every run made before the
+work queue), `proposal_run_id` (Compare Quotes: the Proposal Builder run last
+started from it with `source_run_id`, else `null`; a plain id, it may name a run
+that no longer exists) and `queue_changed_at` (when the item last left or was put
+back in the queue: `PATCH queue_state`, its proposal finishing done or partial,
+or its last open discrepancy resolved; `null` until then and again after a
+Retry). See `GET /api/queue`.
 
 The UI's label for a run is `"<workflow_name> · Run <id>"` (for example
 `"Policy Check · Run 7"`); `GET /api/tasks` returns it as `run_label`.
@@ -479,25 +521,44 @@ lines uses `?line=personal&limit=100`; the Workflows recent-runs list uses
 
 `Run`.
 
-### `PATCH /api/runs/{id}` (slice 3b)
+### `PATCH /api/runs/{id}` (slice 3b, work queue)
 
 ```json
-{"line": "personal"}
+{"line": "personal", "client_name": "Cedar Hollow LLC", "queue_state": "done"}
 ```
 
-Re-tags a run (the run header's Commercial / Personal control). Only `line` can
-change, and the body must be exactly that one key. Works on an active run too.
-Returns `200 Run`.
+Changes a run's tags: any non-empty subset of `line` (the run header's
+Commercial / Personal control), `client_name` (the run header's Client field)
+and `queue_state` (the queue's Mark done, Dismiss and their Undo), and no other
+key. Every value is checked before anything changes, so a bad value next to a
+good one changes nothing. Returns `200 Run`.
 
-- `404 not_found`: unknown run.
-- `400 invalid_run`: `line` missing, `null` or not `commercial` / `personal`,
-  any other key in the body, or a body that is not an object.
+- `line`: `commercial` or `personal`. Works on an active run too.
+- `client_name`: cleaned and limited as in `POST /api/runs`; `""` (or `null`)
+  clears the name, and the queue falls back to the extracted named insured.
+  Works on an active run too.
+- `queue_state`: `open`, `done` or `dismissed`. Sets `queue_changed_at` to now,
+  so a run finished long ago still shows in Done recently for 14 days after it is
+  marked done (D2). `done` or `dismissed` on an active run is `409 run_active`
+  (M1); `open` is allowed.
+
+Errors:
+
+- `404 not_found`: unknown run (checked before the body).
+- `400 invalid_run`: an empty body, a body that is not an object, any other key,
+  `line` missing its value, `null` or not `commercial` / `personal`, a
+  `client_name` that is not text or is over 120 characters, a `queue_state`
+  outside `open` / `done` / `dismissed`.
+- `409 run_active` (with `run_status`): `queue_state` `done` or `dismissed`
+  while the run is queued, running or composing.
 
 ### `POST /api/runs/{id}/retry`
 
 `202 {"run": Run}`. Re-runs only the documents that did not finish, then
 recomposes (a new artifact version). Cell edits are carried into the new
-version and the sections they affect are flagged stale.
+version and the sections they affect are flagged stale. A retry reopens the
+work-queue item (D8): `queue_state` becomes `open` and `queue_changed_at`
+`null`, in the same transaction.
 `409 not_retryable` (with `run_status`) unless the run is `failed`,
 `partial` or `cancelled` and idle (that is, unless `Run.retryable` is true).
 After a retry, open the events stream again: it follows the new execution
@@ -555,6 +616,81 @@ event) and the run is idle; render from it and close. It also closes an idle
 run's replay that has no current `run.end` to end on. For a run that already
 ended, the replay ends with the `run.end` of its latest execution.
 After `run.end` (or a snapshot), fetch `GET /api/runs/{id}` and the artifact.
+
+## Work queue
+
+Spec: `docs/specs/2026-11-02-work-queue-design.md` (its decision ledger and
+amendments override the text above them). Rules: `backend/work_queue.py`.
+
+### `GET /api/queue?line=commercial`
+
+`line` is required: `commercial` (Workflows home) or `personal` (Personal
+lines). Missing or any other value is `422 invalid_request`, like `?line=` on
+`GET /api/runs`.
+
+```json
+{"line": "commercial", "truncated": false,
+ "in_progress": [Item], "needs_review": [Item], "ready": [Item],
+ "needs_attention": [Item], "done_recently": [Item]}
+```
+
+`Item`:
+
+```json
+{"run_id": 7, "workflow_slug": "policy-check", "workflow_name": "Policy Check", "line": "personal",
+ "client": "Avery and Jordan Pellham", "client_source": "broker", "summary": "Renewal check",
+ "open_counts": {"critical": 2, "high": 5, "medium": 1, "low": 1}, "reasons": null,
+ "status": "done", "retryable": false, "finished_at": "...", "queue_state": "open",
+ "queue_changed_at": null, "proposal_run_id": null}
+```
+
+- `client`: the run's `client_name` (`client_source` `"broker"`), else the
+  verified `named_insured` the run extracted (`"extracted"`), else `null` for
+  both (the UI shows "Unnamed client"). Policy Check takes the renewal's name,
+  then the expiring policy's, then the quote's. Compare Quotes takes the name
+  most quotes state (compared ignoring case and spacing); a tie goes to the
+  leftmost quote. Only facts in state `verified` count.
+- `summary`: `"Renewal check"` (Policy Check), `"3 carriers"` (Compare Quotes,
+  one per document), or `"Building proposal"` while the comparison's proposal runs.
+- `open_counts`: open discrepancies per severity for a Policy Check with a
+  report (the same numbers as `open_counts` in `GET /api/runs/{id}/discrepancies`:
+  items of the current version only), else `null`.
+- `reasons`: plain-language causes, in this order, on Needs attention and Ready
+  items, else `null`: "Stopped before finishing" (cancelled), "Interrupted by a
+  restart", "Extraction stopped: budget reached", "N document(s) not read",
+  "Stopped with an error" (a failed run with no other cause), "Proposal didn't
+  finish" (Ready: the comparison's proposal failed or was cancelled).
+- `retryable` is `Run.retryable` (show Retry only when true). `status`,
+  `finished_at`, `queue_state`, `queue_changed_at` and `proposal_run_id` are the
+  run's own fields.
+
+Groups, first match wins:
+
+| Group | Rule |
+|---|---|
+| (not listed) | Proposal Builder runs (they live under Proposals and Activity) |
+| `in_progress` | the run is queued, running or composing; or a comparison whose proposal (`proposal_run_id`) is |
+| `needs_attention` | `queue_state` `open` and status `failed`, `partial` or `cancelled` (a partial Policy Check shows here once, with its `open_counts`) |
+| `needs_review` | `queue_state` `open`, Policy Check with a report and at least one open discrepancy |
+| `ready` | `queue_state` `open`, Compare Quotes `done`, and no proposal, or its proposal failed or was cancelled |
+| `done_recently` | anything else whose later of `finished_at` and `queue_changed_at` is within the last 14 days (resolved checks, proposal built (done or partial), marked done, dismissed) |
+| (not listed) | older than that: Activity only |
+
+Within a group, items are newest first by the later of `finished_at` and
+`queue_changed_at` (then `created_at`), then by run id.
+
+Selection: the line's runs that are active, have an active proposal, are
+`queue_state` `open`, or changed in the last 14 days. Actionable rows come first
+(active, or open and failed / partial / cancelled, a Policy Check, or a
+comparison without a built proposal), then the rest, newest first; at most 500
+are used. `truncated` is true when more rows matched (the UI shows a note).
+
+Leaving and re-entering the queue: `PATCH /api/runs/{id}` `queue_state` (Mark
+done, Dismiss, Undo), a linked proposal finishing done or partial (the
+comparison's `queue_changed_at` is set in the same transaction as the
+proposal's final status), resolving a Policy Check's last open discrepancy
+(sets `queue_changed_at`), and Retry (back to `open`). The UI polls this route
+every 3 s while `in_progress` is non-empty (D5).
 
 ## Policy Check discrepancies (slice 3)
 
@@ -654,7 +790,8 @@ Body `{"status": "open" | "resolved", "note": "..." | null}`, either or both (`4
 empty body, another status, an unknown key, or a note over 2000 characters). Control
 characters are stripped from the note; `note: null` clears it. A status change clears
 `changed_since_resolved`. Returns the item in the GET shape (with `task`); `404 discrepancy_not_found`
-when the current version has no such item.
+when the current version has no such item. Resolving an open item that leaves the current version with
+no open item sets the run's `queue_changed_at` (work queue, D2: the check moves to Done recently).
 
 ## Tasks (slice 3b)
 

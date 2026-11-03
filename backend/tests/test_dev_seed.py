@@ -78,3 +78,39 @@ def test_seeded_policy_checks_are_personal_and_two_tasks_exist(tmp_path, monkeyp
         assert [i["task"]["id"] for i in items if i["task"]] == [linked["id"]]
     finally:
         s.close()
+
+
+def test_seeded_queue_names_clients_and_links_a_failed_proposal(tmp_path, monkeypatch):
+    """Work queue seed: runs 7/8 and two comparisons carry broker client names, one comparison is
+    left unnamed, and a failed proposal built from a comparison puts it in Ready with
+    "Proposal didn't finish" (D3). Proposal runs never show in the queue."""
+    monkeypatch.setenv("BROKERDOCS_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    s = dev_seed.Seeder()
+    try:
+        unnamed = s.run(s.upload("corrupt_truncated.pdf", "corrupt_garbage.pdf"))  # like run 1
+        named = s.run(s.upload("carrier_a_clean.pdf", "carrier_d_clean.pdf"), client=dev_seed.CLIENTS["fallback"])
+        first, second = dev_seed.seed_policy_checks(s)
+        proposal = dev_seed.seed_failed_proposal(s, named["id"])
+        runs = {r["id"]: r for r in s.client.get("/api/runs").json()["runs"]}
+        assert runs[first]["client_name"] == dev_seed.CLIENTS["policy_check"]
+        assert runs[second]["client_name"] == dev_seed.CLIENTS["policy_check_quote_unread"]
+        assert runs[proposal]["status"] == "failed" and runs[proposal]["parameters"]["source_run_id"] == named["id"]
+        assert runs[named["id"]]["proposal_run_id"] == proposal
+
+        commercial = s.client.get("/api/queue", params={"line": "commercial"}).json()
+        ready = {i["run_id"]: i for i in commercial["ready"]}
+        assert ready[named["id"]]["client"] == dev_seed.CLIENTS["fallback"]
+        assert ready[named["id"]]["reasons"] == ["Proposal didn't finish"]
+        attention = {i["run_id"]: i for i in commercial["needs_attention"]}
+        assert attention[unnamed["id"]]["client"] is None and attention[unnamed["id"]]["client_source"] is None
+        every = [i["run_id"] for g in ("in_progress", "needs_review", "ready", "needs_attention", "done_recently")
+                 for i in commercial[g]]
+        assert proposal not in every
+
+        personal = s.client.get("/api/queue", params={"line": "personal"}).json()
+        assert [i["run_id"] for i in personal["needs_review"]] == [first]
+        assert [i["run_id"] for i in personal["needs_attention"]] == [second]
+        assert personal["needs_review"][0]["client_source"] == "broker"
+    finally:
+        s.close()

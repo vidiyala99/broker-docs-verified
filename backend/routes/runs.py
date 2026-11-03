@@ -1,4 +1,5 @@
-"""Run routes: create (idempotent), list (optionally by line), get, re-tag (PATCH line, slice 3b),
+"""Run routes: create (idempotent; optional client_name and, for proposals, source_run_id), list
+(optionally by line), get, PATCH (line, client_name, queue_state: slice 3b and the work queue),
 retry, cancel, the SSE progress stream, and the Policy Check discrepancy list and its per-item
 status (slice 3 T6), each item with its linked task (slice 3b, O4)."""
 
