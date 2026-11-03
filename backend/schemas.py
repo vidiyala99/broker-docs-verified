@@ -10,7 +10,7 @@ import re
 import unicodedata
 from collections.abc import Collection, Sequence
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import (
     BaseModel,
@@ -88,13 +88,15 @@ class FactField(BaseModel):
     kind (slice 3, D13): "scalar" is one value per document (every field before slice 3);
     "forms" asks the same extraction call for a forms array, and each form becomes a fact
     keyed form:<normalized number> (see the policy check fact schema below).
+    "endorsements" (slice 4, certificates) asks the same call for an endorsements array; each
+    endorsement becomes facts keyed cert:endorsement:<normalized number>:<attribute> (see below).
     """
 
     key: str
     label: str
     description: str = ""
     section: str | None = None  # section-plan id the field is usually reported in
-    kind: Literal["scalar", "forms"] = "scalar"
+    kind: Literal["scalar", "forms", "endorsements"] = "scalar"
 
 
 class SectionPlanItem(BaseModel):
@@ -428,6 +430,104 @@ POLICY_CHECK_FIELDS: list[FactField] = [
 ]
 
 
+# --------------------------------------------------------------------- certificate fact schema (slice 4, C3)
+#
+# One combined pass per window, like Policy Check's forms (D13): the scalar cert: fields below plus an
+# endorsements array. One declarations document is one line of coverage (C7); a document stating several
+# lines (a package policy) contributes no facts (pipeline.certificate notices it). Each endorsement becomes
+# facts keyed cert:endorsement:<normalized form number>:<attribute> (schemas.ENDORSEMENT_ATTRIBUTES;
+# form_number holds "<number> <edition>" like a form fact). The
+# endorsement's type (additional insured, waiver, primary and non-contributory; blanket or scheduled) is
+# classified in code from its verified title and named party (pipeline.coi_checks), never taken from the model.
+
+CERT_PREFIX = "cert:"
+ENDORSEMENT_KEY_PREFIX = "cert:endorsement:"
+# form_number: "<number> <edition>" as printed; type: the printed title, which says what the endorsement
+# does (classified in code into ENDORSEMENT_TYPES, pipeline.coi_checks); the rest as printed.
+ENDORSEMENT_ATTRIBUTES = ("form_number", "type", "policy_number", "named_party", "condition")
+ENDORSEMENT_PARTS = ENDORSEMENT_ATTRIBUTES[1:]  # each extracted with its own value, page and quote
+_ENDORSEMENT_KEY_RE = re.compile(r"^cert:endorsement:([0-9A-Z]{1,40}):([a-z_]+)$")
+
+
+def endorsement_key(number: str | None, attribute: str) -> str | None:
+    """cert:endorsement:<number without case, spacing or separators>:<attribute>, or None for an empty
+    or oversized number (the form_key rule) or an unknown attribute."""
+    key = form_key(number)
+    if key is None or attribute not in ENDORSEMENT_ATTRIBUTES:
+        return None
+    return f"{ENDORSEMENT_KEY_PREFIX}{key[len(FORM_KEY_PREFIX):]}:{attribute}"
+
+
+def is_endorsement_key(key: str | None) -> bool:
+    mo = _ENDORSEMENT_KEY_RE.match(key or "")
+    return bool(mo) and mo.group(2) in ENDORSEMENT_ATTRIBUTES
+
+
+def split_endorsement_key(key: str) -> tuple[str, str]:
+    """(compact form number, attribute) of an endorsement fact key."""
+    mo = _ENDORSEMENT_KEY_RE.match(key)
+    if not mo:
+        raise ValueError(f"not an endorsement key: {key!r}")
+    return mo.group(1), mo.group(2)
+
+
+def _cert(key: str, label: str, description: str, section: str, kind: str = "scalar") -> FactField:
+    return FactField(key=key, label=label, description=description, section=section, kind=kind)
+
+
+_LIMIT_NOTE = " As printed on the declarations, for example $1,000,000. Null when the policy does not state it."
+
+CERTIFICATE_FIELDS: list[FactField] = [
+    _cert("cert:named_insured", "Named Insured", "Name of the first named insured as printed on the declarations.",
+          "insured"),
+    _cert("cert:insured_address", "Insured Address", "Mailing address of the named insured as printed.", "insured"),
+    _cert("cert:producer", "Producer", "Producing agent or broker named on the declarations, as printed.", "insured"),
+    _cert("cert:carrier", "Insurer", "Insurance company issuing the policy (not the agent or broker), as printed.",
+          "policy"),
+    _cert("cert:naic", "NAIC Number", "The insurer's NAIC company code as printed. Null when not printed.", "policy"),
+    _cert("cert:policy_number", "Policy Number", "Policy number as printed on the declarations.", "policy"),
+    _cert("cert:line", "Line of Coverage",
+          "The line of coverage as printed in the declarations title or coverage part, for example 'Commercial "
+          "General Liability', 'Business Auto', 'Commercial Umbrella', 'Workers Compensation and Employers "
+          "Liability' or 'Commercial Property'. If the declarations state several lines (a package policy), "
+          "return the title that names the package. Null for a document that is only endorsements.", "policy"),
+    _cert("cert:effective_date", "Effective Date",
+          "Policy period effective (start) date as printed on the declarations; not an endorsement's own "
+          "effective date.", "policy"),
+    _cert("cert:expiration_date", "Expiration Date", "Policy period expiration (end) date as printed on the "
+          "declarations.", "policy"),
+    _cert("cert:gl_each_occurrence", "Each Occurrence", "General liability each occurrence limit." + _LIMIT_NOTE,
+          "limits"),
+    _cert("cert:gl_general_aggregate", "General Aggregate", "General liability general aggregate limit." + _LIMIT_NOTE,
+          "limits"),
+    _cert("cert:gl_products_completed_ops_aggregate", "Products-Completed Operations Aggregate",
+          "General liability products-completed operations aggregate limit." + _LIMIT_NOTE, "limits"),
+    _cert("cert:gl_personal_advertising_injury", "Personal and Advertising Injury",
+          "Personal and advertising injury limit." + _LIMIT_NOTE, "limits"),
+    _cert("cert:gl_damage_to_rented_premises", "Damage to Rented Premises",
+          "Damage to premises rented to you limit." + _LIMIT_NOTE, "limits"),
+    _cert("cert:gl_medical_expense", "Medical Expense", "Medical expense limit, any one person." + _LIMIT_NOTE, "limits"),
+    _cert("cert:auto_combined_single_limit", "Combined Single Limit",
+          "Auto liability combined single limit, each accident." + _LIMIT_NOTE, "limits"),
+    _cert("cert:umbrella_each_occurrence", "Umbrella Each Occurrence",
+          "Umbrella or excess liability each occurrence limit." + _LIMIT_NOTE, "limits"),
+    _cert("cert:umbrella_aggregate", "Umbrella Aggregate", "Umbrella or excess liability aggregate limit." + _LIMIT_NOTE,
+          "limits"),
+    _cert("cert:wc_statutory", "Workers Compensation Statutory Limits",
+          "Workers compensation limits as printed, for example 'Statutory' or 'Per Statute'. Null when not "
+          "printed.", "limits"),
+    _cert("cert:wc_el_each_accident", "Employers Liability Each Accident",
+          "Employers liability bodily injury by accident, each accident." + _LIMIT_NOTE, "limits"),
+    _cert("cert:wc_el_disease_each_employee", "Employers Liability Disease Each Employee",
+          "Employers liability bodily injury by disease, each employee." + _LIMIT_NOTE, "limits"),
+    _cert("cert:wc_el_disease_policy_limit", "Employers Liability Disease Policy Limit",
+          "Employers liability bodily injury by disease, policy limit." + _LIMIT_NOTE, "limits"),
+    _cert("endorsements", "Endorsements",
+          "Additional insured, waiver of subrogation and primary and non-contributory endorsements.",
+          "endorsements", kind="endorsements"),
+]
+
+
 # --------------------------------------------------------------------- artifact content
 
 
@@ -600,8 +700,119 @@ class DiscrepancyBlock(BaseModel):
         return found
 
 
+# --------------------------------------------------------------------- certificate (slice 4, C4)
+#
+# A certificate draft is one ordinary ArtifactContent (D1/P3): a CertificateBlock (what prints, every field a
+# Cell with its evidence state and chips) and one ClaimBlock per checked claim. The broker's decision on a
+# claim (open, resolved = overridden with a reason, removed) lives in discrepancy_state, like a Policy Check
+# discrepancy, so a rebuild never wipes it. A removed claim's content is left out of the CertificateBlock
+# (D13); the ClaimBlock stays so the check list can say "Removed".
+
+
+class ClaimKind(StrEnum):
+    WORDING = "wording"  # a requested wording on one printed policy line (D14)
+    IN_FORCE = "in_force"  # a printed policy is in force on the certificate date
+    INSURED = "insured"  # the named insured is the same on every printed policy
+    DESCRIPTION = "description"  # the broker's description of operations (D11 sign-off)
+    EDITED = "edited"  # a printed value the broker edited (D12 sign-off)
+
+
+class ClaimVerdict(StrEnum):
+    SUPPORTED = "supported"
+    NOT_SUPPORTED = "not_supported"
+    NEEDS_SIGNOFF = "needs_signoff"  # typed by the broker: confirmed with a reason or removed
+
+
+class ClaimBlock(BaseModel):
+    """One checked claim of a certificate draft (pipeline.coi_checks)."""
+
+    type: Literal["claim"] = "claim"
+    id: str  # "claim-" + key, stable across rebuilds
+    key: str  # e.g. additional_insured:A, in_force:B, insured, description, edited:A:cert:gl_each_occurrence
+    kind: ClaimKind
+    title: str
+    verdict: ClaimVerdict
+    reason: str | None = None  # why it is not supported, or what to confirm
+    condition: str | None = None  # D14: the endorsement's quoted condition
+    wording: str | None = None  # additional_insured | waiver_of_subrogation | primary_noncontributory
+    policy_letter: str | None = None  # the policy (document letter) the claim is about
+    removable: bool = True  # D13: an insured mismatch cannot be removed
+    prose: list[Segment] = Field(default_factory=list)  # the explanation, citing its evidence
+    basis: list[str] = Field(default_factory=list)  # what the verdict rests on (fingerprint input)
+
+    def passage_ids(self) -> set[int]:
+        return {p for s in self.prose for p in s.passage_ids}
+
+
+class CertificateField(BaseModel):
+    """One printed value: `cell.value` is what prints ("Not stated" when not verified)."""
+
+    key: str  # the cert: fact key (or "description" style keys for typed values)
+    label: str
+    cell: Cell
+
+
+class CertificatePolicy(BaseModel):
+    """One coverage row: one declarations document (C7)."""
+
+    letter: str  # the document's letter in the run (column key of its cells)
+    insurer: str | None = None  # insurer letter on the certificate (A, B, ...)
+    document_id: int | None = None
+    line: str  # general_liability | auto | umbrella | workers_comp | property | other
+    line_label: str
+    fields: list[CertificateField] = Field(default_factory=list)
+    wording: list[str] = Field(default_factory=list)  # wording printed on this line
+
+
+class CertificateInsurer(BaseModel):
+    letter: str
+    name: str
+    naic: str | None = None
+
+
+class CertificateBlock(BaseModel):
+    type: Literal["certificate"] = "certificate"
+    id: str = "certificate"
+    layout: str = "own-v1"  # the field map the PDF uses (C5: ACORD 25 would be a second map)
+    certificate_date: str  # ISO date
+    holder_name: str
+    holder_address: str = ""
+    producer: CertificateField | None = None
+    insured: list[CertificateField] = Field(default_factory=list)
+    insurers: list[CertificateInsurer] = Field(default_factory=list)
+    policies: list[CertificatePolicy] = Field(default_factory=list)
+    description: str | None = None
+
+    INSURED_COLUMN: ClassVar[str] = "insured"
+
+    def iter_fields(self):
+        """(column key, field) for every printed value: insured and producer under "insured", each
+        policy's fields under its letter."""
+        if self.producer is not None:
+            yield self.INSURED_COLUMN, self.producer
+        for f in self.insured:
+            yield self.INSURED_COLUMN, f
+        for p in self.policies:
+            for f in p.fields:
+                yield p.letter, f
+
+    def find_field(self, row_key: str, column_key: str) -> CertificateField:
+        for col, f in self.iter_fields():
+            if col == column_key and f.key == row_key:
+                return f
+        raise KeyError(f"no certificate field {row_key!r} in {column_key!r}")
+
+    def passage_ids(self) -> set[int]:
+        found: set[int] = set()
+        for _, f in self.iter_fields():
+            found.update(f.cell.passage_ids)
+            found.update(c.passage_id for c in f.cell.conflicts if c.passage_id is not None)
+        return found
+
+
 Block = Annotated[
-    HeadingBlock | ParagraphBlock | ListBlock | TableBlock | IssueBlock | DiscrepancyBlock,
+    HeadingBlock | ParagraphBlock | ListBlock | TableBlock | IssueBlock | DiscrepancyBlock | ClaimBlock
+    | CertificateBlock,
     Field(discriminator="type"),
 ]
 
@@ -634,7 +845,15 @@ class ArtifactContent(BaseModel):
                 return block
         raise KeyError(f"no table block {block_id!r}")
 
+    def find_certificate(self) -> CertificateBlock | None:
+        return next((b for _, b in self.iter_blocks() if isinstance(b, CertificateBlock)), None)
+
     def find_cell(self, block_id: str, row_key: str, column_key: str) -> Cell:
+        """A table cell, or (slice 4) a printed certificate value: block "certificate", row the field
+        key, column the policy letter or "insured"."""
+        cert = self.find_certificate()
+        if cert is not None and cert.id == block_id:
+            return cert.find_field(row_key, column_key).cell
         table = self.find_table(block_id)
         for row in table.rows:
             if row.key == row_key:
@@ -663,7 +882,7 @@ class ArtifactContent(BaseModel):
                 for row in block.rows:
                     for cell in row.cells.values():
                         found.update(cell.passage_ids)
-            elif isinstance(block, DiscrepancyBlock):
+            elif isinstance(block, DiscrepancyBlock | ClaimBlock | CertificateBlock):
                 found.update(block.passage_ids())
         return found
 

@@ -48,6 +48,7 @@ def run_document_out(rd: models.RunDocument) -> dict[str, Any]:
         "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename, "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
         "option_count": rd.option_count, "option_label": rd.option_label,
+        "reused_from_run_id": rd.reused_from_run_id, "read_at": _ts(rd.read_at),  # slice 4 extraction cache
     }
 
 

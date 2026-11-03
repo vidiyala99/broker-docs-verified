@@ -68,7 +68,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend import ams, db, models, work_queue
-from backend.pipeline import compose, extract, parse, policy_check, verify, windows
+from backend.pipeline import cache, certificate, compose, extract, parse, policy_check, verify, windows
 from backend.providers import CallRecord, Provider, ProviderError, RunBudget
 from backend.schemas import (
     CITED_STATES,
@@ -217,6 +217,10 @@ def is_policy_check(run: models.Run) -> bool:
     return run.workflow.slug == db.POLICY_CHECK_SLUG
 
 
+def is_certificate(run: models.Run) -> bool:
+    return run.workflow is not None and run.workflow.slug == db.CERTIFICATE_SLUG
+
+
 def proposal_title(client_name: str) -> str:
     return (f"Insurance Proposal for {client_name}" if client_name else "Insurance Proposal")[:200]
 
@@ -252,6 +256,8 @@ class _Plan:
     todo: list[tuple[int, DocumentRef]]  # (run_document id, document)
     budget_limit: int
     policy_check: bool = False  # slice 3: AMS facts from code, report from the diff (no compose call)
+    certificate: bool = False  # slice 4: the draft is built in code (pipeline.certificate, no compose call)
+    cache_key: str | None = None  # slice 4: extraction cache key (pipeline.cache); None = cache off
 
     @property
     def fields(self) -> list[FactField]:
@@ -407,6 +413,9 @@ def _doc_payload(rd: models.RunDocument) -> dict[str, Any]:
         "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename, "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
         "option_count": rd.option_count, "option_label": rd.option_label,
+        # slice 4 extraction cache: the run whose read was copied, and when the facts were first read
+        "reused_from_run_id": rd.reused_from_run_id,
+        "read_at": rd.read_at.isoformat() if rd.read_at is not None else None,
     }
 
 
@@ -537,10 +546,14 @@ class RunManager:
         max_workers: int = 4,
         bus: EventBus | None = None,
         merge_edits: MergeEdits | None = None,
+        extraction_cache: bool | None = None,
     ):
         """`merge_edits`, when given, is applied on a retry that recomposes an artifact
-        that already exists, so the user's cell edits (D9) survive the new version."""
+        that already exists, so the user's cell edits (D9) survive the new version.
+        `extraction_cache` (slice 4): None follows BROKERDOCS_EXTRACTION_CACHE (on unless "off"),
+        False always reads live (evals, D9)."""
         self._merge_edits = merge_edits
+        self._extraction_cache = extraction_cache
         self._factory = session_factory
         self.provider = provider
         self._load_bytes = load_bytes
@@ -684,6 +697,49 @@ class RunManager:
                 rd.error = rd.error_code = rd.progress = None
                 redo.add(rd.document_id)
             run.facts = [f for f in run.facts if f.document_id not in redo]
+        return self.start(run_id)
+
+    def add_documents(self, run_id: int, document_ids: Sequence[int]) -> bool:
+        """Add document (slice 4, D2): append documents to a certificate draft and read only them.
+
+        Certificate runs only, DONE or PARTIAL, current version not issued (the caller checks it):
+        the run moves to QUEUED through models.reopen_certificate_run (never transition_run, so every
+        other workflow's DONE stays terminal), existing facts are kept, and the rebuild makes a new
+        artifact version whose claims keep their decisions (reconcile). Raises LookupError for an
+        unknown run or document, ValueError (user-safe) for a bad document list, and
+        models.InvalidTransition when the run cannot take a document. Returns whether it started."""
+        ids = [int(i) for i in document_ids]
+        if not ids:
+            raise ValueError("Add at least one document.")
+        if len(set(ids)) != len(ids):
+            raise ValueError("Each document can appear only once in a run.")
+        if self.is_active(run_id):
+            raise models.InvalidTransition("the run is still going")
+        with db.session_scope(self._factory) as s:
+            run = s.get(models.Run, run_id)
+            if run is None:
+                raise LookupError(f"no run {run_id}")
+            found = {d.id: d for d in s.scalars(select(models.Document).where(models.Document.id.in_(ids)))}
+            missing = [i for i in ids if i not in found]
+            if missing:
+                raise LookupError(f"no document {missing[0]}")
+            if any(found[i].kind == "ams" for i in ids):
+                raise ValueError("A certificate reads PDF documents, not an AMS export.")
+            have = {rd.document_id for rd in run.documents}
+            if any(i in have for i in ids):
+                raise ValueError("That document is already on this certificate.")
+            try:
+                parse.check_document_count(len(have) + len(ids), self._limits)
+            except parse.ParseError as exc:
+                raise ValueError(exc.message) from None
+            models.reopen_certificate_run(run, db.CERTIFICATE_SLUG)
+            run.error, run.retryable, run.finished_at = None, False, None
+            work_queue.on_run_retry(run)
+            start = max((rd.position for rd in run.documents), default=-1) + 1
+            for offset, doc_id in enumerate(ids):
+                run.documents.append(models.RunDocument(document_id=doc_id, position=start + offset,
+                                                        slot=_slot_defs(run.workflow.input_slots)[0]["key"],
+                                                        status=RunDocumentStatus.QUEUED, option_count=1))
         return self.start(run_id)
 
     async def wait(self, run_id: int) -> None:
@@ -881,12 +937,15 @@ class RunManager:
                                         rd.document.kind or "quote"))
                     for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.QUEUED]
             spent = (run.tokens_in or 0) + (run.tokens_out or 0)
+            plan_compose = compose_plan(run)
             plan = _Plan(
                 run_id=run_id,
-                compose=compose_plan(run),
+                compose=plan_compose,
                 todo=todo,
                 budget_limit=max(1, self._budget_limit - spent),
                 policy_check=is_policy_check(run),
+                certificate=is_certificate(run),
+                cache_key=cache.extraction_key(plan_compose.fields, plan_compose.instructions, self.provider.config),
             )
             payload = _run_payload(run)
         self._emit(run_id, "run.status", {k: payload[k] for k in ("status", "error", "retryable")})
@@ -924,6 +983,8 @@ class RunManager:
         token = _current_document.set(ref.id)
         budget = budget.child(self._document_budget_limit, label=f"document:{ref.id}")  # T14 ceiling
         try:
+            if ref.kind != "ams" and self._reuse_read(run_id, rd_id, ref, plan):
+                return  # slice 4: an earlier read of the same file was copied (pipeline.cache)
             self._update_doc(run_id, rd_id, RunDocumentStatus.READING, progress="Reading pages")
             pages = await self._read_pages(run_id, rd_id, ref, budget)
             if plan.policy_check and ref.kind == "ams":
@@ -947,7 +1008,8 @@ class RunManager:
             verified = await self._in_thread(windows.verify_document, result, pages, self._verify_config)
             self._store_facts(run_id, ref.id, verified)
             self._update_doc(run_id, rd_id, RunDocumentStatus.DONE, progress=None,
-                             option_count=result.option_count, option_label=result.option_label)
+                             option_count=result.option_count, option_label=result.option_label,
+                             extraction_key=plan.cache_key, reused_from_run_id=None, read_at=models.utcnow())
         except asyncio.CancelledError:
             raise
         except ams.AmsError as exc:
@@ -967,6 +1029,34 @@ class RunManager:
                              error_code="internal_error", error=failure_message("internal_error"))
         finally:
             _current_document.reset(token)
+
+    def cache_enabled(self) -> bool:
+        return cache.enabled_from_env() if self._extraction_cache is None else bool(self._extraction_cache)
+
+    def _reuse_read(self, run_id: int, rd_id: int, ref: DocumentRef, plan: _Plan) -> bool:
+        """Copy an earlier read of the same file under the same key (pipeline.cache). True on a hit."""
+        if plan.cache_key is None or not self.cache_enabled():
+            return False
+        current_ocr = cache.ocr_key(self.provider.config)
+        try:
+            with db.session_scope(self._factory) as s:
+                source = cache.find_source(s, run_id=run_id, document_id=ref.id, key=plan.cache_key)
+                if source is None:
+                    return False
+                rd = s.get(models.RunDocument, rd_id)
+                try:
+                    cache.copy_read(s, source, rd, current_ocr=current_ocr)
+                except cache.OcrMismatch:  # D17: text layer copied (committed), OCR and extraction run live
+                    log.info("run %s document %s: cached read used another OCR method; reading live",
+                             run_id, ref.id)
+                    return False
+                payload = _doc_payload(rd)
+        except Exception:  # a cache problem never fails the document: read it live instead
+            log.exception("run %s document %s: extraction cache copy failed; reading live", run_id, ref.id)
+            return False
+        log.info("run %s document %s: reused the read of run %s", run_id, ref.id, source.run_id)
+        self._emit(run_id, "document.status", payload)
+        return True
 
     def _record_parse_failure(self, doc_id: int, exc: parse.ParseError) -> None:
         with db.session_scope(self._factory) as s:
@@ -1002,6 +1092,7 @@ class RunManager:
             page = s.scalar(select(models.Page).where(models.Page.document_id == doc_id,
                                                       models.Page.page_no == page_no))
             page.ocr_text, page.ocr = text, True
+            page.ocr_key = cache.ocr_key(self.provider.config)  # D17: which OCR method read it
 
     async def _read_pages(self, run_id: int, rd_id: int, ref: DocumentRef, budget: RunBudget) -> list[_PageData]:
         data: bytes | None = None
@@ -1083,6 +1174,8 @@ class RunManager:
                 payload = _run_payload(run)
                 # Slice 3: the Policy Check report is the diff, built in code (D14, no model call).
                 built = self.policy_check_content(run, inp) if plan.policy_check else None
+                if plan.certificate:  # slice 4: the draft and its checks, built in code (C5)
+                    built = certificate.content_for_run(s, run)
         if inp is None:
             self._end(run_id, payload)
             return
@@ -1101,9 +1194,9 @@ class RunManager:
             else:
                 art = run.artifact
                 content = result.content
-                if self._merge_edits is not None:
+                if self._merge_edits is not None and not plan.certificate:  # a certificate keeps its own edits
                     content = self._merge_edits(art.latest_content(), content)
-                models.snapshot_version(s, art, content, note=f"retry, {note}")
+                models.snapshot_version(s, art, content, note="rebuilt" if plan.certificate else f"retry, {note}")
             any_failed = any(RunDocumentStatus(rd.status) == RunDocumentStatus.FAILED for rd in run.documents)
             final = RunStatus.PARTIAL if any_failed or budget.exhausted else RunStatus.DONE
             models.transition_run(run, final)

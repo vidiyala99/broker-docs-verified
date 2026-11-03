@@ -192,7 +192,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from backend.pipeline import verify
-from backend.schemas import FORM_KEY_PREFIX, EvidenceState, FactField, is_form_key
+from backend.schemas import FORM_KEY_PREFIX, EvidenceState, FactField, is_endorsement_key, is_form_key
 
 log = logging.getLogger("brokerdocs.merge")
 
@@ -620,10 +620,14 @@ def merge_document(fields: Sequence[FactField | str], candidates: Iterable[verif
     for c in candidates:
         by_field.setdefault(c.field, []).append(c)
     form_keys = sorted({k for k in [*by_field, *dynamic_keys] if is_form_key(k)})
+    endorsement_keys = sorted({k for k in [*by_field, *dynamic_keys] if is_endorsement_key(k)})
     out = []
     for f in fields:
         if isinstance(f, FactField) and f.kind == "forms":
             out.extend(merge_field(k, by_field.get(k, []), page_text) for k in form_keys)
+            continue
+        if isinstance(f, FactField) and f.kind == "endorsements":  # slice 4: cert:end:<number>[:attribute]
+            out.extend(merge_field(k, by_field.get(k, []), page_text) for k in endorsement_keys)
             continue
         k = f.key if isinstance(f, FactField) else str(f)
         out.append(merge_field(f, by_field.get(k, []), page_text))

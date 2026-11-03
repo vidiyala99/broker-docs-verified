@@ -412,7 +412,16 @@ class Seeder:
         return run
 
 
+def scenario_environment() -> None:
+    """Slice 4 (D9): the seed's runs read live, so a later run on the same fixture bytes cannot copy an
+    earlier read and skip the read that produces its seeded state (budget, fallback, partial, failed)."""
+    from backend.pipeline import cache
+
+    os.environ[cache.ENV_SWITCH] = "off"
+
+
 def seed() -> None:
+    scenario_environment()
     data = _guard_env()
     db_file = data / "brokerdocs.db"
     for suffix in ("", "-wal", "-shm"):

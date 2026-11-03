@@ -48,10 +48,7 @@ from sqlalchemy.orm import Session, aliased, selectinload
 
 from backend import models
 from backend.schemas import ArtifactContent, EvidenceState, RunStatus
-
-COMPARE_QUOTES_SLUG = "compare-quotes"  # db.COMPARE_QUOTES_SLUG (db imports models; keep this module light)
-PROPOSAL_BUILDER_SLUG = "proposal-builder"
-POLICY_CHECK_SLUG = "policy-check"
+from backend.slugs import CERTIFICATE_SLUG, COMPARE_QUOTES_SLUG, POLICY_CHECK_SLUG, PROPOSAL_BUILDER_SLUG
 
 GROUPS = ("in_progress", "needs_review", "ready", "needs_attention", "done_recently")
 WINDOW = timedelta(days=14)
@@ -179,7 +176,7 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
     """(group, item) for one run, or None when the run is not in the queue. `counts` is the
     run's open discrepancy counts per severity (Policy Check with a report), `proposal` the run
     its `proposal_run_id` names (None when unset or gone). See the module docstring."""
-    if run.workflow_slug == PROPOSAL_BUILDER_SLUG:
+    if run.workflow_slug in (PROPOSAL_BUILDER_SLUG, CERTIFICATE_SLUG):  # certificates: their own page (C8)
         return None
     is_check = run.workflow_slug == POLICY_CHECK_SLUG
     is_compare = run.workflow_slug == COMPARE_QUOTES_SLUG
@@ -254,6 +251,8 @@ def extracted_client(workflow_slug: str, facts: Sequence[tuple[str, int, str]]) 
     values = [(slot, pos, " ".join(v.split())) for slot, pos, v in facts if v and v.strip()]
     if not values:
         return None
+    if workflow_slug == CERTIFICATE_SLUG:  # slice 4: the first document that names the insured
+        return sorted((pos, v) for _, pos, v in values)[0][1]
     if workflow_slug == POLICY_CHECK_SLUG:
         for slot in POLICY_NAME_SLOTS:
             hit = sorted((pos, v) for s, pos, v in values if s == slot)
@@ -300,12 +299,138 @@ def run_client(session: Session, run: models.Run) -> tuple[str | None, str | Non
     if run.client_name:
         return run.client_name, "broker"
     where = {rd.document_id: (rd.slot, rd.position) for rd in run.documents}
+    slug = run.workflow.slug if run.workflow else ""
     rows = session.execute(select(models.Fact.document_id, models.Fact.value)
-                           .where(models.Fact.run_id == run.id, models.Fact.field == "named_insured",
+                           .where(models.Fact.run_id == run.id, models.Fact.field == insured_field(slug),
                                   models.Fact.state == str(EvidenceState.VERIFIED)))
     facts = [(*where[d], v) for d, v in rows if d in where and v]
-    slug = run.workflow.slug if run.workflow else ""
     return resolve_client(None, extracted_client(slug, facts))
+
+
+def insured_field(workflow_slug: str) -> str:
+    """The fact whose verified value names the client (slice 4: certificates read cert: keys)."""
+    return "cert:named_insured" if workflow_slug == CERTIFICATE_SLUG else "named_insured"
+
+
+def client_key(name: str | None) -> str:
+    """Normalized client name: what holders are remembered by (slice 4, C2), as names are compared here."""
+    return _norm(name or "")
+
+
+# --------------------------------------------------------------------- certificate queue (slice 4, C8)
+#
+#     certificate run (any line), selected like the work queue (active, open, or changed in 14 days)
+#      +- active (queued/running/composing) -------------------------> in_progress
+#      +- current version issued -------------------------------------> done_recently if in window ("Issued")
+#      +- queue_state done|dismissed ---------------------------------> done_recently if in window
+#      +- failed | cancelled, or no draft ----------------------------> needs_attention (reasons)
+#      +- draft with claims needing action (open, not supported) ------> needs_attention ("N checks to resolve")
+#      +- draft with every claim supported, overridden or removed ----> ready ("Ready to issue")
+# A partial run (a document not read) keeps its draft: classified by its claims, with the reason listed.
+
+CERTIFICATE_GROUPS = ("in_progress", "needs_attention", "ready", "done_recently")
+
+
+def classify_certificate(run: QueueRun, *, open_claims: int | None, issued_at: datetime | None,
+                         now: datetime) -> tuple[str, dict[str, Any]] | None:
+    def item(group: str, summary_text: str, why: list[str] | None = None) -> tuple[str, dict[str, Any]]:
+        return group, {
+            "run_id": run.run_id, "workflow_slug": run.workflow_slug, "workflow_name": run.workflow_name,
+            "line": run.line, "created_at": _iso(run.created_at), "client": run.client,
+            "client_source": run.client_source, "summary": summary_text, "reasons": why or None,
+            "open_claims": open_claims, "status": run.status, "retryable": run.retryable,
+            "finished_at": _iso(run.finished_at), "queue_state": run.queue_state,
+            "queue_changed_at": _iso(run.queue_changed_at), "issued_at": _iso(issued_at),
+        }
+
+    if run.active:
+        return item("in_progress", "Reading documents")
+    stamps = [t for t in (last_change(run), aware(issued_at)) if t is not None]
+    recent = bool(stamps) and max(stamps) >= aware(now) - WINDOW
+    if issued_at is not None:
+        return item("done_recently", "Issued") if recent else None
+    if run.queue_state != "open":
+        return item("done_recently", "Closed") if recent else None
+    why = reasons(run) if run.status in NEEDS_ATTENTION else []
+    if run.status in (str(RunStatus.FAILED), str(RunStatus.CANCELLED)) or open_claims is None:
+        return item("needs_attention", "Draft not ready", why)
+    if open_claims > 0:
+        return item("needs_attention", f"{open_claims} check{'' if open_claims == 1 else 's'} to resolve", why)
+    return item("ready", "Ready to issue", why)
+
+
+def load_certificate_queue(session: Session, *, is_active: Callable[[int], bool] = lambda _id: False,
+                           now: datetime | None = None, cap: int = CAP) -> dict[str, Any]:
+    """The Certificates page queue (`GET /api/certificates/queue`): certificate runs only, every line."""
+    from backend.pipeline import certificate  # the pipeline imports this module
+
+    now = aware(now) or models.utcnow()
+    cutoff = now - WINDOW
+    Run, Workflow = models.Run, models.Workflow
+    query = (select(Run).join(Workflow, Workflow.id == Run.workflow_id)
+             .where(Workflow.slug == CERTIFICATE_SLUG,
+                    or_(Run.status.in_(ACTIVE), Run.queue_state == "open", Run.finished_at >= cutoff,
+                        Run.queue_changed_at >= cutoff))
+             .order_by(Run.id.desc()).limit(cap + 1)
+             .options(selectinload(Run.workflow), selectinload(Run.documents)))
+    runs = list(session.scalars(query))
+    truncated = len(runs) > cap
+    runs = runs[:cap]
+    ids = [r.id for r in runs]
+    drafts: dict[int, tuple[int, int, list]] = {}  # run -> (artifact id, version, claim blocks)
+    issued: dict[tuple[int, int], datetime] = {}
+    states: dict[int, dict[str, models.DiscrepancyState]] = defaultdict(dict)
+    names: dict[int, list[tuple[int, str]]] = defaultdict(list)
+    if ids:
+        for run_id, art_id, version, content in session.execute(
+                select(models.Artifact.run_id, models.Artifact.id, models.Artifact.current_version,
+                       models.ArtifactVersion.content)
+                .join(models.ArtifactVersion, and_(models.ArtifactVersion.artifact_id == models.Artifact.id,
+                                                   models.ArtifactVersion.version == models.Artifact.current_version))
+                .where(models.Artifact.run_id.in_(ids))):
+            drafts[run_id] = (art_id, version, models.claim_blocks(ArtifactContent.model_validate(content)))
+        for art_id, version, at in session.execute(
+                select(models.CertificateIssue.artifact_id, models.CertificateIssue.version,
+                       models.CertificateIssue.issued_at)
+                .where(models.CertificateIssue.run_id.in_(ids))):
+            issued[(art_id, version)] = at
+        for row in session.scalars(select(models.DiscrepancyState).where(models.DiscrepancyState.run_id.in_(ids))):
+            states[row.run_id][row.item_id] = row
+        for run_id, doc_id, value in session.execute(
+                select(models.Fact.run_id, models.Fact.document_id, models.Fact.value)
+                .where(models.Fact.run_id.in_(ids), models.Fact.field == "cert:named_insured",
+                       models.Fact.state == str(EvidenceState.VERIFIED))):
+            names[run_id].append((doc_id, value))
+    groups: dict[str, list[tuple[Any, dict[str, Any]]]] = {g: [] for g in CERTIFICATE_GROUPS}
+    floor = datetime.min.replace(tzinfo=UTC)
+    for run in runs:
+        status = str(run.status)
+        active = is_active(run.id) or status in ACTIVE
+        where = {rd.document_id: (rd.slot, rd.position) for rd in run.documents}
+        facts = [(*where[d], v) for d, v in names.get(run.id, ()) if d in where and v]
+        client, source = resolve_client(run.client_name, extracted_client(CERTIFICATE_SLUG, facts))
+        qr = QueueRun(run_id=run.id, workflow_slug=CERTIFICATE_SLUG, workflow_name=run.workflow.name,
+                      line=run.line or "commercial", status=status, active=active,
+                      queue_state=run.queue_state or "open", created_at=run.created_at, finished_at=run.finished_at,
+                      queue_changed_at=run.queue_changed_at, document_count=len(run.documents),
+                      failed_codes=tuple(rd.error_code for rd in run.documents if str(rd.status) == "failed"),
+                      has_report=run.id in drafts, client=client, client_source=source,
+                      retryable=not active and status in NEEDS_ATTENTION)
+        draft = drafts.get(run.id)
+        open_claims = None
+        issued_at = None
+        if draft is not None:
+            art_id, version, claims = draft
+            open_claims = certificate.claim_counts(claims, states.get(run.id, {})).open
+            issued_at = issued.get((art_id, version))
+        result = classify_certificate(qr, open_claims=open_claims, issued_at=issued_at, now=now)
+        if result is None:
+            continue
+        group, it = result
+        stamps = [t for t in (last_change(qr), aware(issued_at), aware(run.created_at)) if t is not None]
+        groups[group].append(((max(stamps, default=floor), run.id), it))
+    return {**{g: [it for _, it in sorted(rows, key=lambda r: r[0], reverse=True)] for g, rows in groups.items()},
+            "truncated": truncated}
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -337,7 +462,7 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
         select(Run)
         .join(Workflow, Workflow.id == Run.workflow_id)
         .outerjoin(Proposal, Proposal.id == Run.proposal_run_id)
-        .where(Run.line == line, Workflow.slug != PROPOSAL_BUILDER_SLUG,
+        .where(Run.line == line, Workflow.slug.not_in((PROPOSAL_BUILDER_SLUG, CERTIFICATE_SLUG)),
                or_(Run.status.in_(ACTIVE), Proposal.status.in_(ACTIVE), Run.queue_state == "open",
                    Run.finished_at >= cutoff, Run.queue_changed_at >= cutoff))
         .order_by(case((actionable, 0), else_=1), Run.id.desc())

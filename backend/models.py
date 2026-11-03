@@ -31,6 +31,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -40,6 +41,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 
 from backend.schemas import (
     ArtifactContent,
+    ClaimBlock,
     DiscrepancyBlock,
     EvidenceState,
     RunDocumentStatus,
@@ -146,6 +148,9 @@ class Page(Base):
     needs_ocr: Mapped[bool] = mapped_column(Boolean, default=False)
     ocr_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
     ocr: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Slice 4 (D17): which OCR method produced ocr_text (pipeline.cache.ocr_key); the extraction cache
+    # copies OCR text to another document only when this matches the current method.
+    ocr_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     document: Mapped[Document] = relationship(back_populates="pages")
 
@@ -217,6 +222,7 @@ class RunDocument(Base):
     __table_args__ = (
         UniqueConstraint("run_id", "document_id"),
         UniqueConstraint("run_id", "position"),
+        Index("ix_run_document_extraction_key", "extraction_key"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -232,6 +238,11 @@ class RunDocument(Base):
     error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     option_count: Mapped[int] = mapped_column(Integer, default=1)  # D8
     option_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Extraction cache (slice 4, D3/D8/D9): the key the facts were read under (set when the document is
+    # DONE), the run whose read was copied (None for a live read) and when the facts were first read.
+    extraction_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reused_from_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # no FK, like Task.run_id
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     run: Mapped[Run] = relationship(back_populates="documents")
     document: Mapped[Document] = relationship()
@@ -368,11 +379,15 @@ class ArtifactVersion(Base):
     artifact: Mapped[Artifact] = relationship(back_populates="versions")
 
 
-DISCREPANCY_STATUSES = ("open", "resolved")  # D2: no "accepted"
+DISCREPANCY_STATUSES = ("open", "resolved")  # D2: no "accepted"; what Policy Check accepts (D10, pinned)
+# Slice 4 (D1, D10): certificate claims share the table; "removed" is valid for certificate runs only
+# (the route enforces it per workflow), "resolved" on a certificate is an override with a reason.
+CLAIM_STATUSES = ("open", "resolved", "removed")
 
 
 class DiscrepancyState(Base):
-    """The broker's decision on one Policy Check discrepancy (slice 3 T6, spec section 4).
+    """The broker's decision on one Policy Check discrepancy (slice 3 T6, spec section 4), or on
+    one certificate claim (slice 4, D1: same rules, plus status "removed").
 
     Kept outside the artifact, so a regenerate never wipes a decision. `item_id` is the
     DiscrepancyBlock id (derived from the canonical key, stable across regeneration).
@@ -380,15 +395,16 @@ class DiscrepancyState(Base):
     `resolved_fingerprint` the one the broker resolved. Reconciled on every new version
     (`reconcile_discrepancy_states`):
 
-        resolved and current values differ from the resolved ones ──► open, changed_since_resolved
-        open after such a reset and the values are back (version restore) ──► resolved again
+        resolved (or removed) and current values differ from the decided ones ──► open,
+            changed_since_resolved, reset_from = the old status
+        open after such a reset and the values are back (version restore) ──► reset_from again
         an item missing from the current version: row untouched (it may come back)
     """
 
     __tablename__ = "discrepancy_state"
     __table_args__ = (
         UniqueConstraint("run_id", "item_id"),
-        CheckConstraint("status IN ('open', 'resolved')", name="ck_discrepancy_status"),
+        CheckConstraint("status IN ('open', 'resolved', 'removed')", name="ck_discrepancy_status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -399,6 +415,8 @@ class DiscrepancyState(Base):
     fingerprint: Mapped[str] = mapped_column(String(64), default="")
     resolved_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     changed_since_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Slice 4: the decision a fingerprint change reset (resolved | removed), restored if the values return.
+    reset_from: Mapped[str | None] = mapped_column(String(20), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     run: Mapped[Run] = relationship(back_populates="discrepancy_states")
@@ -435,6 +453,51 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+MAX_HOLDER_NAME_CHARS = 120  # D6
+MAX_HOLDER_ADDRESS_CHARS = 300
+MAX_DESCRIPTION_CHARS = 1500
+
+
+class Holder(Base):
+    """A certificate holder remembered per client (slice 4, C2): saved at Issue, offered next time.
+    `client_key` is the normalized client name (work_queue.client_key)."""
+
+    __tablename__ = "holder"
+    __table_args__ = (
+        Index("ix_holder_workspace_client", "workspace_id", "client_key"),
+        UniqueConstraint("workspace_id", "client_key", "name_key", name="uq_holder_client_name"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"))
+    client_key: Mapped[str] = mapped_column(String(MAX_CLIENT_NAME_CHARS))
+    name: Mapped[str] = mapped_column(String(MAX_HOLDER_NAME_CHARS))
+    name_key: Mapped[str] = mapped_column(String(MAX_HOLDER_NAME_CHARS))  # normalized name (one row per holder)
+    address: Mapped[str] = mapped_column(String(MAX_HOLDER_ADDRESS_CHARS), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CertificateIssue(Base):
+    """An issued certificate (slice 4, D5, D16): one artifact version frozen with its holder, its
+    claims and their decisions (override reasons), and the PDF bytes, written in one transaction.
+    Unique per (artifact, version): a second Issue of the same version returns this row."""
+
+    __tablename__ = "certificate_issue"
+    __table_args__ = (UniqueConstraint("artifact_id", "version", name="uq_certificate_issue_version"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), index=True)
+    artifact_id: Mapped[int] = mapped_column(ForeignKey("artifact.id", ondelete="CASCADE"))
+    version: Mapped[int] = mapped_column(Integer)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    holder: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # {"name", "address"}
+    claims: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [{key, title, verdict, status, note, ...}]
+    certificate: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # the frozen CertificateBlock
+    pdf_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    pdf_sha256: Mapped[str] = mapped_column(String(64))
 
 
 class Feedback(Base):
@@ -515,6 +578,22 @@ def transition_fact(fact: Fact, new: EvidenceState) -> None:
 
 def transition_run(run: Run, new: RunStatus) -> None:
     _transition(run, "status", _RUN_TRANSITIONS, RunStatus, new)
+
+
+# Slice 4 (D2): Add document reopens a certificate draft. Never through transition_run, whose table keeps
+# DONE terminal for every workflow; only this guarded function, for certificate runs only.
+_CERTIFICATE_REOPEN = {RunStatus.DONE: RunStatus.QUEUED, RunStatus.PARTIAL: RunStatus.QUEUED}
+
+
+def reopen_certificate_run(run: Run, certificate_slug: str) -> None:
+    """DONE or PARTIAL -> QUEUED for a certificate draft that gets a new document. Raises
+    InvalidTransition for any other workflow or status (the caller checks "not issued")."""
+    current = RunStatus(run.status)
+    if run.workflow is None or run.workflow.slug != certificate_slug:
+        raise InvalidTransition("only a certificate draft can take a new document")
+    if current not in _CERTIFICATE_REOPEN:
+        raise InvalidTransition(f"Run.status: {current.value} cannot take a new document")
+    run.status = _CERTIFICATE_REOPEN[current]
 
 
 def transition_run_document(rd: RunDocument, new: RunDocumentStatus) -> None:
@@ -691,16 +770,48 @@ def discrepancy_blocks(content: ArtifactContent) -> list[DiscrepancyBlock]:
     return [b for _, b in content.iter_blocks() if isinstance(b, DiscrepancyBlock)]
 
 
+def claim_fingerprint(block: ClaimBlock) -> str:
+    """Hash of what a certificate claim's verdict rests on (slice 4): kind, verdict, reason, condition
+    and its basis values. Citations are left out (as for a discrepancy), so a re-read that states the
+    same values on another page keeps the broker's decision; any change of evidence reopens it."""
+    payload = json.dumps({"kind": str(block.kind), "verdict": str(block.verdict), "reason": block.reason,
+                          "condition": block.condition, "basis": list(block.basis)}, sort_keys=True,
+                         separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def claim_blocks(content: ArtifactContent) -> list[ClaimBlock]:
+    return [b for _, b in content.iter_blocks() if isinstance(b, ClaimBlock)]
+
+
+def item_fingerprint(block: DiscrepancyBlock | ClaimBlock) -> str:
+    return claim_fingerprint(block) if isinstance(block, ClaimBlock) else discrepancy_fingerprint(block)
+
+
+def reconciled_status(row: DiscrepancyState | None, fp: str) -> str:
+    """The status `reconcile_discrepancy_states` gives a row for fingerprint `fp`, without changing it
+    (pipeline.certificate applies removals before the version is stored, so content and rows agree)."""
+    if row is None:
+        return "open"
+    if row.fingerprint == fp:
+        return row.status
+    if row.status in ("resolved", "removed") and fp != row.resolved_fingerprint:
+        return "open"
+    if row.status == "open" and row.changed_since_resolved and fp == row.resolved_fingerprint:
+        return row.reset_from or "resolved"
+    return row.status
+
+
 def reconcile_discrepancy_states(session: Session, run_id: int, content: ArtifactContent) -> None:
     """Bring the run's decisions in line with `content`, its current version (see DiscrepancyState).
-    A content without discrepancies (any report but Policy Check) touches nothing."""
-    blocks = discrepancy_blocks(content)
+    A content without discrepancies or certificate claims (Compare, Proposal) touches nothing."""
+    blocks: list[DiscrepancyBlock | ClaimBlock] = [*discrepancy_blocks(content), *claim_blocks(content)]
     if not blocks:
         return
     rows = {r.item_id: r for r in session.scalars(select(DiscrepancyState).where(DiscrepancyState.run_id == run_id))}
     now = utcnow()
     for block in blocks:
-        fp = discrepancy_fingerprint(block)
+        fp = item_fingerprint(block)
         row = rows.get(block.id)
         if row is None:
             row = DiscrepancyState(run_id=run_id, item_id=block.id, status="open", fingerprint=fp,
@@ -710,11 +821,14 @@ def reconcile_discrepancy_states(session: Session, run_id: int, content: Artifac
             continue
         if row.fingerprint == fp:
             continue
+        status = reconciled_status(row, fp)
+        if status != row.status:
+            if status == "open":
+                row.reset_from, row.changed_since_resolved = row.status, True
+            else:
+                row.reset_from, row.changed_since_resolved = None, False
+            row.status, row.updated_at = status, now
         row.fingerprint = fp
-        if row.status == "resolved" and fp != row.resolved_fingerprint:
-            row.status, row.changed_since_resolved, row.updated_at = "open", True, now
-        elif row.status == "open" and row.changed_since_resolved and fp == row.resolved_fingerprint:
-            row.status, row.changed_since_resolved, row.updated_at = "resolved", False, now
     session.flush()
 
 
@@ -770,12 +884,14 @@ _UNSET: Any = object()
 
 
 def update_discrepancy_state(session: Session, run_id: int, item_id: str, *, status: str | None = None,
-                             note: str | None = _UNSET) -> DiscrepancyState:
+                             note: str | None = _UNSET, allowed: tuple[str, ...] = DISCREPANCY_STATUSES
+                             ) -> DiscrepancyState:
     """Set an item's status and/or note (PATCH). A status change clears "changed since resolved";
-    resolving records the current fingerprint as the resolved one. Raises ValueError for a status
-    outside open | resolved and LookupError for an item with no state row."""
-    if status is not None and status not in DISCREPANCY_STATUSES:
-        raise ValueError(f"status must be one of {DISCREPANCY_STATUSES}")
+    resolving (or removing, certificates) records the current fingerprint as the decided one. Raises
+    ValueError for a status outside `allowed` (open | resolved; certificates pass CLAIM_STATUSES) and
+    LookupError for an item with no state row."""
+    if status is not None and status not in allowed:
+        raise ValueError(f"status must be one of {allowed}")
     row = session.scalar(select(DiscrepancyState).where(DiscrepancyState.run_id == run_id,
                                                         DiscrepancyState.item_id == item_id))
     if row is None:
@@ -784,7 +900,8 @@ def update_discrepancy_state(session: Session, run_id: int, item_id: str, *, sta
     if status is not None:
         row.status = status
         row.changed_since_resolved = False
-        row.resolved_fingerprint = row.fingerprint if status == "resolved" else None
+        row.reset_from = None
+        row.resolved_fingerprint = row.fingerprint if status in ("resolved", "removed") else None
     if note is not _UNSET:
         row.note = note
     row.updated_at = utcnow()
@@ -794,7 +911,7 @@ def update_discrepancy_state(session: Session, run_id: int, item_id: str, *, sta
         # check leaves Needs review, so Done recently counts its 14 days from now.
         run = session.get(Run, run_id)
         tally = discrepancy_counts(session, run) if run is not None else None
-        if tally is not None and tally.open_total == 0:
+        if tally is not None and tally.total and tally.open_total == 0:
             run.queue_changed_at = row.updated_at
             session.flush()
     return row

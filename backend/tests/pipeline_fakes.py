@@ -16,7 +16,7 @@ from collections.abc import Callable
 from backend.db import COMPARE_QUOTES
 from backend.providers import CallRole, FakeProvider, ProviderRequest
 from backend.providers.types import TextPart
-from backend.schemas import POLICY_CHECK_FIELDS, scalar_fields
+from backend.schemas import CERTIFICATE_FIELDS, POLICY_CHECK_FIELDS, scalar_fields
 
 LABELS = {f["key"]: f["label"] for f in COMPARE_QUOTES["fact_schema"]}
 
@@ -115,6 +115,87 @@ def policy_responder(tamper: Callable[[str, dict], dict] | None = None) -> Calla
         if req.role is CallRole.VISION:
             return ""
         raise AssertionError(f"policy check made an unexpected {req.role} call")
+
+    return respond
+
+
+# --------------------------------------------------------------------- Certificates (slice 4)
+
+CERT_LABELS = {f.key: f.label for f in scalar_fields(CERTIFICATE_FIELDS)}
+_CERT_FORM = re.compile(r"^\s*Form ([A-Z]{2} ?\d{2} ?\d{2,4})(?: (\d{2} \d{2}))?\s*$")
+_CERT_PARTS = {"Policy Number": "policy_number", "Additional Insured": "named_party", "Waiver Party": "named_party",
+               "Applies": "condition"}
+
+
+def cert_extraction_reply(text: str) -> dict:
+    """The certificate combined pass: "Label: value" lines for the cert: scalar fields (outside an
+    endorsement block), plus an endorsements array. An endorsement block opens with a line
+    "Form CG 20 10 04 13"; its next line is its printed title (type); inside it "Policy Number:",
+    "Additional Insured:" / "Waiver Party:" and "Applies:" lines are its parts."""
+    block = text[text.index("<<<DOCUMENT"): text.rindex(">>>")]
+    page = 0
+    found: dict[str, dict] = {}
+    ends: list[dict] = []
+    current: dict | None = None
+    expect_title = False
+    for line in block.splitlines():
+        m = re.match(r"\[page (\d+)\]", line.strip())
+        if m:
+            page, current, expect_title = int(m.group(1)), None, False
+            continue
+        fm = _CERT_FORM.match(line)
+        if fm:
+            current = {"form_number": fm.group(1), "edition": fm.group(2), "page": page, "quote": line.strip(),
+                       **{p: {"value": None, "page": None, "quote": None}
+                          for p in ("type", "policy_number", "named_party", "condition")}}
+            ends.append(current)
+            expect_title = True
+            continue
+        if current is not None and expect_title and line.strip():
+            current["type"] = {"value": line.strip(), "page": page, "quote": line.strip()}
+            expect_title = False
+            continue
+        if current is not None:
+            for label, part in _CERT_PARTS.items():
+                mm = re.match(rf"\s*{re.escape(label)}:\s*(.+?)\s*$", line)
+                if mm:
+                    current[part] = {"value": mm.group(1), "page": page, "quote": line.strip()}
+            continue
+        for key, label in CERT_LABELS.items():
+            mm = re.match(rf"\s*{re.escape(label)}:\s*(.+?)\s*$", line)
+            if mm and key not in found:
+                found[key] = {"field": key, "value": mm.group(1), "page": page, "quote": line.strip()}
+    return {"facts": list(found.values()), "endorsements": ends, "options_detected": 1, "option_compared": None}
+
+
+def cert_responder(ocr_pages: dict[int, str] | None = None) -> Callable[[ProviderRequest], object]:
+    """Extraction (and OCR) only: a certificate run never asks the model to compose (C5)."""
+    ocr_pages = ocr_pages or {}
+
+    def respond(req: ProviderRequest):
+        text = _user_text(req)
+        if req.role is CallRole.EXTRACT:
+            return cert_extraction_reply(text)
+        if req.role is CallRole.VISION:
+            n = int(re.search(r"Page (\d+)\.", text).group(1))
+            return ocr_pages.get(n, "")
+        raise AssertionError(f"certificate run made an unexpected {req.role} call")
+
+    return respond
+
+
+def any_responder(ocr_pages: dict[int, str] | None = None) -> Callable[[ProviderRequest], object]:
+    """Compare Quotes, Policy Check and certificate runs in one app (the extraction reply follows the
+    workflow's field list in the prompt)."""
+    smart, policy, cert = smart_responder(ocr_pages), policy_responder(), cert_responder(ocr_pages)
+
+    def respond(req: ProviderRequest):
+        text = _user_text(req)
+        if req.role is CallRole.EXTRACT and "- cert:" in text:
+            return cert(req)
+        if req.role is CallRole.EXTRACT and "- coverage_a_limit" in text:
+            return policy(req)
+        return smart(req)
 
     return respond
 
