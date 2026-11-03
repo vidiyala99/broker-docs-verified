@@ -1,8 +1,8 @@
-import { Scales, ShieldCheck } from "@phosphor-icons/react";
 import { QueueView } from "../queue/QueueView";
 import { useQueue } from "../queue/useQueue";
 import { isEmpty } from "../queue/queueUtil";
 import "./personal.css";
+import { Glyph, WorkflowMark } from "../voice/marks";
 
 export const PERSONAL_COMPARE_HREF = "#/?line=personal";
 export const PERSONAL_CHECK_HREF = "#/policy-check/new?line=personal";
@@ -11,10 +11,10 @@ function Actions() {
   return (
     <div className="personal__actions">
       <a href={PERSONAL_COMPARE_HREF} className="btn btn--secondary">
-        <Scales size={18} aria-hidden /> Compare homeowners quotes
+        <WorkflowMark slug="compare-quotes" size={18} /> Compare homeowners quotes
       </a>
       <a href={PERSONAL_CHECK_HREF} className="btn btn--secondary">
-        <ShieldCheck size={18} aria-hidden /> Check a renewal
+        <WorkflowMark slug="policy-check" size={18} /> Check a renewal
       </a>
     </div>
   );
@@ -46,6 +46,7 @@ export function PersonalLinesPage() {
             line="personal"
             empty={
               <div className="queue-empty">
+                <Glyph name="blank" size={32} className="muted-glyph" />
                 <h2 className="queue-empty__title">No personal-lines work yet.</h2>
                 <p className="hint">Start a comparison or a renewal check. A run can also be moved here from its own page.</p>
                 <Actions />

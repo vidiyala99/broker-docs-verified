@@ -1,19 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  Archive,
-  Briefcase,
-  ChartLine,
-  ChatCircleText,
-  FileText,
-  Files,
-  Heartbeat,
-  Lightbulb,
-  ListChecks,
-  MagnifyingGlass,
-  PlugsConnected,
-  ShieldCheck,
-  Stamp,
-} from "@phosphor-icons/react";
+import { Glyph } from "../voice/marks";
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
 
@@ -33,21 +19,21 @@ interface RailItem {
 // runs tagged personal) and Tasks (slice 3b T7). `tip` is the tooltip and accessible name of a live item.
 const GROUPS: RailItem[][] = [
   [
-    { label: "Workflows", icon: <Briefcase size={20} aria-hidden />, href: "#/", section: "workflows" },
-    { label: "Proposals", icon: <FileText size={20} aria-hidden />, href: "#/proposals/new", section: "proposals", tip: "Proposals: new proposal" },
-    { label: "Personal lines", icon: <Heartbeat size={20} aria-hidden />, href: "#/personal-lines", section: "personal-lines" },
-    { label: "Policy check", icon: <ShieldCheck size={20} aria-hidden />, href: "#/policy-check/new", section: "policy-check", tip: "Policy check: new check" },
-    { label: "Certificates", icon: <Stamp size={20} aria-hidden /> },
-    { label: "Tasks", icon: <ListChecks size={20} aria-hidden />, href: "#/tasks", section: "tasks" },
-    { label: "Integrations", icon: <PlugsConnected size={20} aria-hidden />, href: "#/integrations", section: "integrations" },
+    { label: "Workflows", icon: <Glyph name="compare" />, href: "#/", section: "workflows" },
+    { label: "Proposals", icon: <Glyph name="proposal" />, href: "#/proposals/new", section: "proposals", tip: "Proposals: new proposal" },
+    { label: "Personal lines", icon: <Glyph name="personal" />, href: "#/personal-lines", section: "personal-lines" },
+    { label: "Policy check", icon: <Glyph name="policy-check" />, href: "#/policy-check/new", section: "policy-check", tip: "Policy check: new check" },
+    { label: "Certificates", icon: <Glyph name="certificate" /> },
+    { label: "Tasks", icon: <Glyph name="tasks" />, href: "#/tasks", section: "tasks" },
+    { label: "Integrations", icon: <Glyph name="integrations" />, href: "#/integrations", section: "integrations" },
   ],
   [
-    { label: "Assistant", icon: <ChatCircleText size={20} aria-hidden /> },
-    { label: "Market search", icon: <MagnifyingGlass size={20} aria-hidden /> },
-    { label: "Analytics", icon: <ChartLine size={20} aria-hidden /> },
-    { label: "Insights", icon: <Lightbulb size={20} aria-hidden /> },
+    { label: "Assistant", icon: <Glyph name="assistant" /> },
+    { label: "Market search", icon: <Glyph name="search" /> },
+    { label: "Analytics", icon: <Glyph name="analytics" /> },
+    { label: "Insights", icon: <Glyph name="insights" /> },
   ],
-  [{ label: "Vault", icon: <Archive size={20} aria-hidden /> }],
+  [{ label: "Vault", icon: <Glyph name="vault" /> }],
 ];
 
 export function Rail({ section }: { section: Section }) {
@@ -91,7 +77,7 @@ export function Rail({ section }: { section: Section }) {
       <div className="rail__bottom">
         <Tip text="Documents: coming in a later slice" side="right">
           <span className="rail__item is-disabled" role="button" aria-disabled="true" tabIndex={-1} aria-label="Documents, coming in a later slice">
-            <Files size={20} aria-hidden />
+            <Glyph name="documents" />
           </span>
         </Tip>
       </div>

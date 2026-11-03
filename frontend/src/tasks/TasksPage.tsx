@@ -6,16 +6,17 @@ import {
   Check,
   CheckCircle,
   LinkBreak,
-  ListChecks,
   MagnifyingGlass,
   PencilSimple,
   Plus,
   Trash,
   Warning,
 } from "@phosphor-icons/react";
+import { Glyph } from "../voice/marks";
 import { api, ApiError } from "../api/client";
 import type { Task } from "../api/types";
 import { useToast, type ToastHandle } from "../ui/Toast";
+import { useFadeOnChange } from "../ui/motion";
 import { RowMenu } from "./RowMenu";
 import { TaskDialog, type TaskDialogMode } from "./TaskDialog";
 import {
@@ -80,6 +81,9 @@ export function TasksPage({ targetId }: { targetId: number | null }) {
   const pending = useRef(new Map<number, { commit: () => Promise<void>; handle: ToastHandle }>());
   const searchId = useId();
   const sortId = useId();
+  // A pointer filter or sort change re-settles the table with a short opacity lift; typing in search is instant.
+  const tableRef = useRef<HTMLTableElement>(null);
+  useFadeOnChange(tableRef, `${filter}|${search}|${sort.key}:${sort.dir}`);
 
   const load = useCallback(async () => {
     setError(null);
@@ -127,7 +131,8 @@ export function TasksPage({ targetId }: { targetId: number | null }) {
 
   useEffect(() => {
     const id = focusAfter.current;
-    if (id == null) return;
+    // After a save, wait until the dialog has closed (its exit plays on pointer closes; a modal <dialog> keeps focus).
+    if (id == null || dialog) return;
     const el = document.querySelector<HTMLElement>(`[data-task="${id}"] .task-title`);
     if (!el) return;
     focusAfter.current = null;
@@ -275,7 +280,7 @@ export function TasksPage({ targetId }: { targetId: number | null }) {
             </div>
           ) : empty ? (
             <div className="tasks__empty">
-              <ListChecks size={28} className="muted-glyph" aria-hidden />
+              <Glyph name="tasks" size={32} className="muted-glyph" />
               <h2 className="state-block__title">{EMPTY_TEXT}</h2>
               {newButton}
             </div>
@@ -337,7 +342,7 @@ export function TasksPage({ targetId }: { targetId: number | null }) {
                   </button>
                 </div>
               ) : (
-                <table className="tasks-table" role="table" aria-label="Tasks">
+                <table ref={tableRef} className="tasks-table" role="table" aria-label="Tasks">
                   <thead role="rowgroup">
                     <tr role="row">
                       <th role="columnheader" scope="col" className="tasks-table__check">

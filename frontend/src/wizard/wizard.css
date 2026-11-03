@@ -375,7 +375,7 @@ input[type="radio"] {
 }
 
 .tpl-option:active {
-  transform: scale(0.99);
+  transform: scale(var(--press-scale-large));
 }
 
 .tpl-option > :not(.tpl-option__radio) {
@@ -601,6 +601,19 @@ input[type="radio"] {
 
 .picker__caret {
   transition: transform var(--dur-base) var(--ease-out);
+}
+
+/* Carets turn instantly for keyboard toggles and under reduced motion (no rotation to watch). */
+:root[data-input="keyboard"] .picker__caret,
+:root[data-input="keyboard"] .add-section__caret {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .picker__caret,
+  :root .add-section__caret {
+    transition: none;
+  }
 }
 
 .picker.is-open .picker__caret {

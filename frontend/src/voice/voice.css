@@ -1,0 +1,254 @@
+/* The "Paper trail" voice (owner-approved direction C, VOICE-BRIEF.md; rules in DESIGN.md "Voice"). Loaded after
+   app.css. Type rule: the serif is the paper (page titles, section headings, the client); Inter is the system
+   (actions, statuses, labels, numbers). Marks: voice/marks.tsx. */
+
+/* ------------------------------------------------------------------ type: the paper layer */
+
+.page-title,
+.wizard__title,
+.wizard__step-title,
+.integrations__group-title,
+.task-form__title,
+.state-block__title,
+.toolbar__title,
+.queue-group__title,
+.queue-empty__title,
+.queue-row__client,
+.run-client__value,
+.report-section__title {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-semibold);
+  font-synthesis: none;
+}
+
+.page-title {
+  font-size: var(--text-xl);
+  letter-spacing: -0.015em;
+}
+
+.queue-group__title {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.queue-group__count,
+.toolbar__version {
+  font-family: var(--font-sans);
+}
+
+.queue-group__count {
+  font-size: var(--text-md);
+}
+
+.queue-group--in_progress .queue-group__title,
+.queue-group--done_recently .queue-group__title {
+  font-size: 17px;
+}
+
+.queue-row__client {
+  font-size: 19px;
+  letter-spacing: -0.005em;
+}
+
+.queue-list--slim .queue-row__client {
+  font-size: var(--text-md);
+}
+
+.queue-row__client.is-unnamed {
+  font-weight: var(--weight-semibold);
+}
+
+.toolbar__title {
+  align-items: center;
+  font-size: 19px;
+}
+
+.run-client__value {
+  max-width: min(320px, 100%);
+  font-size: 17px;
+}
+
+/* "Add client" is the system asking, not a name: it stays Inter. */
+.run-client__value.is-empty {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* ------------------------------------------------------------------ marks */
+
+.vmark {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+.queue-group__icon {
+  color: var(--color-text);
+}
+
+.queue-group--needs_attention .queue-group__icon {
+  color: var(--color-stale-fg);
+}
+
+.queue-row__mark {
+  position: relative;
+  width: auto;
+  height: auto;
+  background: none;
+  border-radius: 0;
+  color: var(--color-text-muted);
+}
+
+.queue-group--needs_attention .queue-row__mark {
+  color: var(--color-stale-fg);
+}
+
+.queue-group--done_recently .queue-row__mark > .vmark {
+  opacity: 0.72;
+}
+
+.queue-row,
+.queue-list--slim .queue-row {
+  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 12.5rem;
+}
+
+.toolbar__title .vmark--workflow {
+  color: var(--color-text-muted);
+}
+
+/* Glyphs inside buttons and links keep the 18px footprint of the icons they replace. */
+.btn > .vmark,
+.link-btn > .vmark {
+  width: 18px;
+  height: 18px;
+}
+
+/* The reading line: travels down the page while documents are read (state indication; constant motion = linear). */
+.vmark__read {
+  animation: vmark-read 1.6s linear infinite;
+}
+
+@keyframes vmark-read {
+  0% { opacity: 0; transform: translateY(0); }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(11px); }
+}
+
+/* The seal on a row in Done recently. It lands once when a pointer action files the row (scale 1.25 to 1 with a
+   small rotation settle, 220ms ease-out: B's "lands" moment, borrowed once). */
+.seal {
+  position: absolute;
+  right: -6px;
+  bottom: -5px;
+  color: var(--color-text-muted);
+}
+
+.seal--lands {
+  animation: seal-lands 220ms var(--ease-out) backwards;
+}
+
+@keyframes seal-lands {
+  from {
+    opacity: 0;
+    transform: scale(1.25) rotate(-12deg);
+  }
+}
+
+/* Workflow pages carry their mark beside the title (wizards, run header). */
+.wizard__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  letter-spacing: -0.015em;
+}
+
+.wizard__title .vmark--workflow {
+  color: var(--color-text-muted);
+}
+
+/* Empty and reading states: the sheet is the picture. */
+.state-block__title,
+.queue-empty__title {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-semibold);
+  font-size: 18px;
+  line-height: var(--leading-md);
+}
+
+.queue-empty > .vmark,
+.tasks__empty > .vmark,
+.state-block > .vmark {
+  color: var(--color-text-muted);
+}
+
+.disc-empty > .vmark {
+  color: var(--color-text-muted);
+}
+
+/* Activity rows: the workflow's mark leads the run, as on the queue. */
+.run-link__mark {
+  align-self: center;
+  color: var(--color-text-muted);
+}
+
+.report-skeleton__mark {
+  display: inline-block;
+  margin-right: var(--space-2);
+  vertical-align: -4px;
+  color: var(--color-text-muted);
+}
+
+.doc-row__glyph.vmark--reading {
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------------ queue: one loud button per region */
+
+/* Needs attention's repeated Retry steps down to the secondary look, so the column is not a wall of violet. */
+.queue-group--needs_attention .btn--primary {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-input);
+  color: var(--color-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .queue-group--needs_attention .btn--primary:hover {
+    background: var(--color-primary-tint);
+  }
+}
+
+/* Each "N severity" pair stays together when the counts wrap (390). */
+.queue-sev {
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmark__read {
+    animation: none;
+    opacity: 1;
+    transform: translateY(5px);
+  }
+  .seal--lands {
+    animation: none;
+  }
+}
+
+@media (max-width: 699px) {
+  .page-title {
+    font-size: 32px;
+    line-height: 40px;
+  }
+  .queue-group__title {
+    font-size: 19px;
+  }
+  .queue-row__client {
+    font-size: 17px;
+    line-height: 22px;
+  }
+  .queue-row,
+  .queue-list--slim .queue-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}

@@ -413,6 +413,33 @@
   }
 }
 
+/* Pointer closes (B5): a 120ms exit back toward the trigger corner, faster than the 150ms enter. A transition, so a
+   reopen mid-exit retargets. Keyboard closes unmount at once (RowMenu.tsx). */
+.row-menu__list--leaving {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+/* Reduced motion: opacity only, no scale (the literal 150ms used to keep scaling here). */
+@media (prefers-reduced-motion: reduce) {
+  .row-menu__list--animate {
+    animation-name: row-menu-fade;
+  }
+  .row-menu__list--leaving {
+    transform: none;
+  }
+}
+
+@keyframes row-menu-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 .row-menu__item {
   display: flex;
   align-items: center;
@@ -476,6 +503,19 @@
   from {
     opacity: 0;
     transform: scale(0.98);
+  }
+}
+
+/* Reduced motion (B2): the same fade as the review dialog, no scale. Exit and backdrop: ui/motion.css. */
+@media (prefers-reduced-motion: reduce) {
+  .task-dialog--animate[open] {
+    animation: task-dialog-fade var(--dur-fade) ease;
+  }
+}
+
+@keyframes task-dialog-fade {
+  from {
+    opacity: 0;
   }
 }
 

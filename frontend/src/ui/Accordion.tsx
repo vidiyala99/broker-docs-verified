@@ -1,10 +1,12 @@
 import { useId, useState, type ReactNode } from "react";
 import { CaretDown } from "@phosphor-icons/react";
+import { Collapse } from "./motion";
 
 /**
  * Disclosure section. `summary` is shown inside the toggle only while closed, so the button's
- * name carries what is folded away ("Upload 3, 3 documents, all read"). The body fades in on a
- * pointer open; keyboard opens are instant (DESIGN.md: no keyboard-triggered animation).
+ * name carries what is folded away ("Upload 3, 3 documents, all read"). The body opens and closes
+ * with height + opacity on a pointer toggle; keyboard toggles are instant (DESIGN.md: no
+ * keyboard-triggered animation).
  */
 export function Accordion({
   title,
@@ -28,8 +30,11 @@ export function Accordion({
   children: ReactNode;
 }) {
   const [own, setOwn] = useState(defaultOpen);
-  const [viaPointer, setViaPointer] = useState(false);
+  // The last toggle: animate only the change a pointer click asked for. An open state set from outside (a run
+  // finishing folds Upload, the strip's "Show uploads") is instant.
+  const [last, setLast] = useState<{ open: boolean; pointer: boolean } | null>(null);
   const open = controlled ?? own;
+  const animate = last != null && last.pointer && last.open === open;
   const id = useId();
   return (
     <div className={`accordion${open ? " is-open" : ""}${className ? ` ${className}` : ""}`}>
@@ -41,7 +46,7 @@ export function Accordion({
           aria-controls={id}
           onClick={(e) => {
             // detail is 0 for Enter/Space activation.
-            setViaPointer(e.detail > 0);
+            setLast({ open: !open, pointer: e.detail > 0 });
             setOwn(!open);
             onToggle?.(!open);
           }}
@@ -54,9 +59,11 @@ export function Accordion({
         </button>
         {extra}
       </div>
-      <div id={id} className={`accordion__body${viaPointer ? " fade-in" : ""}`} hidden={!open}>
-        {children}
-      </div>
+      {/* Height + opacity on pointer toggles (Collapse); kept mounted so upload rows keep their state, and `hidden`
+          once settled closed. */}
+      <Collapse id={id} open={open} animate={animate} keepMounted>
+        <div className="accordion__body">{children}</div>
+      </Collapse>
     </div>
   );
 }

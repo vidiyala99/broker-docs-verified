@@ -1,5 +1,8 @@
 import type { Run } from "../api/types";
 import { hueOf } from "../report/Chip";
+import { WorkflowMark } from "../voice/marks";
+
+const SLUG: Record<string, string> = { "Proposal Builder": "proposal", "Policy Check": "policy-check" };
 
 const STATUS_TEXT: Record<Run["status"], string> = {
   queued: "Queued",
@@ -34,6 +37,7 @@ export function RecentRuns({ runs, compact, currentId }: { runs: Run[]; compact?
         <li key={r.id}>
           <a href={`#/runs/${r.id}`} className="run-link" aria-current={currentId === r.id ? "page" : undefined}>
             <span className="run-link__top">
+              {!compact && <WorkflowMark slug={SLUG[r.workflow_name] ?? "compare-quotes"} size={20} className="run-link__mark" />}
               <span className="run-link__title">{runTitle(r)}</span>
               <span className={`status-word status-word--${r.status}`}>{statusText(r.status)}</span>
             </span>

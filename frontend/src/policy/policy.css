@@ -157,6 +157,19 @@
   cursor: not-allowed;
 }
 
+/* Multi-select toggles, so no sliding indicator: the check glyph fades in when a pointer turns a filter on
+   (state indication, 120ms); keyboard toggles show it at once. Opacity only, so reduced motion keeps it. */
+.sev-filter__check {
+  transition: opacity var(--dur-press) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+:root[data-input="keyboard"] .sev-filter__check {
+  transition: none;
+}
+
 .sev-filter__count {
   color: var(--color-text-muted);
   font-variant-numeric: var(--numeric-table);

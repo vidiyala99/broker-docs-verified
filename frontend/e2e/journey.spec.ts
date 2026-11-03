@@ -52,7 +52,9 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   await page.getByRole("button", { name: "Compare 3 quotes" }).click();
   await expect(page).toHaveURL(/#\/runs\/\d+/);
   await expect(page.locator(".doc-row")).toHaveCount(3);
-  await expect(page.locator(".doc-row .spinner").first()).toBeVisible();
+  // D7 (voice + motion lane, 2026-11-03): a document being read shows the reading mark (a sheet with a moving line,
+  // DESIGN.md Voice) instead of the spinner; selector only, same check (a reading row is visible).
+  await expect(page.locator(".doc-row .vmark--reading").first()).toBeVisible();
   await shot(page, "1440-03-run-progress");
   await expect(page.locator(".report")).toBeVisible({ timeout: 60_000 });
   await expect(page.locator(".doc-row--done")).toHaveCount(3);

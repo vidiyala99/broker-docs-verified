@@ -71,9 +71,55 @@
   transform: scale(var(--press-scale));
 }
 
-.line-choice__opt:has(input:checked) {
+/* Shared sliding segmented control (voice + motion lane): one indicator per segment slides to the checked option.
+   Pure CSS: the index comes from :has(), so it retargets mid-flight (a transition, not a keyframe). 200ms
+   --ease-in-out (an on-screen move); instant for keyboard changes and under reduced motion. */
+.line-choice__seg {
+  --seg-n: 2;
+  --seg-i: 0;
+  position: relative;
+  isolation: isolate;
+}
+
+.line-choice__seg:has(> :nth-child(3)) { --seg-n: 3; }
+.line-choice__seg:has(> :nth-child(4)) { --seg-n: 4; }
+.line-choice__seg:has(> :nth-child(2) input:checked) { --seg-i: 1; }
+.line-choice__seg:has(> :nth-child(3) input:checked) { --seg-i: 2; }
+.line-choice__seg:has(> :nth-child(4) input:checked) { --seg-i: 3; }
+
+.line-choice__seg::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc((100% - (var(--seg-n) - 1) * var(--space-2)) / var(--seg-n));
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius-control);
   background: var(--color-primary-tint);
-  border-color: var(--color-primary);
+  transform: translateX(calc(var(--seg-i) * (100% + var(--space-2))));
+  transition: transform var(--dur-base) var(--ease-in-out);
+  pointer-events: none;
+}
+
+/* Keyboard changes (arrow keys) are instant: the shared input helper (ui/input.ts) marks the last input method. */
+:root[data-input="keyboard"] .line-choice__seg::after {
+  transition: none;
+}
+
+.line-choice__opt {
+  background: transparent;
+}
+
+.line-choice__opt:has(input:checked) {
+  border-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line-choice__seg::after {
+    transition: none;
+  }
 }
 
 .line-choice__opt:has(input:focus-visible) {

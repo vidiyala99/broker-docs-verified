@@ -227,9 +227,11 @@ a {
   border-radius: var(--radius-control);
 }
 
-.crumbs a:hover {
-  color: var(--color-text);
-  text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .crumbs a:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+  }
 }
 
 .crumbs [aria-current="page"] {
@@ -303,11 +305,51 @@ a {
   z-index: var(--z-panel);
   background: var(--color-text);
   opacity: 0.16;
-  animation: fade-in var(--dur-base) var(--ease-out);
+  transition: opacity var(--dur-base) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .left-panel--overlay {
   border-color: var(--color-border-input);
+}
+
+/* Narrow left panel overlay (shell/layout.tsx): a pointer open reveals it from its left edge, a drawer (clip-path +
+   a 12px nudge, 250ms --ease-out); a pointer close folds it back the same way, faster (200ms). Clip, not
+   translateX(-100%): a full slide drew the panel across the rail (voice + motion lane, round 3). Keyboard opens and
+   Esc are instant (no .is-animated class). Transitions, so a quick close mid-open retargets. */
+.left-panel--overlay {
+  clip-path: inset(0 0 0 0 round var(--radius-control));
+}
+
+.left-panel--overlay.is-animated {
+  transition:
+    clip-path var(--dur-drawer) var(--ease-out),
+    transform var(--dur-drawer) var(--ease-out);
+  @starting-style {
+    clip-path: inset(0 100% 0 0 round var(--radius-control));
+    transform: translateX(-12px);
+  }
+}
+
+.left-panel--overlay.is-leaving {
+  clip-path: inset(0 100% 0 0 round var(--radius-control));
+  transform: translateX(-12px);
+  transition:
+    clip-path var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+  pointer-events: none;
+}
+
+.panel-scrim.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Keyboard opens: no scrim fade either. */
+.panel-scrim.is-instant {
+  transition: none;
 }
 
 .left-panel__close {
@@ -673,15 +715,21 @@ kbd {
   border-radius: var(--radius-control);
   background: var(--color-tooltip-bg);
   color: var(--color-tooltip-fg);
-  animation: toast-in var(--dur-toast) var(--ease-out);
+  /* Enter as a transition from @starting-style, not a keyframe (B3), so it retargets mid-flight; exit leaves the
+     way it came (down), faster, on --ease-out (B7). */
   transition:
-    opacity var(--dur-fast) ease,
-    transform var(--dur-fast) ease;
+    opacity var(--dur-toast) var(--ease-out),
+    transform var(--dur-toast) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 
 .toast.is-leaving {
   opacity: 0;
   transform: translateY(8px);
+  transition-duration: var(--dur-fast);
 }
 
 .toast__action {
@@ -698,13 +746,6 @@ kbd {
 
 .toast :focus-visible {
   outline-color: var(--color-tooltip-fg);
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
 }
 
 /* Accordion */
@@ -760,15 +801,6 @@ kbd {
   margin-left: auto;
   color: var(--color-text-muted);
   transition: transform var(--dur-base) var(--ease-out);
-}
-
-/* A body opened by pointer fades in (opacity only, kept under reduced motion); keyboard opens
-   carry no .fade-in and are instant. @starting-style fires when [hidden] is removed. */
-.fade-in:not([hidden]) {
-  transition: opacity var(--dur-fast) var(--ease-out);
-  @starting-style {
-    opacity: 0;
-  }
 }
 
 .accordion.is-open .accordion__caret {
@@ -1326,9 +1358,31 @@ kbd {
   transition: transform var(--dur-base) var(--ease-out);
 }
 
+/* Carets turn instantly for keyboard toggles (B4) and under reduced motion (no rotation). */
+:root[data-input="keyboard"] .chat__caret,
+:root[data-input="keyboard"] .accordion__caret {
+  transition: none;
+}
+
 /* Chat docks at the bottom, so its caret points the way it moves: down to fold, up to open. */
 .chat--collapsed .chat__caret {
   transform: rotate(180deg);
+}
+
+/* The Collapse around the body (ui/motion.tsx) takes the body's place in the column: it fills the chat's share of
+   the panel, and its row (0fr to 1fr) reveals the body on a pointer open. */
+.chat > .chat__collapse {
+  flex: 1;
+  min-height: 0;
+}
+
+.chat--idle > .chat__collapse {
+  flex: none;
+}
+
+.chat__collapse > .collapse__inner {
+  display: flex;
+  flex-direction: column;
 }
 
 .chat__body {
@@ -1336,10 +1390,6 @@ kbd {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-
-.chat__body[hidden] {
-  display: none;
 }
 
 .chat--idle .chat__body {
@@ -1571,6 +1621,43 @@ kbd {
   color: var(--color-text);
   margin-bottom: -1px;
   height: 41px;
+}
+
+/* Folder tabs: the active tab's paper (background, border, text) cross-fades in 150ms; no sliding underline (the
+   folder look carries the state). Keyboard switches are instant. */
+.tab {
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+:root[data-input="keyboard"] .tab {
+  transition: none;
+}
+
+/* A PDF tab opened from a chip by pointer rises in (opacity + 4px, 200ms); closing it sinks out (190ms, then gone).
+   Spatial consistency: the tab arrives where the source came from. usePresence in RunView.tsx. */
+.tab--entering {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.tab--leaving {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
 }
 
 .tab--pdf {
@@ -2153,6 +2240,8 @@ kbd {
   text-align: left;
   cursor: pointer;
   color: var(--color-text);
+  /* Same colour cross-fade as the other toggles (consistency, LOW). */
+  transition: background-color var(--dur-fast) ease;
 }
 
 .trust__item > svg {
@@ -2304,6 +2393,52 @@ kbd {
   }
 }
 
+/* Pointer exit of the split pane (RunView.tsx): the pane leaves by the edge it came from, faster (150ms), laid over
+   the report's right half while the report widens under it. Esc and keyboard exits are instant (no ghost). */
+.source-pane--leaving {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  background: var(--color-surface);
+  pointer-events: none;
+  animation: source-pane-out var(--dur-fast) var(--ease-out) forwards;
+}
+
+@keyframes source-pane-out {
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+@keyframes source-pane-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Outline show / hide (RunView.tsx), pointer only: it slides 12px in from the right edge it lives on, and back out. */
+.report-area[data-outline-motion="enter"] > .outline {
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+.report-area[data-outline-motion="leave"] > .outline {
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
 .source-pane__head {
   display: flex;
   align-items: center;
@@ -2438,12 +2573,68 @@ canvas {
   display: none;
 }
 
+/* Route change (App.tsx): only the main pane takes part in the view transition, as a plain opacity cross-fade
+   (--dur-fast). The root is not captured, so the rail, top bar and panels stay live and still; the group does not
+   morph its size or position (no movement), the new page takes its place at once and the two images cross-fade. */
+:root {
+  view-transition-name: none;
+}
+
+#main {
+  view-transition-name: main-pane;
+}
+
+::view-transition-group(main-pane) {
+  animation: none;
+}
+
+::view-transition-old(main-pane),
+::view-transition-new(main-pane) {
+  animation-duration: var(--dur-fast);
+  animation-timing-function: ease;
+}
+
+/* Reduced motion (B1): every movement above becomes an opacity fade; nothing translates, scales or rotates. */
 @media (prefers-reduced-motion: reduce) {
-  .pane__body.is-split.split-anim .source-pane,
+  .pane__body.is-split.split-anim .source-pane {
+    animation: fade-in var(--dur-fade) ease;
+  }
+  .source-pane--leaving {
+    animation: source-pane-fade-out var(--dur-fade) ease forwards;
+  }
   .toast {
-    animation-name: fade-in;
+    transition: opacity var(--dur-fade) ease;
   }
   .toast.is-leaving {
+    transform: none;
+  }
+  .left-panel--overlay.is-animated {
+    transition: opacity var(--dur-fade) ease;
+    @starting-style {
+      opacity: 0;
+    }
+  }
+  .left-panel--overlay.is-leaving {
+    transform: none;
+    clip-path: inset(0 0 0 0 round var(--radius-control));
+    opacity: 0;
+    transition: opacity var(--dur-fade) ease;
+  }
+  :root .accordion__caret,
+  :root .chat__caret {
+    transition: none;
+  }
+  .tab--entering {
+    transition: opacity var(--dur-fade) ease;
+  }
+  .tab--leaving {
+    transform: none;
+    transition: opacity var(--dur-fade) ease;
+  }
+  .report-area[data-outline-motion] > .outline {
+    transition: opacity var(--dur-fade) ease;
+  }
+  .report-area[data-outline-motion="leave"] > .outline {
     transform: none;
   }
   .runs-skeleton span,

@@ -5,6 +5,7 @@ import { ROLE_LABEL } from "../policy/draft";
 import { hueOf } from "../report/Chip";
 import { MoreRow, useFold } from "../ui/Fold";
 import { statusText } from "../launch/RecentRuns";
+import { ReadingMark } from "../voice/marks";
 
 const DOC_TEXT: Record<RunDocument["status"], string> = {
   queued: "Queued",
@@ -116,5 +117,6 @@ function DocGlyph({ status }: { status: RunDocument["status"] }) {
   if (status === "done") return <CheckCircle size={16} weight="fill" className="ok-glyph doc-row__glyph" aria-hidden />;
   if (status === "failed") return <WarningCircle size={16} weight="fill" className="danger-glyph doc-row__glyph" aria-hidden />;
   if (status === "queued") return <Circle size={16} className="muted-glyph doc-row__glyph" aria-hidden />;
-  return <span className="spinner doc-row__glyph" aria-hidden />;
+  // Reading: the page with its reading line (DESIGN.md Voice), not a generic spinner.
+  return <ReadingMark size={16} className="doc-row__glyph" />;
 }

@@ -1,16 +1,17 @@
-/* Reusable motion primitives (ui/motion.tsx). Tokens only: --ease-out, --dur-base (200ms), --dur-fast (150ms).
-   Reduced motion (tokens.css sets --dur-base to 0 and --press-scale to 1) keeps opacity fades and drops movement. */
+/* Reusable motion primitives (ui/motion.tsx). Tokens only: --ease-out, --dur-base (200ms), --dur-fast (150ms),
+   --dur-fade (150ms, reduced motion). Reduced motion keeps opacity fades and drops movement (block at the end). */
 
 /* ------------------------------------------------------------------ list item enter / exit */
 
-/* Enter: a row that arrives after the list was shown (moved between groups, Undo, a finished run). */
+/* Enter: a row that arrives after the list was shown (moved between groups, Undo, a finished run). A transition from
+   @starting-style, not a keyframe (motion audit B3), so it retargets if the row changes mid-flight. Once it settles the
+   transform is `none` again: no stacking context is left behind, so a menu inside an entered row is not covered by the
+   next row. */
 .motion-enter {
-  /* backwards, not both: no transform is left behind, so a menu inside is not trapped in a stacking context. */
-  animation: motion-enter 200ms var(--ease-out) backwards;
-}
-
-@keyframes motion-enter {
-  from {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+  @starting-style {
     opacity: 0;
     transform: translateY(-6px);
   }
@@ -60,6 +61,11 @@
   opacity: 0;
 }
 
+/* keepMounted, settled closed: out of the layout and the accessibility tree (the author display beats [hidden]). */
+.collapse[hidden] {
+  display: none;
+}
+
 .collapse__inner {
   min-height: 0;
   overflow: hidden;
@@ -79,6 +85,43 @@
 @starting-style {
   .collapse--animate[data-open="true"] {
     grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ dialog exit and backdrop (useDialogClose) */
+
+/* Both native dialogs (task, review) carry .dialog-motion. Their own CSS keeps the pointer-open settle (opacity +
+   scale 0.98, --dur-base); this adds the backdrop fade on open and the pointer-close exit: opacity + scale 0.98 over
+   --dur-fast (exit faster than enter), modal and centred (no trigger origin). Esc and keyboard closes skip it. */
+.dialog-motion {
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.dialog-motion::backdrop {
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.dialog-motion--enter[open]::backdrop {
+  animation: dialog-backdrop-in var(--dur-base) var(--ease-out);
+}
+
+.dialog-motion.is-closing[open] {
+  opacity: 0;
+  transform: scale(0.98);
+  animation: none;
+  pointer-events: none;
+}
+
+.dialog-motion.is-closing[open]::backdrop {
+  opacity: 0;
+  animation: none;
+}
+
+@keyframes dialog-backdrop-in {
+  from {
     opacity: 0;
   }
 }
@@ -131,8 +174,27 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Opacity only: transform is no longer transitioned, so the starting translateY never shows. */
   .motion-enter {
-    animation: motion-fade 150ms ease backwards;
+    transition: opacity var(--dur-fade) ease;
+  }
+  /* Disclosure: no height animation, the body fades in and out at full height, then the layout settles once. */
+  .collapse--animate {
+    transition: opacity var(--dur-fade) ease;
+  }
+  .collapse--animate[data-open="false"] {
+    grid-template-rows: 1fr;
+  }
+  .dialog-motion {
+    transition: opacity var(--dur-fade) ease;
+  }
+  .dialog-motion.is-closing[open] {
+    transform: none;
+  }
+  @starting-style {
+    .collapse--animate[data-open="true"] {
+      grid-template-rows: 1fr;
+    }
   }
   .motion-exit {
     animation: motion-fade-out 150ms ease both;

@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { DotsThree } from "@phosphor-icons/react";
+import { keyboardAction } from "../ui/input";
+import { tokenMs } from "../ui/motion";
 
 export interface MenuItem {
   label: string;
@@ -15,9 +17,23 @@ export interface MenuItem {
  */
 export function RowMenu({ label, items }: { label: string; items: MenuItem[] }) {
   const [open, setOpen] = useState<{ focus: number; animate: boolean } | null>(null);
+  // Pointer closes leave the list mounted for its 120ms exit (opacity + scale 0.97 toward the trigger); it is inert and
+  // hidden from assistive tech meanwhile. Keyboard closes (Esc, Tab, Enter on an item) are instant.
+  const [leaving, setLeaving] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const id = useId();
+
+  const close = (viaPointer: boolean) => {
+    setOpen(null);
+    setLeaving(viaPointer && !keyboardAction());
+  };
+
+  useEffect(() => {
+    if (!leaving) return;
+    const t = window.setTimeout(() => setLeaving(false), tokenMs("--dur-press", 120));
+    return () => window.clearTimeout(t);
+  }, [leaving]);
 
   useEffect(() => {
     if (!open) return;
@@ -28,7 +44,7 @@ export function RowMenu({ label, items }: { label: string; items: MenuItem[] }) 
     if (!open) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
-      if (!menu.current?.contains(t) && !trigger.current?.contains(t)) setOpen(null);
+      if (!menu.current?.contains(t) && !trigger.current?.contains(t)) close(true);
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
@@ -50,23 +66,32 @@ export function RowMenu({ label, items }: { label: string; items: MenuItem[] }) 
         aria-haspopup="menu"
         aria-expanded={open != null}
         aria-controls={open ? id : undefined}
-        onClick={(e) => setOpen((o) => (o ? null : { focus: 0, animate: e.detail > 0 }))}
+        onClick={(e) => {
+          if (open) close(e.detail > 0);
+          else {
+            setLeaving(false);
+            setOpen({ focus: 0, animate: e.detail > 0 });
+          }
+        }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
+            setLeaving(false);
             setOpen({ focus: e.key === "ArrowUp" ? items.length - 1 : 0, animate: false });
           }
         }}
       >
         <DotsThree size={20} weight="bold" aria-hidden />
       </button>
-      {open && (
+      {(open || leaving) && (
         <div
           ref={menu}
-          id={id}
+          id={open ? id : undefined}
           role="menu"
           aria-label={label}
-          className={`row-menu__list${open.animate ? " row-menu__list--animate" : ""}`}
+          aria-hidden={open ? undefined : true}
+          inert={!open || undefined}
+          className={`row-menu__list${open ? (open.animate ? " row-menu__list--animate" : "") : " row-menu__list--leaving"}`}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
@@ -97,9 +122,15 @@ export function RowMenu({ label, items }: { label: string; items: MenuItem[] }) 
               role="menuitem"
               tabIndex={-1}
               className={`row-menu__item${item.danger ? " row-menu__item--danger" : ""}`}
-              onClick={() => {
-                setOpen(null);
+              onClick={(e) => {
+                close(e.detail > 0);
                 item.run();
+                // The leaving list is inert, so the clicked item loses focus. If the action did not move focus itself
+                // (a dialog, a navigation, a row that left), return it to the trigger instead of the page body.
+                window.setTimeout(() => {
+                  const a = document.activeElement;
+                  if ((a === document.body || a === null || menu.current?.contains(a)) && trigger.current?.isConnected) trigger.current.focus();
+                }, 0);
               }}
             >
               {item.icon}
