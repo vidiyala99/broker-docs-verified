@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_written_contract_gl",
+  "case_id": "cert_written_contract",
+  "file": "cert_written_contract_gl.pdf",
+  "doc_kind": "declarations",
+  "layout": "clean",
+  "line": "general_liability",
+  "variant": "certificate_declarations_clean",
+  "gate_bucket": "certificate",
+  "description": "Declarations document of cert_written_contract (clean layout). States 14 keys.",
+  "carrier": "Quarry Lane Indemnity Company",
+  "page_count": 2,
+  "size_bytes": 6918,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": {
+      "value": "Harrow & Finch Landscaping Inc",
+      "printed": "Harrow & Finch Landscaping Inc",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Harrow & Finch Landscaping Inc",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:insured_address": {
+      "value": "48 Orchard Spur Road, Boise, ID 83702",
+      "printed": "48 Orchard Spur Road, Boise, ID 83702",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 48 Orchard Spur Road, Boise, ID 83702",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:carrier": {
+      "value": "Quarry Lane Indemnity Company",
+      "printed": "Quarry Lane Indemnity Company",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Quarry Lane Indemnity Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": {
+      "value": "90633",
+      "printed": "90633",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "NAIC Company Code: 90633",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:policy_number": {
+      "value": "QLI-GL-207731",
+      "printed": "QLI-GL-207731",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Number: QLI-GL-207731",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:line": {
+      "value": "general_liability",
+      "printed": "Commercial General Liability",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Coverage Part: Commercial General Liability",
+      "source": "text",
+      "accepted_values": [
+        "Commercial General Liability"
+      ]
+    },
+    "cert:effective_date": {
+      "value": "07/15/2026",
+      "printed": "07/15/2026",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Effective Date: 07/15/2026",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:expiration_date": {
+      "value": "07/15/2027",
+      "printed": "07/15/2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Expiration Date: 07/15/2027",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_each_occurrence": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_general_aggregate": {
+      "value": "$2,000,000",
+      "printed": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "General Aggregate Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_products_completed_ops_aggregate": {
+      "value": "$2,000,000",
+      "printed": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Products-Completed Operations Aggregate Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_personal_advertising_injury": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Personal and Advertising Injury Limit: $1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_damage_to_rented_premises": {
+      "value": "$300,000",
+      "printed": "$300,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Damage to Premises Rented to You Limit: $300,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_medical_expense": {
+      "value": "$10,000",
+      "printed": "$10,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Medical Expense Limit (any one person): $10,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

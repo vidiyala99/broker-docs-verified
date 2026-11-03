@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "case_id": "cert_traps",
+  "workflow": "certificate",
+  "gate_bucket": "certificate",
+  "description": "Paving contractor certificate with the traps: an expired GL policy (expired the day before), an auto policy under another named insured, an AI endorsement whose policy number matches no shown policy, and a package policy that contributes no facts. AI requested.",
+  "exercises": [
+    "expired_policy",
+    "ai_endorsement_other_policy_number",
+    "insured_mismatch",
+    "package_policy",
+    "ai_blanket_unconditional",
+    "umbrella_declarations",
+    "long_form_dates",
+    "multicol_layout"
+  ],
+  "parameters": {
+    "client_name": "Brightline Paving LLC",
+    "holder_name": "Ridgefield Commons Owners Association",
+    "holder_address": "77 Ridgefield Commons Drive, Dayton, OH 45459",
+    "wording": {
+      "additional_insured": true,
+      "waiver_of_subrogation": false,
+      "primary_noncontributory": false
+    },
+    "certificate_date": "2026-11-03",
+    "description": ""
+  },
+  "documents": [
+    "cert_traps_gl_expired",
+    "cert_traps_ai_blanket",
+    "cert_traps_auto_other_insured",
+    "cert_traps_ai_other_policy",
+    "cert_traps_wc",
+    "cert_traps_umbrella",
+    "cert_traps_package"
+  ],
+  "shown_policies": [
+    {
+      "fixture_id": "cert_traps_gl_expired",
+      "policy_number": "FHA GL 5520117",
+      "line": "general_liability"
+    },
+    {
+      "fixture_id": "cert_traps_auto_other_insured",
+      "policy_number": "CA 7719-0024",
+      "line": "auto"
+    },
+    {
+      "fixture_id": "cert_traps_wc",
+      "policy_number": "WC-6604-1183",
+      "line": "workers_comp"
+    },
+    {
+      "fixture_id": "cert_traps_umbrella",
+      "policy_number": "FHA-UMB-0098",
+      "line": "umbrella"
+    }
+  ],
+  "claims": [
+    {
+      "key": "wording:additional_insured:general_liability",
+      "kind": "wording",
+      "status": "supported",
+      "reason": "blanket_form_cited",
+      "note": "OM 20 33 is an unconditional blanket AI on FHA-GL-5520117 = FHA GL 5520117.",
+      "wording": "additional_insured",
+      "line": "general_liability",
+      "evidence": [
+        {
+          "fixture_id": "cert_traps_ai_blanket",
+          "page": 1,
+          "key": "cert:endorsement:OM2033:form_number"
+        }
+      ]
+    },
+    {
+      "key": "wording:additional_insured:auto",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "OM 20 49 names CA 7719-0042, not the auto policy CA 7719-0024: it joins no policy.",
+      "wording": "additional_insured",
+      "line": "auto",
+      "evidence": []
+    },
+    {
+      "key": "wording:additional_insured:umbrella",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "No additional insured endorsement modifies the umbrella policy.",
+      "wording": "additional_insured",
+      "line": "umbrella",
+      "evidence": []
+    },
+    {
+      "key": "in_force:FHAGL5520117",
+      "kind": "in_force",
+      "status": "not_supported",
+      "reason": "expired",
+      "note": "Expired 11/02/2026, the day before the certificate date.",
+      "line": "general_liability",
+      "policy_number": "FHA GL 5520117",
+      "evidence": []
+    },
+    {
+      "key": "in_force:CA77190024",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "in_force",
+      "note": "01/01/2026 to 01/01/2027.",
+      "line": "auto",
+      "policy_number": "CA 7719-0024",
+      "evidence": [
+        {
+          "fixture_id": "cert_traps_auto_other_insured",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_traps_auto_other_insured",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "in_force:WC66041183",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "in_force",
+      "note": "06/01/2026 to 06/01/2027.",
+      "line": "workers_comp",
+      "policy_number": "WC-6604-1183",
+      "evidence": [
+        {
+          "fixture_id": "cert_traps_wc",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_traps_wc",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "in_force:FHAUMB0098",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "in_force",
+      "note": "January 1, 2026 to January 1, 2027.",
+      "line": "umbrella",
+      "policy_number": "FHA-UMB-0098",
+      "evidence": [
+        {
+          "fixture_id": "cert_traps_umbrella",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_traps_umbrella",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "insured_consistent",
+      "kind": "insured",
+      "status": "not_supported",
+      "reason": "insured_mismatch",
+      "note": "The auto policy names Ferro Ridge Hauling Inc, the others Brightline Paving LLC.",
+      "evidence": []
+    }
+  ],
+  "notices": [
+    {
+      "kind": "package",
+      "fixture_id": "cert_traps_package"
+    },
+    {
+      "kind": "endorsement_unmatched",
+      "fixture_id": "cert_traps_ai_other_policy",
+      "form": "OM2049",
+      "form_number": "OM 20 49 10 23",
+      "policy_number": "CA 7719-0042"
+    }
+  ]
+}

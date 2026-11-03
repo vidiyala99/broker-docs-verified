@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_contractor_ai_scheduled",
+  "case_id": "cert_contractor",
+  "file": "cert_contractor_ai_scheduled.pdf",
+  "doc_kind": "endorsement",
+  "layout": "clean",
+  "line": null,
+  "variant": "certificate_endorsement_clean",
+  "gate_bucket": "certificate",
+  "description": "Endorsement document of cert_contractor (clean layout). policy number printed with spaces (declarations use dashes): joins after D7 normalization. States 5 keys.",
+  "carrier": "Thistlewood Casualty Company",
+  "page_count": 1,
+  "size_bytes": 4847,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": null,
+    "cert:insured_address": null,
+    "cert:carrier": {
+      "value": "Thistlewood Casualty Company",
+      "printed": "Thistlewood Casualty Company",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Thistlewood Casualty Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": null,
+    "cert:policy_number": null,
+    "cert:line": null,
+    "cert:effective_date": null,
+    "cert:expiration_date": null,
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null,
+    "cert:endorsement:OM2026:form_number": {
+      "value": "OM 20 26 04 24",
+      "printed": "OM 20 26 04 24",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Form OM 20 26 04 24",
+      "source": "text",
+      "accepted_values": [
+        "OM 20 26",
+        "OM 20 26 (04/24)",
+        "OM 20 26 04/24"
+      ]
+    },
+    "cert:endorsement:OM2026:type": {
+      "value": "additional_insured_scheduled",
+      "printed": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION",
+      "source": "text",
+      "accepted_values": [
+        "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION"
+      ]
+    },
+    "cert:endorsement:OM2026:policy_number": {
+      "value": "GL 4410 2281",
+      "printed": "GL 4410 2281",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "This endorsement forms part of Policy No. GL 4410 2281",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2026:named_party": {
+      "value": "MARLOWE PROPERTY GROUP LLC",
+      "printed": "MARLOWE PROPERTY GROUP LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Name of Additional Insured Person or Organization: MARLOWE PROPERTY GROUP LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2026:condition": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

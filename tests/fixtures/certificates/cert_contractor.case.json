@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "case_id": "cert_contractor",
+  "workflow": "certificate",
+  "gate_bucket": "certificate",
+  "description": "General contractor certificate for a landlord: GL, auto and WC declarations with a scheduled additional insured naming the holder, an unconditional WC waiver and an unconditional primary and non-contributory endorsement. AI, waiver and P&NC requested; description of operations given.",
+  "exercises": [
+    "gl_declarations",
+    "auto_declarations",
+    "wc_declarations",
+    "ai_scheduled_names_holder",
+    "waiver_of_subrogation",
+    "primary_noncontributory",
+    "policy_number_normalized_join",
+    "in_force_effective_day",
+    "in_force_expiration_day",
+    "insured_case_insensitive",
+    "description_sign_off",
+    "multicol_layout"
+  ],
+  "parameters": {
+    "client_name": "Calloway Build Group LLC",
+    "holder_name": "Marlowe Property Group LLC",
+    "holder_address": "2200 Larkspur Avenue, Suite 400, Tacoma, WA 98402",
+    "wording": {
+      "additional_insured": true,
+      "waiver_of_subrogation": true,
+      "primary_noncontributory": true
+    },
+    "certificate_date": "2026-11-03",
+    "description": "Tenant improvements at 2200 Larkspur Avenue, Suite 140."
+  },
+  "documents": [
+    "cert_contractor_gl",
+    "cert_contractor_auto",
+    "cert_contractor_wc",
+    "cert_contractor_ai_scheduled",
+    "cert_contractor_waiver_wc",
+    "cert_contractor_pnc_gl"
+  ],
+  "shown_policies": [
+    {
+      "fixture_id": "cert_contractor_gl",
+      "policy_number": "GL-4410-2281",
+      "line": "general_liability"
+    },
+    {
+      "fixture_id": "cert_contractor_auto",
+      "policy_number": "CA-4410-2290",
+      "line": "auto"
+    },
+    {
+      "fixture_id": "cert_contractor_wc",
+      "policy_number": "WC 88-310-57",
+      "line": "workers_comp"
+    }
+  ],
+  "claims": [
+    {
+      "key": "wording:additional_insured:general_liability",
+      "kind": "wording",
+      "status": "supported",
+      "reason": "scheduled_names_holder",
+      "note": "OM 20 26 schedules MARLOWE PROPERTY GROUP LLC, the holder (case-insensitive).",
+      "wording": "additional_insured",
+      "line": "general_liability",
+      "evidence": [
+        {
+          "fixture_id": "cert_contractor_ai_scheduled",
+          "page": 1,
+          "key": "cert:endorsement:OM2026:form_number"
+        }
+      ]
+    },
+    {
+      "key": "wording:additional_insured:auto",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "No additional insured endorsement modifies the auto policy.",
+      "wording": "additional_insured",
+      "line": "auto",
+      "evidence": []
+    },
+    {
+      "key": "wording:waiver_of_subrogation:general_liability",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "No waiver endorsement modifies the GL policy.",
+      "wording": "waiver_of_subrogation",
+      "line": "general_liability",
+      "evidence": []
+    },
+    {
+      "key": "wording:waiver_of_subrogation:auto",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "No waiver endorsement modifies the auto policy.",
+      "wording": "waiver_of_subrogation",
+      "line": "auto",
+      "evidence": []
+    },
+    {
+      "key": "wording:waiver_of_subrogation:workers_comp",
+      "kind": "wording",
+      "status": "supported",
+      "reason": "endorsement_cited",
+      "note": "OM 00 03 waives recovery on WC8831057 = WC 88-310-57 after normalization.",
+      "wording": "waiver_of_subrogation",
+      "line": "workers_comp",
+      "evidence": [
+        {
+          "fixture_id": "cert_contractor_waiver_wc",
+          "page": 1,
+          "key": "cert:endorsement:OM0003:form_number"
+        }
+      ]
+    },
+    {
+      "key": "wording:primary_noncontributory:general_liability",
+      "kind": "wording",
+      "status": "supported",
+      "reason": "endorsement_cited",
+      "note": "OM 20 01 on GL4410-2281 = GL-4410-2281 after normalization.",
+      "wording": "primary_noncontributory",
+      "line": "general_liability",
+      "evidence": [
+        {
+          "fixture_id": "cert_contractor_pnc_gl",
+          "page": 1,
+          "key": "cert:endorsement:OM2001:form_number"
+        }
+      ]
+    },
+    {
+      "key": "wording:primary_noncontributory:auto",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "No primary and non-contributory endorsement modifies the auto policy.",
+      "wording": "primary_noncontributory",
+      "line": "auto",
+      "evidence": []
+    },
+    {
+      "key": "in_force:GL44102281",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "in_force",
+      "note": "03/01/2026 to 03/01/2027.",
+      "line": "general_liability",
+      "policy_number": "GL-4410-2281",
+      "evidence": [
+        {
+          "fixture_id": "cert_contractor_gl",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_contractor_gl",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "in_force:CA44102290",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "effective_day",
+      "note": "Effective on the certificate date.",
+      "line": "auto",
+      "policy_number": "CA-4410-2290",
+      "evidence": [
+        {
+          "fixture_id": "cert_contractor_auto",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_contractor_auto",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "in_force:WC8831057",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "expiration_day",
+      "note": "Expires on the certificate date.",
+      "line": "workers_comp",
+      "policy_number": "WC 88-310-57",
+      "evidence": [
+        {
+          "fixture_id": "cert_contractor_wc",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_contractor_wc",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "insured_consistent",
+      "kind": "insured",
+      "status": "supported",
+      "reason": "insured_match",
+      "note": "Same named insured on all three policies (WC in upper case).",
+      "evidence": [
+        {
+          "fixture_id": "cert_contractor_gl",
+          "page": 1,
+          "key": "cert:named_insured"
+        },
+        {
+          "fixture_id": "cert_contractor_auto",
+          "page": 1,
+          "key": "cert:named_insured"
+        },
+        {
+          "fixture_id": "cert_contractor_wc",
+          "page": 1,
+          "key": "cert:named_insured"
+        }
+      ]
+    },
+    {
+      "key": "description_reviewed",
+      "kind": "sign_off",
+      "status": "not_supported",
+      "reason": "sign_off_required",
+      "note": "A typed description is open until the broker confirms it (D11).",
+      "evidence": []
+    }
+  ],
+  "notices": []
+}

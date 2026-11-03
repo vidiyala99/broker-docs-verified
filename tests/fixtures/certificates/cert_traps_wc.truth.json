@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_traps_wc",
+  "case_id": "cert_traps",
+  "file": "cert_traps_wc.pdf",
+  "doc_kind": "declarations",
+  "layout": "multicol",
+  "line": "workers_comp",
+  "variant": "certificate_declarations_multicol",
+  "gate_bucket": "certificate",
+  "description": "Declarations document of cert_traps (multicol layout). States 12 keys.",
+  "carrier": "Brannock Mutual Insurance Company",
+  "page_count": 2,
+  "size_bytes": 7703,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": {
+      "value": "Brightline Paving LLC",
+      "printed": "Brightline Paving LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Brightline Paving LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:insured_address": {
+      "value": "9 Kestrel Industrial Court, Dayton, OH 45402",
+      "printed": "9 Kestrel Industrial Court, Dayton, OH 45402",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "9 Kestrel Industrial Court, Dayton, OH 45402",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:carrier": {
+      "value": "Brannock Mutual Insurance Company",
+      "printed": "Brannock Mutual Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Brannock Mutual Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": {
+      "value": "90577",
+      "printed": "90577",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "90577",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:policy_number": {
+      "value": "WC-6604-1183",
+      "printed": "WC-6604-1183",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "WC-6604-1183",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:line": {
+      "value": "workers_comp",
+      "printed": "Workers Compensation and Employers Liability",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Workers Compensation and Employers Liability",
+      "source": "text",
+      "accepted_values": [
+        "Workers Compensation and Employers Liability"
+      ]
+    },
+    "cert:effective_date": {
+      "value": "06/01/2026",
+      "printed": "06/01/2026",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "06/01/2026",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:expiration_date": {
+      "value": "06/01/2027",
+      "printed": "06/01/2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "06/01/2027",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": {
+      "value": "Statutory",
+      "printed": "Statutory",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Statutory",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:wc_el_each_accident": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:wc_el_disease_each_employee": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:wc_el_disease_policy_limit": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

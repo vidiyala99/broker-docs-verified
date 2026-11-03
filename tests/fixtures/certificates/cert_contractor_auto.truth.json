@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_contractor_auto",
+  "case_id": "cert_contractor",
+  "file": "cert_contractor_auto.pdf",
+  "doc_kind": "declarations",
+  "layout": "clean",
+  "line": "auto",
+  "variant": "certificate_declarations_clean",
+  "gate_bucket": "certificate",
+  "description": "Declarations document of cert_contractor (clean layout). effective on the certificate date (boundary, in force). States 9 keys.",
+  "carrier": "Thistlewood Casualty Company",
+  "page_count": 2,
+  "size_bytes": 5749,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": {
+      "value": "Calloway Build Group LLC",
+      "printed": "Calloway Build Group LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Calloway Build Group LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:insured_address": {
+      "value": "1180 Ferrous Way, Tacoma, WA 98402",
+      "printed": "1180 Ferrous Way, Tacoma, WA 98402",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 1180 Ferrous Way, Tacoma, WA 98402",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:carrier": {
+      "value": "Thistlewood Casualty Company",
+      "printed": "Thistlewood Casualty Company",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Thistlewood Casualty Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": {
+      "value": "90412",
+      "printed": "90412",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "NAIC Company Code: 90412",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:policy_number": {
+      "value": "CA-4410-2290",
+      "printed": "CA-4410-2290",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Number: CA-4410-2290",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:line": {
+      "value": "auto",
+      "printed": "Business Auto",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Coverage Part: Business Auto",
+      "source": "text",
+      "accepted_values": [
+        "Business Auto"
+      ]
+    },
+    "cert:effective_date": {
+      "value": "11/03/2026",
+      "printed": "11/03/2026",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Effective Date: 11/03/2026",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:expiration_date": {
+      "value": "11/03/2027",
+      "printed": "11/03/2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Expiration Date: 11/03/2027",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Covered Autos Liability, Combined Single Limit: $1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

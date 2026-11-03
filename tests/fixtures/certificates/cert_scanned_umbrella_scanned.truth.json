@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_scanned_umbrella_scanned",
+  "case_id": "cert_scanned",
+  "file": "cert_scanned_umbrella_scanned.pdf",
+  "doc_kind": "declarations",
+  "layout": "scanned",
+  "line": "umbrella",
+  "variant": "certificate_declarations_scanned",
+  "gate_bucket": "certificate",
+  "description": "Declarations document of cert_scanned (scanned layout). image-only pages: every value is scan-read. States 10 keys.",
+  "carrier": "Glasshouse Specialty Insurance Company",
+  "page_count": 2,
+  "size_bytes": 268948,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [
+      1,
+      2
+    ],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": {
+      "value": "Pemberton Event Staffing Co",
+      "printed": "Pemberton Event Staffing Co",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Pemberton Event Staffing Co",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:insured_address": {
+      "value": "610 Wharf Lantern Street, Savannah, GA 31401",
+      "printed": "610 Wharf Lantern Street, Savannah, GA 31401",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 610 Wharf Lantern Street, Savannah, GA 31401",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:carrier": {
+      "value": "Glasshouse Specialty Insurance Company",
+      "printed": "Glasshouse Specialty Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Glasshouse Specialty Insurance Company",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:naic": {
+      "value": "90915",
+      "printed": "90915",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "NAIC Company Code: 90915",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:policy_number": {
+      "value": "GSI-UMB-40022",
+      "printed": "GSI-UMB-40022",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Number: GSI-UMB-40022",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:line": {
+      "value": "umbrella",
+      "printed": "Commercial Umbrella Liability",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Coverage Part: Commercial Umbrella Liability",
+      "source": "image",
+      "accepted_values": [
+        "Commercial Umbrella Liability"
+      ]
+    },
+    "cert:effective_date": {
+      "value": "05/01/2026",
+      "printed": "05/01/2026",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Effective Date: 05/01/2026",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:expiration_date": {
+      "value": "05/01/2027",
+      "printed": "05/01/2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Expiration Date: 05/01/2027",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": {
+      "value": "$2,000,000",
+      "printed": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $2,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:umbrella_aggregate": {
+      "value": "$4,000,000",
+      "printed": "$4,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Aggregate Limit: $4,000,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

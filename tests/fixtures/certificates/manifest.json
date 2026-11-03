@@ -1,0 +1,354 @@
+{
+  "generator_version": 1,
+  "seed": 20261104,
+  "pymupdf_version": "1.28.0",
+  "synthetic": true,
+  "synthetic_notice": "Synthetic sample document for software testing. Not an insurance policy; all names and numbers are invented.",
+  "cert_fields": {
+    "cert:named_insured": "Named insured",
+    "cert:insured_address": "Named insured address",
+    "cert:carrier": "Insurer (carrier) name",
+    "cert:naic": "Insurer NAIC code",
+    "cert:policy_number": "Policy number",
+    "cert:line": "Line of coverage (general_liability, auto, umbrella, workers_comp, property, other)",
+    "cert:effective_date": "Policy effective date",
+    "cert:expiration_date": "Policy expiration date",
+    "cert:gl_each_occurrence": "GL each occurrence limit",
+    "cert:gl_general_aggregate": "GL general aggregate limit",
+    "cert:gl_products_completed_ops_aggregate": "GL products-completed operations aggregate limit",
+    "cert:gl_personal_advertising_injury": "GL personal and advertising injury limit",
+    "cert:gl_damage_to_rented_premises": "GL damage to rented premises limit",
+    "cert:gl_medical_expense": "GL medical expense limit",
+    "cert:auto_combined_single_limit": "Auto combined single limit",
+    "cert:umbrella_each_occurrence": "Umbrella each occurrence limit",
+    "cert:umbrella_aggregate": "Umbrella aggregate limit",
+    "cert:wc_statutory": "Workers compensation statutory limits",
+    "cert:wc_el_each_accident": "Employer's liability each accident",
+    "cert:wc_el_disease_each_employee": "Employer's liability disease, each employee",
+    "cert:wc_el_disease_policy_limit": "Employer's liability disease, policy limit"
+  },
+  "cases": [
+    {
+      "case_id": "cert_contractor",
+      "truth": "cert_contractor.case.json",
+      "documents": [
+        "cert_contractor_gl",
+        "cert_contractor_auto",
+        "cert_contractor_wc",
+        "cert_contractor_ai_scheduled",
+        "cert_contractor_waiver_wc",
+        "cert_contractor_pnc_gl"
+      ],
+      "claims": 12,
+      "not_supported": 5,
+      "exercises": [
+        "gl_declarations",
+        "auto_declarations",
+        "wc_declarations",
+        "ai_scheduled_names_holder",
+        "waiver_of_subrogation",
+        "primary_noncontributory",
+        "policy_number_normalized_join",
+        "in_force_effective_day",
+        "in_force_expiration_day",
+        "insured_case_insensitive",
+        "description_sign_off",
+        "multicol_layout"
+      ],
+      "description": "General contractor certificate for a landlord: GL, auto and WC declarations with a scheduled additional insured naming the holder, an unconditional WC waiver and an unconditional primary and non-contributory endorsement. AI, waiver and P&NC requested; description of operations given."
+    },
+    {
+      "case_id": "cert_written_contract",
+      "truth": "cert_written_contract.case.json",
+      "documents": [
+        "cert_written_contract_gl",
+        "cert_written_contract_endorsement_packet",
+        "cert_written_contract_auto",
+        "cert_written_contract_ai_auto_other_party"
+      ],
+      "claims": 7,
+      "not_supported": 5,
+      "exercises": [
+        "written_contract_blanket_ai",
+        "conditional_waiver",
+        "ai_scheduled_other_party",
+        "not_yet_effective",
+        "two_forms_one_document",
+        "multicol_layout"
+      ],
+      "description": "Landscaper certificate for a municipality: blanket AI and blanket waiver that apply only where required by a written contract (D14), and an auto policy that starts the day after the certificate date with a scheduled AI naming another party. AI and waiver requested."
+    },
+    {
+      "case_id": "cert_traps",
+      "truth": "cert_traps.case.json",
+      "documents": [
+        "cert_traps_gl_expired",
+        "cert_traps_ai_blanket",
+        "cert_traps_auto_other_insured",
+        "cert_traps_ai_other_policy",
+        "cert_traps_wc",
+        "cert_traps_umbrella",
+        "cert_traps_package"
+      ],
+      "claims": 8,
+      "not_supported": 4,
+      "exercises": [
+        "expired_policy",
+        "ai_endorsement_other_policy_number",
+        "insured_mismatch",
+        "package_policy",
+        "ai_blanket_unconditional",
+        "umbrella_declarations",
+        "long_form_dates",
+        "multicol_layout"
+      ],
+      "description": "Paving contractor certificate with the traps: an expired GL policy (expired the day before), an auto policy under another named insured, an AI endorsement whose policy number matches no shown policy, and a package policy that contributes no facts. AI requested."
+    },
+    {
+      "case_id": "cert_scanned",
+      "truth": "cert_scanned.case.json",
+      "documents": [
+        "cert_scanned_gl_with_pnc",
+        "cert_scanned_umbrella_scanned"
+      ],
+      "claims": 5,
+      "not_supported": 3,
+      "exercises": [
+        "scanned_document",
+        "endorsement_attached_to_declarations",
+        "umbrella_declarations"
+      ],
+      "description": "Event staffing certificate for a venue: GL with primary and non-contributory attached as its last page, and scanned umbrella declarations (scan-read values are not verified). P&NC requested."
+    }
+  ],
+  "documents": [
+    {
+      "fixture_id": "cert_contractor_gl",
+      "case_id": "cert_contractor",
+      "file": "cert_contractor_gl.pdf",
+      "truth": "cert_contractor_gl.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_clean",
+      "gate_bucket": "certificate",
+      "sha256": "b28534c026da9dfbd2c1db2e4b45b4835b984bc65e57c4242c87e08479f5ca24",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_contractor (clean layout). States 14 keys."
+    },
+    {
+      "fixture_id": "cert_contractor_auto",
+      "case_id": "cert_contractor",
+      "file": "cert_contractor_auto.pdf",
+      "truth": "cert_contractor_auto.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_clean",
+      "gate_bucket": "certificate",
+      "sha256": "8a9032cdf495c6da6b0b3dfe0312051e610c63cf277a2353ebde6422fcf61332",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_contractor (clean layout). effective on the certificate date (boundary, in force). States 9 keys."
+    },
+    {
+      "fixture_id": "cert_contractor_wc",
+      "case_id": "cert_contractor",
+      "file": "cert_contractor_wc.pdf",
+      "truth": "cert_contractor_wc.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_multicol",
+      "gate_bucket": "certificate",
+      "sha256": "870b0aaa7a5329ed83f0a7c167131e7ebb418b747d9101dbfa6ad08020d2e35b",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_contractor (multicol layout). expires on the certificate date (boundary, in force); insured printed in upper case. States 12 keys."
+    },
+    {
+      "fixture_id": "cert_contractor_ai_scheduled",
+      "case_id": "cert_contractor",
+      "file": "cert_contractor_ai_scheduled.pdf",
+      "truth": "cert_contractor_ai_scheduled.truth.json",
+      "doc_kind": "endorsement",
+      "variant": "certificate_endorsement_clean",
+      "gate_bucket": "certificate",
+      "sha256": "e2319918faec9a46a4ad2ca72f8973687caa4ca8dae016eca1f3db60cf2af702",
+      "deterministic_bytes": true,
+      "description": "Endorsement document of cert_contractor (clean layout). policy number printed with spaces (declarations use dashes): joins after D7 normalization. States 5 keys."
+    },
+    {
+      "fixture_id": "cert_contractor_waiver_wc",
+      "case_id": "cert_contractor",
+      "file": "cert_contractor_waiver_wc.pdf",
+      "truth": "cert_contractor_waiver_wc.truth.json",
+      "doc_kind": "endorsement",
+      "variant": "certificate_endorsement_clean",
+      "gate_bucket": "certificate",
+      "sha256": "c111313da26baadd5822d5872397f9ba4fe0d3397c7be74c849056978eade35b",
+      "deterministic_bytes": true,
+      "description": "Endorsement document of cert_contractor (clean layout). States 4 keys."
+    },
+    {
+      "fixture_id": "cert_contractor_pnc_gl",
+      "case_id": "cert_contractor",
+      "file": "cert_contractor_pnc_gl.pdf",
+      "truth": "cert_contractor_pnc_gl.truth.json",
+      "doc_kind": "endorsement",
+      "variant": "certificate_endorsement_clean",
+      "gate_bucket": "certificate",
+      "sha256": "3e76379048e73136192bfcab48d8bc3d13b4c73cad15698470aa00c87d2fa376",
+      "deterministic_bytes": true,
+      "description": "Endorsement document of cert_contractor (clean layout). States 4 keys."
+    },
+    {
+      "fixture_id": "cert_written_contract_gl",
+      "case_id": "cert_written_contract",
+      "file": "cert_written_contract_gl.pdf",
+      "truth": "cert_written_contract_gl.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_clean",
+      "gate_bucket": "certificate",
+      "sha256": "00308cfab099e76942a6e77480fe8a936a484f8dbbee041b433283492b9a2d60",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_written_contract (clean layout). States 14 keys."
+    },
+    {
+      "fixture_id": "cert_written_contract_endorsement_packet",
+      "case_id": "cert_written_contract",
+      "file": "cert_written_contract_endorsement_packet.pdf",
+      "truth": "cert_written_contract_endorsement_packet.truth.json",
+      "doc_kind": "endorsement",
+      "variant": "certificate_endorsement_clean",
+      "gate_bucket": "certificate",
+      "sha256": "0e576f56994832bce426c9a422628727c9ff3ccc25ac045fccb0b1cac0e0b8bb",
+      "deterministic_bytes": true,
+      "description": "Endorsement document of cert_written_contract (clean layout). two forms in one document, both conditional on a written contract. States 9 keys."
+    },
+    {
+      "fixture_id": "cert_written_contract_auto",
+      "case_id": "cert_written_contract",
+      "file": "cert_written_contract_auto.pdf",
+      "truth": "cert_written_contract_auto.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_multicol",
+      "gate_bucket": "certificate",
+      "sha256": "9066e610901d5c86c3750cdec5be282806dc06702c80f896ca6b0235d0995505",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_written_contract (multicol layout). effective the day after the certificate date (not yet in force). States 9 keys."
+    },
+    {
+      "fixture_id": "cert_written_contract_ai_auto_other_party",
+      "case_id": "cert_written_contract",
+      "file": "cert_written_contract_ai_auto_other_party.pdf",
+      "truth": "cert_written_contract_ai_auto_other_party.truth.json",
+      "doc_kind": "endorsement",
+      "variant": "certificate_endorsement_clean",
+      "gate_bucket": "certificate",
+      "sha256": "ce118b12ee609210ca93781d057517fa7c8ef731be7179a25429f10c1213c72a",
+      "deterministic_bytes": true,
+      "description": "Endorsement document of cert_written_contract (clean layout). scheduled AI naming a party that is not the holder. States 5 keys."
+    },
+    {
+      "fixture_id": "cert_traps_gl_expired",
+      "case_id": "cert_traps",
+      "file": "cert_traps_gl_expired.pdf",
+      "truth": "cert_traps_gl_expired.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_clean",
+      "gate_bucket": "certificate",
+      "sha256": "03cb8281b4dbf7e31bb05c8a55060fafdde21827f7f25d0f7b6a17a7a4c4520f",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_traps (clean layout). expired the day before the certificate date. States 14 keys."
+    },
+    {
+      "fixture_id": "cert_traps_ai_blanket",
+      "case_id": "cert_traps",
+      "file": "cert_traps_ai_blanket.pdf",
+      "truth": "cert_traps_ai_blanket.truth.json",
+      "doc_kind": "endorsement",
+      "variant": "certificate_endorsement_clean",
+      "gate_bucket": "certificate",
+      "sha256": "b81d81916091bc0432ccdfb7c5b75f538de9f33e82d25f055df387a3de587bb3",
+      "deterministic_bytes": true,
+      "description": "Endorsement document of cert_traps (clean layout). unconditional blanket AI: the cited form supports the claim. States 4 keys."
+    },
+    {
+      "fixture_id": "cert_traps_auto_other_insured",
+      "case_id": "cert_traps",
+      "file": "cert_traps_auto_other_insured.pdf",
+      "truth": "cert_traps_auto_other_insured.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_clean",
+      "gate_bucket": "certificate",
+      "sha256": "66095eed9aeb57d8e86cbe68ebc6cf92ea804cc9d1ea82ac91e91a9334fc469c",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_traps (clean layout). named insured differs from the other policies. States 9 keys."
+    },
+    {
+      "fixture_id": "cert_traps_ai_other_policy",
+      "case_id": "cert_traps",
+      "file": "cert_traps_ai_other_policy.pdf",
+      "truth": "cert_traps_ai_other_policy.truth.json",
+      "doc_kind": "endorsement",
+      "variant": "certificate_endorsement_clean",
+      "gate_bucket": "certificate",
+      "sha256": "26f63afdd9126da10b4d81996c230cead68b8a58cc88553eac077d79be60cfb4",
+      "deterministic_bytes": true,
+      "description": "Endorsement document of cert_traps (clean layout). names policy CA 7719-0042 (the auto policy is CA 7719-0024): matches no shown policy. States 5 keys."
+    },
+    {
+      "fixture_id": "cert_traps_wc",
+      "case_id": "cert_traps",
+      "file": "cert_traps_wc.pdf",
+      "truth": "cert_traps_wc.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_multicol",
+      "gate_bucket": "certificate",
+      "sha256": "4d27d4ae6c52909d90d7e1dfa49ba54f2e29b3bc2dffb8455266e54bddc21df1",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_traps (multicol layout). States 12 keys."
+    },
+    {
+      "fixture_id": "cert_traps_umbrella",
+      "case_id": "cert_traps",
+      "file": "cert_traps_umbrella.pdf",
+      "truth": "cert_traps_umbrella.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_clean",
+      "gate_bucket": "certificate",
+      "sha256": "ce4fd0ababb70db20b01cdfeb47777c4104b86c614b40444682ff006a7c0a76f",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_traps (clean layout). dates printed in long form. States 10 keys."
+    },
+    {
+      "fixture_id": "cert_traps_package",
+      "case_id": "cert_traps",
+      "file": "cert_traps_package.pdf",
+      "truth": "cert_traps_package.truth.json",
+      "doc_kind": "package",
+      "variant": "certificate_package_clean",
+      "gate_bucket": "certificate",
+      "sha256": "fcc21880a217db1feb78805cbdd985ed6687478f8237861e8ae0534d7f8e9f25",
+      "deterministic_bytes": true,
+      "description": "Package document of cert_traps (clean layout). two lines in one document (C7): notice, no facts. Contributes no facts (package policy, C7)."
+    },
+    {
+      "fixture_id": "cert_scanned_gl_with_pnc",
+      "case_id": "cert_scanned",
+      "file": "cert_scanned_gl_with_pnc.pdf",
+      "truth": "cert_scanned_gl_with_pnc.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_clean",
+      "gate_bucket": "certificate",
+      "sha256": "7a1bc58d2856534c29659472b111eaef4f3a7bb33ea7423c491de175267d0eef",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_scanned (clean layout). declarations with the endorsement attached as page 3 (one combined pass). States 17 keys."
+    },
+    {
+      "fixture_id": "cert_scanned_umbrella_scanned",
+      "case_id": "cert_scanned",
+      "file": "cert_scanned_umbrella_scanned.pdf",
+      "truth": "cert_scanned_umbrella_scanned.truth.json",
+      "doc_kind": "declarations",
+      "variant": "certificate_declarations_scanned",
+      "gate_bucket": "certificate",
+      "sha256": "29a010f741c201b8567f94a58b821fb953df7c6587d35d11e2347d994952b85e",
+      "deterministic_bytes": true,
+      "description": "Declarations document of cert_scanned (scanned layout). image-only pages: every value is scan-read. States 10 keys."
+    }
+  ]
+}

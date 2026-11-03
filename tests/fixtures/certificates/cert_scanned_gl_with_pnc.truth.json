@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_scanned_gl_with_pnc",
+  "case_id": "cert_scanned",
+  "file": "cert_scanned_gl_with_pnc.pdf",
+  "doc_kind": "declarations",
+  "layout": "clean",
+  "line": "general_liability",
+  "variant": "certificate_declarations_clean",
+  "gate_bucket": "certificate",
+  "description": "Declarations document of cert_scanned (clean layout). declarations with the endorsement attached as page 3 (one combined pass). States 17 keys.",
+  "carrier": "Glasshouse Specialty Insurance Company",
+  "page_count": 3,
+  "size_bytes": 9441,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": {
+      "value": "Pemberton Event Staffing Co",
+      "printed": "Pemberton Event Staffing Co",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Pemberton Event Staffing Co",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:insured_address": {
+      "value": "610 Wharf Lantern Street, Savannah, GA 31401",
+      "printed": "610 Wharf Lantern Street, Savannah, GA 31401",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 610 Wharf Lantern Street, Savannah, GA 31401",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:carrier": {
+      "value": "Glasshouse Specialty Insurance Company",
+      "printed": "Glasshouse Specialty Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Glasshouse Specialty Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": {
+      "value": "90915",
+      "printed": "90915",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "NAIC Company Code: 90915",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:policy_number": {
+      "value": "GSI-GL-40021",
+      "printed": "GSI-GL-40021",
+      "page": 1,
+      "pages": [
+        1,
+        3
+      ],
+      "quote": "Policy Number: GSI-GL-40021",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:line": {
+      "value": "general_liability",
+      "printed": "Commercial General Liability",
+      "page": 1,
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "quote": "Coverage Part: Commercial General Liability",
+      "source": "text",
+      "accepted_values": [
+        "Commercial General Liability"
+      ]
+    },
+    "cert:effective_date": {
+      "value": "05/01/2026",
+      "printed": "05/01/2026",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Effective Date: 05/01/2026",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:expiration_date": {
+      "value": "05/01/2027",
+      "printed": "05/01/2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Expiration Date: 05/01/2027",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_each_occurrence": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_general_aggregate": {
+      "value": "$2,000,000",
+      "printed": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "General Aggregate Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_products_completed_ops_aggregate": {
+      "value": "$2,000,000",
+      "printed": "$2,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Products-Completed Operations Aggregate Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_personal_advertising_injury": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Personal and Advertising Injury Limit: $1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_damage_to_rented_premises": {
+      "value": "$300,000",
+      "printed": "$300,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Damage to Premises Rented to You Limit: $300,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_medical_expense": {
+      "value": "$10,000",
+      "printed": "$10,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Medical Expense Limit (any one person): $10,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null,
+    "cert:endorsement:OM2002:form_number": {
+      "value": "OM 20 02 04 24",
+      "printed": "OM 20 02 04 24",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "Form OM 20 02 04 24",
+      "source": "text",
+      "accepted_values": [
+        "OM 20 02",
+        "OM 20 02 (04/24)",
+        "OM 20 02 04/24"
+      ]
+    },
+    "cert:endorsement:OM2002:type": {
+      "value": "primary_noncontributory",
+      "printed": "PRIMARY AND NONCONTRIBUTORY - OTHER INSURANCE CONDITION",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "PRIMARY AND NONCONTRIBUTORY - OTHER INSURANCE CONDITION",
+      "source": "text",
+      "accepted_values": [
+        "PRIMARY AND NONCONTRIBUTORY - OTHER INSURANCE CONDITION"
+      ]
+    },
+    "cert:endorsement:OM2002:policy_number": {
+      "value": "GSI-GL-40021",
+      "printed": "GSI-GL-40021",
+      "page": 3,
+      "pages": [
+        1,
+        3
+      ],
+      "quote": "This endorsement forms part of Policy No. GSI-GL-40021",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2002:named_party": null,
+    "cert:endorsement:OM2002:condition": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

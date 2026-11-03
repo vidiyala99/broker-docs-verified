@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_traps_ai_other_policy",
+  "case_id": "cert_traps",
+  "file": "cert_traps_ai_other_policy.pdf",
+  "doc_kind": "endorsement",
+  "layout": "clean",
+  "line": null,
+  "variant": "certificate_endorsement_clean",
+  "gate_bucket": "certificate",
+  "description": "Endorsement document of cert_traps (clean layout). names policy CA 7719-0042 (the auto policy is CA 7719-0024): matches no shown policy. States 5 keys.",
+  "carrier": "Fenwick Hollow Assurance Company",
+  "page_count": 1,
+  "size_bytes": 4842,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": null,
+    "cert:insured_address": null,
+    "cert:carrier": {
+      "value": "Fenwick Hollow Assurance Company",
+      "printed": "Fenwick Hollow Assurance Company",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Fenwick Hollow Assurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": null,
+    "cert:policy_number": null,
+    "cert:line": null,
+    "cert:effective_date": null,
+    "cert:expiration_date": null,
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null,
+    "cert:endorsement:OM2049:form_number": {
+      "value": "OM 20 49 10 23",
+      "printed": "OM 20 49 10 23",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Form OM 20 49 10 23",
+      "source": "text",
+      "accepted_values": [
+        "OM 20 49",
+        "OM 20 49 (10/23)",
+        "OM 20 49 10/23"
+      ]
+    },
+    "cert:endorsement:OM2049:type": {
+      "value": "additional_insured_scheduled",
+      "printed": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION",
+      "source": "text",
+      "accepted_values": [
+        "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION"
+      ]
+    },
+    "cert:endorsement:OM2049:policy_number": {
+      "value": "CA 7719-0042",
+      "printed": "CA 7719-0042",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "This endorsement forms part of Policy No. CA 7719-0042",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2049:named_party": {
+      "value": "Ridgefield Commons Owners Association",
+      "printed": "Ridgefield Commons Owners Association",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Name of Additional Insured Person or Organization: Ridgefield Commons Owners Association",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2049:condition": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}
