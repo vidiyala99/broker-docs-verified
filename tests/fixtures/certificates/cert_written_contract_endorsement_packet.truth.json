@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_written_contract_endorsement_packet",
+  "case_id": "cert_written_contract",
+  "file": "cert_written_contract_endorsement_packet.pdf",
+  "doc_kind": "endorsement",
+  "layout": "clean",
+  "line": null,
+  "variant": "certificate_endorsement_clean",
+  "gate_bucket": "certificate",
+  "description": "Endorsement document of cert_written_contract (clean layout). two forms in one document, both conditional on a written contract. States 9 keys.",
+  "carrier": "Quarry Lane Indemnity Company",
+  "page_count": 2,
+  "size_bytes": 6487,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": null,
+    "cert:insured_address": null,
+    "cert:carrier": {
+      "value": "Quarry Lane Indemnity Company",
+      "printed": "Quarry Lane Indemnity Company",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Quarry Lane Indemnity Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": null,
+    "cert:policy_number": null,
+    "cert:line": null,
+    "cert:effective_date": null,
+    "cert:expiration_date": null,
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null,
+    "cert:endorsement:OM2038:form_number": {
+      "value": "OM 20 38 04 24",
+      "printed": "OM 20 38 04 24",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Form OM 20 38 04 24",
+      "source": "text",
+      "accepted_values": [
+        "OM 20 38",
+        "OM 20 38 (04/24)",
+        "OM 20 38 04/24"
+      ]
+    },
+    "cert:endorsement:OM2038:type": {
+      "value": "additional_insured_blanket",
+      "printed": "ADDITIONAL INSURED - OWNERS, LESSEES OR CONTRACTORS - AUTOMATIC STATUS",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "ADDITIONAL INSURED - OWNERS, LESSEES OR CONTRACTORS - AUTOMATIC STATUS",
+      "source": "text",
+      "accepted_values": [
+        "ADDITIONAL INSURED - OWNERS, LESSEES OR CONTRACTORS - AUTOMATIC STATUS"
+      ]
+    },
+    "cert:endorsement:OM2038:policy_number": {
+      "value": "QLI-GL-207731",
+      "printed": "QLI-GL-207731",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "This endorsement forms part of Policy No. QLI-GL-207731",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2038:named_party": null,
+    "cert:endorsement:OM2038:condition": {
+      "value": "only where required by a written contract signed before the loss",
+      "printed": "only where required by a written contract signed before the loss",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "This endorsement applies only where required by a written contract signed before the loss.",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2404:form_number": {
+      "value": "OM 24 04 04 24",
+      "printed": "OM 24 04 04 24",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Form OM 24 04 04 24",
+      "source": "text",
+      "accepted_values": [
+        "OM 24 04",
+        "OM 24 04 (04/24)",
+        "OM 24 04 04/24"
+      ]
+    },
+    "cert:endorsement:OM2404:type": {
+      "value": "waiver_of_subrogation",
+      "printed": "WAIVER OF TRANSFER OF RIGHTS OF RECOVERY AGAINST OTHERS TO US",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "WAIVER OF TRANSFER OF RIGHTS OF RECOVERY AGAINST OTHERS TO US",
+      "source": "text",
+      "accepted_values": [
+        "WAIVER OF TRANSFER OF RIGHTS OF RECOVERY AGAINST OTHERS TO US"
+      ]
+    },
+    "cert:endorsement:OM2404:policy_number": {
+      "value": "QLI-GL-207731",
+      "printed": "QLI-GL-207731",
+      "page": 2,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "This endorsement forms part of Policy No. QLI-GL-207731",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2404:named_party": null,
+    "cert:endorsement:OM2404:condition": {
+      "value": "only where you agreed in a written contract, before the loss, to waive these rights",
+      "printed": "only where you agreed in a written contract, before the loss, to waive these rights",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "This waiver applies only where you agreed in a written contract, before the loss, to waive these rights.",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

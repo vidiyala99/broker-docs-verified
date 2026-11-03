@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_contractor_waiver_wc",
+  "case_id": "cert_contractor",
+  "file": "cert_contractor_waiver_wc.pdf",
+  "doc_kind": "endorsement",
+  "layout": "clean",
+  "line": null,
+  "variant": "certificate_endorsement_clean",
+  "gate_bucket": "certificate",
+  "description": "Endorsement document of cert_contractor (clean layout). States 4 keys.",
+  "carrier": "Brannock Mutual Insurance Company",
+  "page_count": 1,
+  "size_bytes": 3914,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": null,
+    "cert:insured_address": null,
+    "cert:carrier": {
+      "value": "Brannock Mutual Insurance Company",
+      "printed": "Brannock Mutual Insurance Company",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Brannock Mutual Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": null,
+    "cert:policy_number": null,
+    "cert:line": null,
+    "cert:effective_date": null,
+    "cert:expiration_date": null,
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null,
+    "cert:endorsement:OM0003:form_number": {
+      "value": "OM 00 03 01 25",
+      "printed": "OM 00 03 01 25",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Form OM 00 03 01 25",
+      "source": "text",
+      "accepted_values": [
+        "OM 00 03",
+        "OM 00 03 (01/25)",
+        "OM 00 03 01/25"
+      ]
+    },
+    "cert:endorsement:OM0003:type": {
+      "value": "waiver_of_subrogation",
+      "printed": "WAIVER OF OUR RIGHT TO RECOVER FROM OTHERS",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "WAIVER OF OUR RIGHT TO RECOVER FROM OTHERS",
+      "source": "text",
+      "accepted_values": [
+        "WAIVER OF OUR RIGHT TO RECOVER FROM OTHERS"
+      ]
+    },
+    "cert:endorsement:OM0003:policy_number": {
+      "value": "WC8831057",
+      "printed": "WC8831057",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "This endorsement forms part of Policy No. WC8831057",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM0003:named_party": null,
+    "cert:endorsement:OM0003:condition": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

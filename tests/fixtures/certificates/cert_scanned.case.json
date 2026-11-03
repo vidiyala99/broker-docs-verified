@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "case_id": "cert_scanned",
+  "workflow": "certificate",
+  "gate_bucket": "certificate",
+  "description": "Event staffing certificate for a venue: GL with primary and non-contributory attached as its last page, and scanned umbrella declarations (scan-read values are not verified). P&NC requested.",
+  "exercises": [
+    "scanned_document",
+    "endorsement_attached_to_declarations",
+    "umbrella_declarations"
+  ],
+  "parameters": {
+    "client_name": "Pemberton Event Staffing Co",
+    "holder_name": "Tidewater Hall Venue Partners LP",
+    "holder_address": "1 Tidewater Hall Plaza, Savannah, GA 31401",
+    "wording": {
+      "additional_insured": false,
+      "waiver_of_subrogation": false,
+      "primary_noncontributory": true
+    },
+    "certificate_date": "2026-11-03",
+    "description": ""
+  },
+  "documents": [
+    "cert_scanned_gl_with_pnc",
+    "cert_scanned_umbrella_scanned"
+  ],
+  "shown_policies": [
+    {
+      "fixture_id": "cert_scanned_gl_with_pnc",
+      "policy_number": "GSI-GL-40021",
+      "line": "general_liability"
+    },
+    {
+      "fixture_id": "cert_scanned_umbrella_scanned",
+      "policy_number": "GSI-UMB-40022",
+      "line": "umbrella"
+    }
+  ],
+  "claims": [
+    {
+      "key": "wording:primary_noncontributory:general_liability",
+      "kind": "wording",
+      "status": "supported",
+      "reason": "endorsement_cited",
+      "note": "OM 20 02 attached to the GL declarations.",
+      "wording": "primary_noncontributory",
+      "line": "general_liability",
+      "evidence": [
+        {
+          "fixture_id": "cert_scanned_gl_with_pnc",
+          "page": 3,
+          "key": "cert:endorsement:OM2002:form_number"
+        }
+      ]
+    },
+    {
+      "key": "wording:primary_noncontributory:umbrella",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "No primary and non-contributory endorsement modifies the umbrella policy.",
+      "wording": "primary_noncontributory",
+      "line": "umbrella",
+      "evidence": []
+    },
+    {
+      "key": "in_force:GSIGL40021",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "in_force",
+      "note": "05/01/2026 to 05/01/2027.",
+      "line": "general_liability",
+      "policy_number": "GSI-GL-40021",
+      "evidence": [
+        {
+          "fixture_id": "cert_scanned_gl_with_pnc",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_scanned_gl_with_pnc",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "in_force:GSIUMB40022",
+      "kind": "in_force",
+      "status": "not_supported",
+      "reason": "unverified_dates",
+      "note": "The umbrella dates are scan-read only; in force needs both dates verified.",
+      "line": "umbrella",
+      "policy_number": "GSI-UMB-40022",
+      "evidence": []
+    },
+    {
+      "key": "insured_consistent",
+      "kind": "insured",
+      "status": "not_supported",
+      "reason": "unverified_insured",
+      "note": "The umbrella's named insured is scan-read only, so consistency is not verified.",
+      "evidence": []
+    }
+  ],
+  "notices": []
+}

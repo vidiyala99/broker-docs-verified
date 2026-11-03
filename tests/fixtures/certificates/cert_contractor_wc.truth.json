@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_contractor_wc",
+  "case_id": "cert_contractor",
+  "file": "cert_contractor_wc.pdf",
+  "doc_kind": "declarations",
+  "layout": "multicol",
+  "line": "workers_comp",
+  "variant": "certificate_declarations_multicol",
+  "gate_bucket": "certificate",
+  "description": "Declarations document of cert_contractor (multicol layout). expires on the certificate date (boundary, in force); insured printed in upper case. States 12 keys.",
+  "carrier": "Brannock Mutual Insurance Company",
+  "page_count": 2,
+  "size_bytes": 7711,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": {
+      "value": "CALLOWAY BUILD GROUP LLC",
+      "printed": "CALLOWAY BUILD GROUP LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "CALLOWAY BUILD GROUP LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:insured_address": {
+      "value": "1180 Ferrous Way, Tacoma, WA 98402",
+      "printed": "1180 Ferrous Way, Tacoma, WA 98402",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "1180 Ferrous Way, Tacoma, WA 98402",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:carrier": {
+      "value": "Brannock Mutual Insurance Company",
+      "printed": "Brannock Mutual Insurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Brannock Mutual Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": {
+      "value": "90577",
+      "printed": "90577",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "90577",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:policy_number": {
+      "value": "WC 88-310-57",
+      "printed": "WC 88-310-57",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "WC 88-310-57",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:line": {
+      "value": "workers_comp",
+      "printed": "Workers Compensation and Employers Liability",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Workers Compensation and Employers Liability",
+      "source": "text",
+      "accepted_values": [
+        "Workers Compensation and Employers Liability"
+      ]
+    },
+    "cert:effective_date": {
+      "value": "11/03/2025",
+      "printed": "11/03/2025",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "11/03/2025",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:expiration_date": {
+      "value": "11/03/2026",
+      "printed": "11/03/2026",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "11/03/2026",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": {
+      "value": "Statutory",
+      "printed": "Statutory",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Statutory",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:wc_el_each_accident": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:wc_el_disease_each_employee": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:wc_el_disease_policy_limit": {
+      "value": "$1,000,000",
+      "printed": "$1,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "$1,000,000",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

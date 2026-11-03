@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_traps_ai_blanket",
+  "case_id": "cert_traps",
+  "file": "cert_traps_ai_blanket.pdf",
+  "doc_kind": "endorsement",
+  "layout": "clean",
+  "line": null,
+  "variant": "certificate_endorsement_clean",
+  "gate_bucket": "certificate",
+  "description": "Endorsement document of cert_traps (clean layout). unconditional blanket AI: the cited form supports the claim. States 4 keys.",
+  "carrier": "Fenwick Hollow Assurance Company",
+  "page_count": 1,
+  "size_bytes": 4155,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": null,
+    "cert:insured_address": null,
+    "cert:carrier": {
+      "value": "Fenwick Hollow Assurance Company",
+      "printed": "Fenwick Hollow Assurance Company",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Fenwick Hollow Assurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": null,
+    "cert:policy_number": null,
+    "cert:line": null,
+    "cert:effective_date": null,
+    "cert:expiration_date": null,
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null,
+    "cert:endorsement:OM2033:form_number": {
+      "value": "OM 20 33 04 24",
+      "printed": "OM 20 33 04 24",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Form OM 20 33 04 24",
+      "source": "text",
+      "accepted_values": [
+        "OM 20 33",
+        "OM 20 33 (04/24)",
+        "OM 20 33 04/24"
+      ]
+    },
+    "cert:endorsement:OM2033:type": {
+      "value": "additional_insured_blanket",
+      "printed": "ADDITIONAL INSURED - BLANKET - OWNERS, LESSEES OR CONTRACTORS",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "ADDITIONAL INSURED - BLANKET - OWNERS, LESSEES OR CONTRACTORS",
+      "source": "text",
+      "accepted_values": [
+        "ADDITIONAL INSURED - BLANKET - OWNERS, LESSEES OR CONTRACTORS"
+      ]
+    },
+    "cert:endorsement:OM2033:policy_number": {
+      "value": "FHA-GL-5520117",
+      "printed": "FHA-GL-5520117",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "This endorsement forms part of Policy No. FHA-GL-5520117",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2033:named_party": null,
+    "cert:endorsement:OM2033:condition": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

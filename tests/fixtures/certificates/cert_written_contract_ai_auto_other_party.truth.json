@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_written_contract_ai_auto_other_party",
+  "case_id": "cert_written_contract",
+  "file": "cert_written_contract_ai_auto_other_party.pdf",
+  "doc_kind": "endorsement",
+  "layout": "clean",
+  "line": null,
+  "variant": "certificate_endorsement_clean",
+  "gate_bucket": "certificate",
+  "description": "Endorsement document of cert_written_contract (clean layout). scheduled AI naming a party that is not the holder. States 5 keys.",
+  "carrier": "Quarry Lane Indemnity Company",
+  "page_count": 1,
+  "size_bytes": 4834,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": null,
+    "cert:insured_address": null,
+    "cert:carrier": {
+      "value": "Quarry Lane Indemnity Company",
+      "printed": "Quarry Lane Indemnity Company",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Quarry Lane Indemnity Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": null,
+    "cert:policy_number": null,
+    "cert:line": null,
+    "cert:effective_date": null,
+    "cert:expiration_date": null,
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": null,
+    "cert:umbrella_aggregate": null,
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null,
+    "cert:endorsement:OM2048:form_number": {
+      "value": "OM 20 48 10 23",
+      "printed": "OM 20 48 10 23",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Form OM 20 48 10 23",
+      "source": "text",
+      "accepted_values": [
+        "OM 20 48",
+        "OM 20 48 (10/23)",
+        "OM 20 48 10/23"
+      ]
+    },
+    "cert:endorsement:OM2048:type": {
+      "value": "additional_insured_scheduled",
+      "printed": "DESIGNATED INSURED - ADDITIONAL INSURED",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "DESIGNATED INSURED - ADDITIONAL INSURED",
+      "source": "text",
+      "accepted_values": [
+        "DESIGNATED INSURED - ADDITIONAL INSURED"
+      ]
+    },
+    "cert:endorsement:OM2048:policy_number": {
+      "value": "QLI-BA-207744",
+      "printed": "QLI-BA-207744",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "This endorsement forms part of Policy No. QLI-BA-207744",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2048:named_party": {
+      "value": "Ostrander Equipment Leasing Corp",
+      "printed": "Ostrander Equipment Leasing Corp",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Name of Additional Insured Person or Organization: Ostrander Equipment Leasing Corp",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:endorsement:OM2048:condition": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

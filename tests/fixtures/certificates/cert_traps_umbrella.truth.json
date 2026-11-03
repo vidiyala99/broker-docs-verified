@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "fixture_id": "cert_traps_umbrella",
+  "case_id": "cert_traps",
+  "file": "cert_traps_umbrella.pdf",
+  "doc_kind": "declarations",
+  "layout": "clean",
+  "line": "umbrella",
+  "variant": "certificate_declarations_clean",
+  "gate_bucket": "certificate",
+  "description": "Declarations document of cert_traps (clean layout). dates printed in long form. States 10 keys.",
+  "carrier": "Fenwick Hollow Assurance Company",
+  "page_count": 2,
+  "size_bytes": 5992,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "cert:named_insured": {
+      "value": "Brightline Paving LLC",
+      "printed": "Brightline Paving LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Brightline Paving LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:insured_address": {
+      "value": "9 Kestrel Industrial Court, Dayton, OH 45402",
+      "printed": "9 Kestrel Industrial Court, Dayton, OH 45402",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 9 Kestrel Industrial Court, Dayton, OH 45402",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:carrier": {
+      "value": "Fenwick Hollow Assurance Company",
+      "printed": "Fenwick Hollow Assurance Company",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Fenwick Hollow Assurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:naic": {
+      "value": "90781",
+      "printed": "90781",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "NAIC Company Code: 90781",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:policy_number": {
+      "value": "FHA-UMB-0098",
+      "printed": "FHA-UMB-0098",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Number: FHA-UMB-0098",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:line": {
+      "value": "umbrella",
+      "printed": "Commercial Umbrella Liability",
+      "page": 1,
+      "pages": [
+        1,
+        2
+      ],
+      "quote": "Coverage Part: Commercial Umbrella Liability",
+      "source": "text",
+      "accepted_values": [
+        "Commercial Umbrella Liability"
+      ]
+    },
+    "cert:effective_date": {
+      "value": "January 1, 2026",
+      "printed": "January 1, 2026",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Effective Date: January 1, 2026",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:expiration_date": {
+      "value": "January 1, 2027",
+      "printed": "January 1, 2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Expiration Date: January 1, 2027",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:gl_each_occurrence": null,
+    "cert:gl_general_aggregate": null,
+    "cert:gl_products_completed_ops_aggregate": null,
+    "cert:gl_personal_advertising_injury": null,
+    "cert:gl_damage_to_rented_premises": null,
+    "cert:gl_medical_expense": null,
+    "cert:auto_combined_single_limit": null,
+    "cert:umbrella_each_occurrence": {
+      "value": "$5,000,000",
+      "printed": "$5,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Each Occurrence Limit: $5,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:umbrella_aggregate": {
+      "value": "$5,000,000",
+      "printed": "$5,000,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Aggregate Limit: $5,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "cert:wc_statutory": null,
+    "cert:wc_el_each_accident": null,
+    "cert:wc_el_disease_each_employee": null,
+    "cert:wc_el_disease_policy_limit": null
+  },
+  "printed_unused": [],
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

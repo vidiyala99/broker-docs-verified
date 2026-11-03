@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261104,
+  "synthetic": true,
+  "case_id": "cert_written_contract",
+  "workflow": "certificate",
+  "gate_bucket": "certificate",
+  "description": "Landscaper certificate for a municipality: blanket AI and blanket waiver that apply only where required by a written contract (D14), and an auto policy that starts the day after the certificate date with a scheduled AI naming another party. AI and waiver requested.",
+  "exercises": [
+    "written_contract_blanket_ai",
+    "conditional_waiver",
+    "ai_scheduled_other_party",
+    "not_yet_effective",
+    "two_forms_one_document",
+    "multicol_layout"
+  ],
+  "parameters": {
+    "client_name": "Harrow & Finch Landscaping Inc",
+    "holder_name": "City of Saltmarsh Parks Department",
+    "holder_address": "300 Civic Plaza, Saltmarsh, ID 83616",
+    "wording": {
+      "additional_insured": true,
+      "waiver_of_subrogation": true,
+      "primary_noncontributory": false
+    },
+    "certificate_date": "2026-11-03",
+    "description": ""
+  },
+  "documents": [
+    "cert_written_contract_gl",
+    "cert_written_contract_endorsement_packet",
+    "cert_written_contract_auto",
+    "cert_written_contract_ai_auto_other_party"
+  ],
+  "shown_policies": [
+    {
+      "fixture_id": "cert_written_contract_gl",
+      "policy_number": "QLI-GL-207731",
+      "line": "general_liability"
+    },
+    {
+      "fixture_id": "cert_written_contract_auto",
+      "policy_number": "QLI-BA-207744",
+      "line": "auto"
+    }
+  ],
+  "claims": [
+    {
+      "key": "wording:additional_insured:general_liability",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "conditional",
+      "note": "OM 20 38 applies only where required by a written contract signed before the loss: confirm and give the reason (D14).",
+      "wording": "additional_insured",
+      "line": "general_liability",
+      "evidence": []
+    },
+    {
+      "key": "wording:additional_insured:auto",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "scheduled_other_party",
+      "note": "OM 20 48 schedules Ostrander Equipment Leasing Corp, not the holder.",
+      "wording": "additional_insured",
+      "line": "auto",
+      "evidence": []
+    },
+    {
+      "key": "wording:waiver_of_subrogation:general_liability",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "conditional",
+      "note": "OM 24 04 applies only where you agreed in a written contract, before the loss, to waive these rights (D14).",
+      "wording": "waiver_of_subrogation",
+      "line": "general_liability",
+      "evidence": []
+    },
+    {
+      "key": "wording:waiver_of_subrogation:auto",
+      "kind": "wording",
+      "status": "not_supported",
+      "reason": "no_endorsement",
+      "note": "No waiver endorsement modifies the auto policy.",
+      "wording": "waiver_of_subrogation",
+      "line": "auto",
+      "evidence": []
+    },
+    {
+      "key": "in_force:QLIGL207731",
+      "kind": "in_force",
+      "status": "supported",
+      "reason": "in_force",
+      "note": "07/15/2026 to 07/15/2027.",
+      "line": "general_liability",
+      "policy_number": "QLI-GL-207731",
+      "evidence": [
+        {
+          "fixture_id": "cert_written_contract_gl",
+          "page": 1,
+          "key": "cert:effective_date"
+        },
+        {
+          "fixture_id": "cert_written_contract_gl",
+          "page": 1,
+          "key": "cert:expiration_date"
+        }
+      ]
+    },
+    {
+      "key": "in_force:QLIBA207744",
+      "kind": "in_force",
+      "status": "not_supported",
+      "reason": "not_yet_effective",
+      "note": "Effective 11/04/2026, the day after the certificate date.",
+      "line": "auto",
+      "policy_number": "QLI-BA-207744",
+      "evidence": []
+    },
+    {
+      "key": "insured_consistent",
+      "kind": "insured",
+      "status": "supported",
+      "reason": "insured_match",
+      "note": "Same named insured on both policies.",
+      "evidence": [
+        {
+          "fixture_id": "cert_written_contract_gl",
+          "page": 1,
+          "key": "cert:named_insured"
+        },
+        {
+          "fixture_id": "cert_written_contract_auto",
+          "page": 1,
+          "key": "cert:named_insured"
+        }
+      ]
+    }
+  ],
+  "notices": []
+}
