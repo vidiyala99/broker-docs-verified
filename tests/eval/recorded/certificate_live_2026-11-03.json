@@ -1,0 +1,2653 @@
+{
+ "note": "Model replies recorded from the live certificate gate on 2026-11-03 (EXTRACTION_VERSION 2026-11-03.1 prompts, gpt extract/vision models from backend.providers.config). Replayed offline by test_certificate_replay.py.",
+ "cases": {
+  "cert_contractor": {
+   "extract": {
+    "cert_contractor_auto.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Calloway Build Group LLC",
+       "page": 1,
+       "quote": "Named Insured: Calloway Build Group LLC"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "1180 Ferrous Way, Tacoma, WA 98402",
+       "page": 1,
+       "quote": "Mailing Address: 1180 Ferrous Way, Tacoma, WA 98402"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Thistlewood Casualty Company",
+       "page": 1,
+       "quote": "Thistlewood Casualty Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90412",
+       "page": 1,
+       "quote": "NAIC Company Code: 90412"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "CA-4410-2290",
+       "page": 1,
+       "quote": "Policy Number: CA-4410-2290"
+      },
+      {
+       "field": "cert:line",
+       "value": "Business Auto",
+       "page": 1,
+       "quote": "Coverage Part: Business Auto"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "11/03/2026",
+       "page": 1,
+       "quote": "Policy Effective Date: 11/03/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "11/03/2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: 11/03/2027"
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Covered Autos Liability, Combined Single Limit: $1,000,000"
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_contractor_gl.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Calloway Build Group LLC",
+       "page": 1,
+       "quote": "Named Insured: Calloway Build Group LLC"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "1180 Ferrous Way, Tacoma, WA 98402",
+       "page": 1,
+       "quote": "Mailing Address: 1180 Ferrous Way, Tacoma, WA 98402"
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Thistlewood Casualty Company",
+       "page": 1,
+       "quote": "Thistlewood Casualty Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90412",
+       "page": 1,
+       "quote": "NAIC Company Code: 90412"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "GL-4410-2281",
+       "page": 1,
+       "quote": "Policy Number: GL-4410-2281"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability",
+       "page": 1,
+       "quote": "Coverage Part: Commercial General Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "03/01/2026",
+       "page": 1,
+       "quote": "Policy Effective Date: 03/01/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "03/01/2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: 03/01/2027"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "General Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "Products-Completed Operations Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Personal and Advertising Injury Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": "$300,000",
+       "page": 2,
+       "quote": "Damage to Premises Rented to You Limit: $300,000"
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": "$10,000",
+       "page": 2,
+       "quote": "Medical Expense Limit (any one person): $10,000"
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_contractor_wc.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "CALLOWAY BUILD GROUP LLC",
+       "page": 1,
+       "quote": "NAMED INSURED\nCALLOWAY BUILD GROUP LLC"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "1180 Ferrous Way, Tacoma, WA 98402",
+       "page": 1,
+       "quote": "MAILING ADDRESS\n1180 Ferrous Way, Tacoma, WA 98402"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Brannock Mutual Insurance Company",
+       "page": 1,
+       "quote": "Brannock Mutual Insurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90577",
+       "page": 1,
+       "quote": "NAIC COMPANY CODE\n90577"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "WC 88-310-57",
+       "page": 1,
+       "quote": "POLICY NUMBER\nWC 88-310-57"
+      },
+      {
+       "field": "cert:line",
+       "value": "Workers Compensation and Employers Liability",
+       "page": 1,
+       "quote": "COVERAGE PART\nWorkers Compensation and Employers Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "11/03/2025",
+       "page": 1,
+       "quote": "POLICY EFFECTIVE DATE\n11/03/2025"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "11/03/2026",
+       "page": 1,
+       "quote": "POLICY EXPIRATION DATE\n11/03/2026"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": "Statutory",
+       "page": 2,
+       "quote": "LIMITS OF INSURANCE\nStatutory"
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "$1,000,000"
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "$1,000,000"
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "$1,000,000"
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_contractor_waiver_wc.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:insured_address",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Brannock Mutual Insurance Company",
+       "page": 1,
+       "quote": "Brannock Mutual Insurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "WC8831057",
+       "page": 1,
+       "quote": "This endorsement forms part of Policy No. WC8831057"
+      },
+      {
+       "field": "cert:line",
+       "value": "Workers Compensation and Employers Liability Insurance Policy",
+       "page": 1,
+       "quote": "This endorsement modifies insurance provided under the Workers Compensation and Employers Liability Insurance Policy."
+      },
+      {
+       "field": "cert:effective_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 00 03 01 25",
+       "edition": "01 25",
+       "page": 1,
+       "quote": "Form OM 00 03 01 25",
+       "type": {
+        "value": "WAIVER OF OUR RIGHT TO RECOVER FROM OTHERS",
+        "page": 1,
+        "quote": "WAIVER OF OUR RIGHT TO RECOVER FROM OTHERS"
+       },
+       "policy_number": {
+        "value": "WC8831057",
+        "page": 1,
+        "quote": "This endorsement forms part of Policy No. WC8831057"
+       },
+       "named_party": {
+        "value": null,
+        "page": null,
+        "quote": null
+       },
+       "condition": {
+        "value": "for whom you perform work",
+        "page": 1,
+        "quote": "We will not enforce our right against any person or organization for whom you perform work."
+       }
+      }
+     ]
+    },
+    "cert_contractor_ai_scheduled.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:insured_address",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Thistlewood Casualty Company",
+       "page": 1,
+       "quote": "Thistlewood Casualty Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "GL 4410 2281",
+       "page": 1,
+       "quote": "This endorsement forms part of Policy No. GL 4410 2281"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability",
+       "page": 1,
+       "quote": "This endorsement modifies insurance provided under the Commercial General Liability Coverage Part."
+      },
+      {
+       "field": "cert:effective_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 20 26 04 24",
+       "edition": "04 24",
+       "page": 1,
+       "quote": "Form OM 20 26 04 24",
+       "type": {
+        "value": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION",
+        "page": 1,
+        "quote": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION"
+       },
+       "policy_number": {
+        "value": "GL 4410 2281",
+        "page": 1,
+        "quote": "This endorsement forms part of Policy No. GL 4410 2281"
+       },
+       "named_party": {
+        "value": "MARLOWE PROPERTY GROUP LLC",
+        "page": 1,
+        "quote": "Name of Additional Insured Person or Organization: MARLOWE PROPERTY GROUP LLC"
+       },
+       "condition": {
+        "value": "but only with respect to liability for bodily injury, property\ndamage or personal and advertising injury caused by your acts or omissions in the performance of\nyour ongoing operations for that additional insured.",
+        "page": 1,
+        "quote": "but only with respect to liability for bodily injury, property\ndamage or personal and advertising injury caused by your acts or omissions in the performance of\nyour ongoing operations for that additional insured."
+       }
+      }
+     ]
+    },
+    "cert_contractor_pnc_gl.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:insured_address",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Thistlewood Casualty Company",
+       "page": 1,
+       "quote": "Thistlewood Casualty Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "GL4410-2281",
+       "page": 1,
+       "quote": "This endorsement forms part of Policy No. GL4410-2281"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability Coverage Part",
+       "page": 1,
+       "quote": "This endorsement modifies insurance provided under the Commercial General Liability Coverage Part."
+      },
+      {
+       "field": "cert:effective_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 20 01 04 24",
+       "edition": "04 24",
+       "page": 1,
+       "quote": "Form OM 20 01 04 24",
+       "type": {
+        "value": "PRIMARY AND NONCONTRIBUTORY - OTHER INSURANCE CONDITION",
+        "page": 1,
+        "quote": "PRIMARY AND NONCONTRIBUTORY - OTHER INSURANCE CONDITION"
+       },
+       "policy_number": {
+        "value": "GL4410-2281",
+        "page": 1,
+        "quote": "This endorsement forms part of Policy No. GL4410-2281"
+       },
+       "named_party": {
+        "value": null,
+        "page": null,
+        "quote": null
+       },
+       "condition": {
+        "value": "This insurance is primary to and will not seek contribution from any other insurance available",
+        "page": 1,
+        "quote": "This insurance is primary to and will not seek contribution from any other insurance available"
+       }
+      }
+     ]
+    }
+   },
+   "vision": {}
+  },
+  "cert_scanned": {
+   "extract": {
+    "cert_scanned_gl_with_pnc.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Pemberton Event Staffing Co",
+       "page": 1,
+       "quote": "Named Insured: Pemberton Event Staffing Co"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "610 Wharf Lantern Street, Savannah, GA 31401",
+       "page": 1,
+       "quote": "Mailing Address: 610 Wharf Lantern Street, Savannah, GA 31401"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Glasshouse Specialty Insurance Company",
+       "page": 1,
+       "quote": "Glasshouse Specialty Insurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90915",
+       "page": 1,
+       "quote": "NAIC Company Code: 90915"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "GSI-GL-40021",
+       "page": 1,
+       "quote": "Policy Number: GSI-GL-40021"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability",
+       "page": 1,
+       "quote": "Coverage Part: Commercial General Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "05/01/2026",
+       "page": 1,
+       "quote": "Policy Effective Date: 05/01/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "05/01/2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: 05/01/2027"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "General Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "Products-Completed Operations Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Personal and Advertising Injury Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": "$300,000",
+       "page": 2,
+       "quote": "Damage to Premises Rented to You Limit: $300,000"
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": "$10,000",
+       "page": 2,
+       "quote": "Medical Expense Limit (any one person): $10,000"
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 20 02 04 24",
+       "edition": "04 24",
+       "page": 3,
+       "quote": "Form OM 20 02 04 24",
+       "type": {
+        "value": "PRIMARY AND NONCONTRIBUTORY - OTHER INSURANCE CONDITION",
+        "page": 3,
+        "quote": "PRIMARY AND NONCONTRIBUTORY - OTHER INSURANCE CONDITION"
+       },
+       "policy_number": {
+        "value": "GSI-GL-40021",
+        "page": 3,
+        "quote": "This endorsement forms part of Policy No. GSI-GL-40021"
+       },
+       "named_party": {
+        "value": null,
+        "page": null,
+        "quote": null
+       },
+       "condition": {
+        "value": "This insurance is primary to and will not seek contribution from any other insurance available",
+        "page": 3,
+        "quote": "This insurance is primary to and will not seek contribution from any other insurance available"
+       }
+      }
+     ]
+    },
+    "cert_scanned_umbrella_scanned.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Pemberton Event Staffing Co",
+       "page": 1,
+       "quote": "Named Insured: Pemberton Event Staffing Co"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "610 Wharf Lantern Street, Savannah, GA 31401",
+       "page": 1,
+       "quote": "Mailing Address: 610 Wharf Lantern Street, Savannah, GA 31401"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Glasshouse Specialty Insurance Company",
+       "page": 1,
+       "quote": "Glasshouse Specialty Insurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90915",
+       "page": 1,
+       "quote": "NAIC Company Code: 90915"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "GSI-UMB-40022",
+       "page": 1,
+       "quote": "Policy Number: GSI-UMB-40022"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial Umbrella Liability",
+       "page": 1,
+       "quote": "Coverage Part: Commercial Umbrella Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "05/01/2026",
+       "page": 1,
+       "quote": "Policy Effective Date: 05/01/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "05/01/2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: 05/01/2027"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": "$4,000,000",
+       "page": 2,
+       "quote": "Aggregate Limit: $4,000,000"
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $2,000,000"
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": "$4,000,000",
+       "page": 2,
+       "quote": "Aggregate Limit: $4,000,000"
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    }
+   },
+   "vision": {
+    "1": "Glasshouse Specialty Insurance Company\n\nCommercial Umbrella Liability Declarations . Page 1 of 2\n\nDeclarations\n\nNAIC Company Code: 90915\nPolicy Number: GSI-UMB-40022\nNamed Insured: Pemberton Event Staffing Co\nMailing Address: 610 Wharf Lantern Street, Savannah, GA 31401\nPolicy Effective Date: 05/01/2026\nPolicy Expiration Date: 05/01/2027\nCoverage Part: Commercial Umbrella Liability\n\nThese declarations, together with the common policy conditions, coverage forms and\nendorsements listed in the schedule, complete the policy described above.\n\nThe insurance afforded applies only to the coverages for which a limit of insurance is\nshown. Limits apply as stated in the coverage form.\n\nSynthetic sample document for software testing. Not an insurance policy; all names and numbers are invented.",
+    "2": "Glasshouse Specialty Insurance Company\nCommercial Umbrella Liability Declarations   Page 2 of 2\n\nLimits of Insurance\nEach Occurrence Limit: $2,000,000\nAggregate Limit: $4,000,000\n\nThe limits shown are the most the insurer will pay regardless of the number of insureds,\nclaims made or suits brought, or persons or organizations making claims.\n\nSynthetic sample document for software testing. Not an insurance policy; all names and numbers are invented."
+   }
+  },
+  "cert_traps": {
+   "extract": {
+    "cert_traps_auto_other_insured.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Ferro Ridge Hauling Inc",
+       "page": 1,
+       "quote": "Named Insured: Ferro Ridge Hauling Inc"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "15 Slag Pit Road, Dayton, OH 45417",
+       "page": 1,
+       "quote": "Mailing Address: 15 Slag Pit Road, Dayton, OH 45417"
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Fenwick Hollow Assurance Company",
+       "page": 1,
+       "quote": "Fenwick Hollow Assurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90781",
+       "page": 1,
+       "quote": "NAIC Company Code: 90781"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "CA 7719-0024",
+       "page": 1,
+       "quote": "Policy Number: CA 7719-0024"
+      },
+      {
+       "field": "cert:line",
+       "value": "Business Auto",
+       "page": 1,
+       "quote": "Coverage Part: Business Auto"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "01/01/2026",
+       "page": 1,
+       "quote": "Policy Effective Date: 01/01/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "01/01/2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: 01/01/2027"
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "Covered Autos Liability, Combined Single Limit: $2,000,000"
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_traps_gl_expired.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Brightline Paving LLC",
+       "page": 1,
+       "quote": "Named Insured: Brightline Paving LLC"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "9 Kestrel Industrial Court, Dayton, OH 45402",
+       "page": 1,
+       "quote": "Mailing Address: 9 Kestrel Industrial Court, Dayton, OH 45402"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Fenwick Hollow Assurance Company",
+       "page": 1,
+       "quote": "Fenwick Hollow Assurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90781",
+       "page": 1,
+       "quote": "NAIC Company Code: 90781"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "FHA GL 5520117",
+       "page": 1,
+       "quote": "Policy Number: FHA GL 5520117"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability",
+       "page": 1,
+       "quote": "Coverage Part: Commercial General Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "11/02/2025",
+       "page": 1,
+       "quote": "Policy Effective Date: 11/02/2025"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "11/02/2026",
+       "page": 1,
+       "quote": "Policy Expiration Date: 11/02/2026"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "General Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "Products-Completed Operations Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Personal and Advertising Injury Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": "$300,000",
+       "page": 2,
+       "quote": "Damage to Premises Rented to You Limit: $300,000"
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": "$10,000",
+       "page": 2,
+       "quote": "Medical Expense Limit (any one person): $10,000"
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_traps_ai_blanket.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:insured_address",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Fenwick Hollow Assurance Company",
+       "page": 1,
+       "quote": "Fenwick Hollow Assurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "FHA-GL-5520117",
+       "page": 1,
+       "quote": "This endorsement forms part of Policy No. FHA-GL-5520117"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability Coverage Part",
+       "page": 1,
+       "quote": "This endorsement modifies insurance provided under the Commercial General Liability Coverage Part."
+      },
+      {
+       "field": "cert:effective_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 20 33 04 24",
+       "edition": "04 24",
+       "page": 1,
+       "quote": "Form OM 20 33 04 24",
+       "type": {
+        "value": "ADDITIONAL INSURED - BLANKET - OWNERS, LESSEES OR CONTRACTORS",
+        "page": 1,
+        "quote": "ADDITIONAL INSURED - BLANKET - OWNERS, LESSEES OR CONTRACTORS"
+       },
+       "policy_number": {
+        "value": "FHA-GL-5520117",
+        "page": 1,
+        "quote": "This endorsement forms part of Policy No. FHA-GL-5520117"
+       },
+       "named_party": {
+        "value": null,
+        "page": null,
+        "quote": null
+       },
+       "condition": {
+        "value": null,
+        "page": null,
+        "quote": null
+       }
+      }
+     ]
+    },
+    "cert_traps_ai_other_policy.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:insured_address",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Fenwick Hollow Assurance Company",
+       "page": 1,
+       "quote": "Fenwick Hollow Assurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "CA 7719-0042",
+       "page": 1,
+       "quote": "This endorsement forms part of Policy No. CA 7719-0042"
+      },
+      {
+       "field": "cert:line",
+       "value": "Business Auto Coverage Form",
+       "page": 1,
+       "quote": "This endorsement modifies insurance provided under the Business Auto Coverage Form."
+      },
+      {
+       "field": "cert:effective_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 20 49 10 23",
+       "edition": "10 23",
+       "page": 1,
+       "quote": "Form OM 20 49 10 23",
+       "type": {
+        "value": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION",
+        "page": 1,
+        "quote": "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION"
+       },
+       "policy_number": {
+        "value": "CA 7719-0042",
+        "page": 1,
+        "quote": "This endorsement forms part of Policy No. CA 7719-0042"
+       },
+       "named_party": {
+        "value": "Ridgefield Commons Owners Association",
+        "page": 1,
+        "quote": "Name of Additional Insured Person or Organization: Ridgefield Commons Owners Association"
+       },
+       "condition": {
+        "value": "but only with respect to liability for bodily injury, property damage or personal and advertising injury caused by your acts or omissions in the performance of your ongoing operations for that additional insured.",
+        "page": 1,
+        "quote": "but only with respect to liability for bodily injury, property damage or personal and advertising injury caused by your acts or omissions in the performance of\nyour ongoing operations for that additional insured."
+       }
+      }
+     ]
+    },
+    "cert_traps_wc.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Brightline Paving LLC",
+       "page": 1,
+       "quote": "NAMED INSURED\nBrightline Paving LLC"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "9 Kestrel Industrial Court, Dayton, OH 45402",
+       "page": 1,
+       "quote": "MAILING ADDRESS\n9 Kestrel Industrial Court, Dayton, OH 45402"
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Brannock Mutual Insurance Company",
+       "page": 1,
+       "quote": "Brannock Mutual Insurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90577",
+       "page": 1,
+       "quote": "NAIC COMPANY CODE\n90577"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "WC-6604-1183",
+       "page": 1,
+       "quote": "POLICY NUMBER\nWC-6604-1183"
+      },
+      {
+       "field": "cert:line",
+       "value": "Workers Compensation and Employers Liability",
+       "page": 1,
+       "quote": "COVERAGE PART\nWorkers Compensation and Employers Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "06/01/2026",
+       "page": 1,
+       "quote": "POLICY EFFECTIVE DATE\n06/01/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "06/01/2027",
+       "page": 1,
+       "quote": "POLICY EXPIRATION DATE\n06/01/2027"
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": "Statutory",
+       "page": 2,
+       "quote": "LIMITS OF INSURANCE\nStatutory"
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "$1,000,000\n$1,000,000\n$1,000,000\nPart One, Workers Compensation\nEmployers Liability, Bodily Injury by Accident, each accident"
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "$1,000,000\n$1,000,000\n$1,000,000\nPart One, Workers Compensation\nEmployers Liability, Bodily Injury by Accident, each accident\nEmployers Liability, Bodily Injury by Disease, each employee"
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "$1,000,000\n$1,000,000\n$1,000,000\nPart One, Workers Compensation\nEmployers Liability, Bodily Injury by Accident, each accident\nEmployers Liability, Bodily Injury by Disease, each employee\nEmployers Liability, Bodily Injury by Disease, policy limit"
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_traps_umbrella.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Brightline Paving LLC",
+       "page": 1,
+       "quote": "Named Insured: Brightline Paving LLC"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "9 Kestrel Industrial Court, Dayton, OH 45402",
+       "page": 1,
+       "quote": "Mailing Address: 9 Kestrel Industrial Court, Dayton, OH 45402"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Fenwick Hollow Assurance Company",
+       "page": 1,
+       "quote": "Fenwick Hollow Assurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90781",
+       "page": 1,
+       "quote": "NAIC Company Code: 90781"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "FHA-UMB-0098",
+       "page": 1,
+       "quote": "Policy Number: FHA-UMB-0098"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial Umbrella Liability",
+       "page": 1,
+       "quote": "Coverage Part: Commercial Umbrella Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "January 1, 2026",
+       "page": 1,
+       "quote": "Policy Effective Date: January 1, 2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "January 1, 2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: January 1, 2027"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": "$5,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $5,000,000"
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": "$5,000,000",
+       "page": 2,
+       "quote": "Aggregate Limit: $5,000,000"
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_traps_package.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Brightline Paving LLC",
+       "page": 1,
+       "quote": "Named Insured: Brightline Paving LLC"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "9 Kestrel Industrial Court, Dayton, OH 45402",
+       "page": 1,
+       "quote": "Mailing Address: 9 Kestrel Industrial Court, Dayton, OH 45402"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Fenwick Hollow Assurance Company",
+       "page": 1,
+       "quote": "Fenwick Hollow Assurance Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90781",
+       "page": 1,
+       "quote": "NAIC Company Code: 90781"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "FHA-CPP-3301",
+       "page": 1,
+       "quote": "Policy Number: FHA-CPP-3301"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial Package Policy",
+       "page": 1,
+       "quote": "Commercial Package Policy Declarations    Page 1 of 2"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "04/01/2026",
+       "page": 1,
+       "quote": "Policy Effective Date: 04/01/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "04/01/2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: 04/01/2027"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": "$3,000,000",
+       "page": 2,
+       "quote": "General Aggregate Limit: $3,000,000"
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    }
+   },
+   "vision": {}
+  },
+  "cert_written_contract": {
+   "extract": {
+    "cert_written_contract_auto.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Harrow & Finch Landscaping Inc",
+       "page": 1,
+       "quote": "NAMED INSURED\nHarrow & Finch Landscaping Inc"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "48 Orchard Spur Road, Boise, ID 83702",
+       "page": 1,
+       "quote": "MAILING ADDRESS\n48 Orchard Spur Road, Boise, ID 83702"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Quarry Lane Indemnity Company",
+       "page": 1,
+       "quote": "Quarry Lane Indemnity Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90633",
+       "page": 1,
+       "quote": "NAIC COMPANY CODE\n90633"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "QLI-BA-207744",
+       "page": 1,
+       "quote": "POLICY NUMBER\nQLI-BA-207744"
+      },
+      {
+       "field": "cert:line",
+       "value": "Business Auto",
+       "page": 1,
+       "quote": "COVERAGE PART\nBusiness Auto"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "11/04/2026",
+       "page": 1,
+       "quote": "POLICY EFFECTIVE DATE\n11/04/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "11/04/2027",
+       "page": 1,
+       "quote": "POLICY EXPIRATION DATE\n11/04/2027"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "LIMITS OF INSURANCE\n$1,000,000\nCovered Autos Liability, Combined Single Limit"
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_written_contract_gl.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": "Harrow & Finch Landscaping Inc",
+       "page": 1,
+       "quote": "Named Insured: Harrow & Finch Landscaping Inc"
+      },
+      {
+       "field": "cert:insured_address",
+       "value": "48 Orchard Spur Road, Boise, ID 83702",
+       "page": 1,
+       "quote": "Mailing Address: 48 Orchard Spur Road, Boise, ID 83702"
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Quarry Lane Indemnity Company",
+       "page": 1,
+       "quote": "Quarry Lane Indemnity Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": "90633",
+       "page": 1,
+       "quote": "NAIC Company Code: 90633"
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "QLI-GL-207731",
+       "page": 1,
+       "quote": "Policy Number: QLI-GL-207731"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability",
+       "page": 1,
+       "quote": "Coverage Part: Commercial General Liability"
+      },
+      {
+       "field": "cert:effective_date",
+       "value": "07/15/2026",
+       "page": 1,
+       "quote": "Policy Effective Date: 07/15/2026"
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": "07/15/2027",
+       "page": 1,
+       "quote": "Policy Expiration Date: 07/15/2027"
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Each Occurrence Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "General Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": "$2,000,000",
+       "page": 2,
+       "quote": "Products-Completed Operations Aggregate Limit: $2,000,000"
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": "$1,000,000",
+       "page": 2,
+       "quote": "Personal and Advertising Injury Limit: $1,000,000"
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": "$300,000",
+       "page": 2,
+       "quote": "Damage to Premises Rented to You Limit: $300,000"
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": "$10,000",
+       "page": 2,
+       "quote": "Medical Expense Limit (any one person): $10,000"
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": []
+    },
+    "cert_written_contract_ai_auto_other_party.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:insured_address",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Quarry Lane Indemnity Company",
+       "page": 1,
+       "quote": "Quarry Lane Indemnity Company\nPolicy Endorsement    Page 1 of 1"
+      },
+      {
+       "field": "cert:naic",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "QLI-BA-207744",
+       "page": 1,
+       "quote": "This endorsement forms part of Policy No. QLI-BA-207744"
+      },
+      {
+       "field": "cert:line",
+       "value": "Business Auto Coverage Form",
+       "page": 1,
+       "quote": "This endorsement modifies insurance provided under the Business Auto Coverage Form."
+      },
+      {
+       "field": "cert:effective_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 20 48",
+       "edition": "10 23",
+       "page": 1,
+       "quote": "Form OM 20 48 10 23\nDESIGNATED INSURED - ADDITIONAL INSURED",
+       "type": {
+        "value": "DESIGNATED INSURED - ADDITIONAL INSURED",
+        "page": 1,
+        "quote": "DESIGNATED INSURED - ADDITIONAL INSURED"
+       },
+       "policy_number": {
+        "value": "QLI-BA-207744",
+        "page": 1,
+        "quote": "This endorsement forms part of Policy No. QLI-BA-207744"
+       },
+       "named_party": {
+        "value": "Ostrander Equipment Leasing Corp",
+        "page": 1,
+        "quote": "Name of Additional Insured Person or Organization: Ostrander Equipment Leasing Corp"
+       },
+       "condition": {
+        "value": "but only with respect to liability for bodily injury, property damage or personal and advertising injury caused by your acts or omissions in the performance of your ongoing operations for that additional insured.",
+        "page": 1,
+        "quote": "but only with respect to liability for bodily injury, property\ndamage or personal and advertising injury caused by your acts or omissions in the performance of\nyour ongoing operations for that additional insured."
+       }
+      }
+     ]
+    },
+    "cert_written_contract_endorsement_packet.pdf": {
+     "facts": [
+      {
+       "field": "cert:named_insured",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:insured_address",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:producer",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:carrier",
+       "value": "Quarry Lane Indemnity Company",
+       "page": 1,
+       "quote": "Quarry Lane Indemnity Company"
+      },
+      {
+       "field": "cert:naic",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:policy_number",
+       "value": "QLI-GL-207731",
+       "page": 1,
+       "quote": "This endorsement forms part of Policy No. QLI-GL-207731"
+      },
+      {
+       "field": "cert:line",
+       "value": "Commercial General Liability",
+       "page": 1,
+       "quote": "This endorsement modifies insurance provided under the Commercial General Liability Coverage Part."
+      },
+      {
+       "field": "cert:effective_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:expiration_date",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_general_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_products_completed_ops_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_personal_advertising_injury",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_damage_to_rented_premises",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:gl_medical_expense",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:auto_combined_single_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_each_occurrence",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:umbrella_aggregate",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_statutory",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_each_accident",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_each_employee",
+       "value": null,
+       "page": null,
+       "quote": null
+      },
+      {
+       "field": "cert:wc_el_disease_policy_limit",
+       "value": null,
+       "page": null,
+       "quote": null
+      }
+     ],
+     "options_detected": 1,
+     "option_compared": null,
+     "endorsements": [
+      {
+       "form_number": "OM 20 38 04 24",
+       "edition": "04 24",
+       "page": 1,
+       "quote": "Form OM 20 38 04 24",
+       "type": {
+        "value": "ADDITIONAL INSURED - OWNERS, LESSEES OR CONTRACTORS - AUTOMATIC STATUS",
+        "page": 1,
+        "quote": "ADDITIONAL INSURED - OWNERS, LESSEES OR CONTRACTORS - AUTOMATIC STATUS"
+       },
+       "policy_number": {
+        "value": "QLI-GL-207731",
+        "page": 1,
+        "quote": "This endorsement forms part of Policy No. QLI-GL-207731"
+       },
+       "named_party": {
+        "value": null,
+        "page": null,
+        "quote": null
+       },
+       "condition": {
+        "value": "This endorsement applies only where required by a written contract signed before the loss.",
+        "page": 1,
+        "quote": "This endorsement applies only where required by a written contract signed before the loss."
+       }
+      },
+      {
+       "form_number": "OM 24 04 04 24",
+       "edition": "04 24",
+       "page": 2,
+       "quote": "Form OM 24 04 04 24",
+       "type": {
+        "value": "WAIVER OF TRANSFER OF RIGHTS OF RECOVERY AGAINST OTHERS TO US",
+        "page": 2,
+        "quote": "WAIVER OF TRANSFER OF RIGHTS OF RECOVERY AGAINST OTHERS TO US"
+       },
+       "policy_number": {
+        "value": "QLI-GL-207731",
+        "page": 2,
+        "quote": "This endorsement forms part of Policy No. QLI-GL-207731"
+       },
+       "named_party": {
+        "value": null,
+        "page": null,
+        "quote": null
+       },
+       "condition": {
+        "value": "This waiver applies only where you agreed in a written contract, before the loss, to waive these rights.",
+        "page": 2,
+        "quote": "This waiver applies only where you agreed in a written contract, before the loss, to waive these rights."
+       }
+      }
+     ]
+    }
+   },
+   "vision": {}
+  }
+ }
+}

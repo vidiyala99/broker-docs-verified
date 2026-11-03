@@ -7,7 +7,9 @@ read from a scan, couldn't verify, conflicting or not stated all make a dependen
 (PRODUCT.md: never guessed).
 
     documents ──► per document: package policy? (line names several lines) ──► notice, no facts (C7)
-        │         declarations? (a cited line of coverage)  ──► a policy row
+        │         declarations? (a cited line of coverage, and, when the document prints
+        │           endorsements, a fact only declarations print: insured, period, a limit)
+        │                                                   ──► a policy row
         │         endorsements (any read document)           ──► joined below
         ▼
     endorsement join (D7): policy numbers compared upper-case without spaces, dashes, dots or slashes;
@@ -84,6 +86,11 @@ LINE_LIMITS: dict[str, tuple[str, ...]] = {
     PROPERTY: (),
     OTHER: (),
 }
+# Facts only a declarations page prints. An endorsement form also prints the carrier, the coverage part it
+# modifies and the policy number, so those do not tell a declarations document from an endorsement.
+DECLARATIONS_ONLY: tuple[str, ...] = (
+    "cert:named_insured", "cert:insured_address", "cert:effective_date", "cert:expiration_date",
+    *dict.fromkeys(k for keys in LINE_LIMITS.values() for k in keys))
 
 # --------------------------------------------------------------------- normalizers
 
@@ -296,6 +303,21 @@ class PolicyDoc:
         return self.line_info[1]
 
     @property
+    def declarations(self) -> bool:
+        """Does this document read as a policy's declarations (a policy row on the certificate)?
+
+        It needs a line of coverage. A document that prints endorsements must also state a fact only
+        declarations print (named insured, address, policy period or a limit), stated in any state:
+        an endorsement form names the coverage part and the policy number it modifies ("This
+        endorsement forms part of Policy No. X"), so a line and a number alone do not make it a
+        policy. Its endorsements join the policy they name instead (D7)."""
+        if self.line is None:
+            return False
+        if not self.endorsements:
+            return True
+        return any(self.fact(k).stated for k in DECLARATIONS_ONLY)
+
+    @property
     def policy_number_label(self) -> str:
         pn = self.fact("cert:policy_number")
         return pn.value if pn.cited else f"in document {self.letter}"
@@ -338,10 +360,10 @@ def join(documents: Sequence[PolicyDoc]) -> Joined:
             notices.append(CertNotice("package", f"Document {d.letter} ({d.filename}) covers several lines; package "
                                   "policies are not supported yet, so nothing from it is used.", d.letter))
             continue
-        if d.line is not None:
+        if d.declarations:
             policies.append(d)
         sources.append(d)
-        if d.line is None and not d.endorsements:
+        if not d.declarations and not d.endorsements:
             notices.append(CertNotice("not_used", f"Document {d.letter} ({d.filename}) shows no declarations and "
                                   "no endorsement a certificate uses.", d.letter))
     by_number: dict[str, list[PolicyDoc]] = {}

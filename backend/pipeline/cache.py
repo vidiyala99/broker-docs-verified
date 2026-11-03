@@ -47,7 +47,7 @@ from backend.pipeline import extract
 from backend.providers import CallRole, ProviderConfig
 from backend.schemas import FactField, RunDocumentStatus
 
-EXTRACTION_VERSION = "2026-11-03.1"
+EXTRACTION_VERSION = "2026-11-03.2"  # .2: endorsement form number without a doubled edition
 ENV_SWITCH = "BROKERDOCS_EXTRACTION_CACHE"
 _OFF = {"off", "0", "false", "no", "disabled"}
 
