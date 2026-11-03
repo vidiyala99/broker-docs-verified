@@ -57,6 +57,9 @@ export interface RunDocument {
   error_code: string | null;
   option_count: number;
   option_label: string | null;
+  /** Slice 4 extraction cache: the run whose read was copied (null = read live), and when it was first read. */
+  reused_from_run_id?: number | null;
+  read_at?: string | null;
 }
 
 /** Slice 3b: a run's book of business. Personal lines = household cover (R1); a tag only (R2). */
@@ -234,6 +237,144 @@ export interface DiscrepancyItem extends DiscrepancyBlock {
   /** Slice 3b: the task linked to this item (first open, else newest), or null (API.md, O4). */
   task?: { id: number; status: TaskStatus } | null;
 }
+
+// ---------------------------------------------------------------- certificates (slice 4, backend/API.md "Certificates")
+// The two block types below are not in the `Block` union yet: the UI lane (C11) adds them with their rendering.
+
+export type Wording = "additional_insured" | "waiver_of_subrogation" | "primary_noncontributory";
+export type ClaimKind = "wording" | "in_force" | "insured" | "description" | "edited";
+export type ClaimVerdict = "supported" | "not_supported" | "needs_signoff";
+export type ClaimStatus = "open" | "resolved" | "removed";
+
+export interface CertificateParameters {
+  holder_name: string;
+  holder_address?: string;
+  wording?: Partial<Record<Wording, boolean>>;
+  /** YYYY-MM-DD; omitted = today. */
+  certificate_date?: string | null;
+  description?: string;
+}
+
+export interface ClaimBlock {
+  type: "claim";
+  id: string;
+  key: string;
+  kind: ClaimKind;
+  title: string;
+  verdict: ClaimVerdict;
+  reason: string | null;
+  condition: string | null;
+  wording: Wording | null;
+  policy_letter: string | null;
+  removable: boolean;
+  prose: Segment[];
+  basis: string[];
+}
+
+export interface ClaimItem extends ClaimBlock {
+  status: ClaimStatus;
+  note: string | null;
+  changed_since_resolved: boolean;
+  updated_at: string | null;
+  /** Send back as expected_fingerprint on PATCH (D15). */
+  fingerprint: string;
+  needs_action: boolean;
+  task?: { id: number; status: TaskStatus } | null;
+}
+
+export interface CertificateField {
+  key: string;
+  label: string;
+  cell: Cell;
+}
+
+export interface CertificatePolicy {
+  letter: string;
+  insurer: string | null;
+  document_id: number | null;
+  line: "general_liability" | "auto" | "umbrella" | "workers_comp" | "property" | "other";
+  line_label: string;
+  fields: CertificateField[];
+  wording: Wording[];
+}
+
+export interface CertificateBlock {
+  type: "certificate";
+  id: "certificate";
+  layout: string;
+  certificate_date: string;
+  holder_name: string;
+  holder_address: string;
+  producer: CertificateField | null;
+  insured: CertificateField[];
+  insurers: { letter: string; name: string; naic: string | null }[];
+  policies: CertificatePolicy[];
+  description: string | null;
+}
+
+export interface CertificateIssue {
+  id: number;
+  run_id: number;
+  artifact_id: number;
+  version: number;
+  issued_at: string;
+  holder: { name: string; address: string };
+  claims: { key: string; title: string; kind: ClaimKind; verdict: ClaimVerdict; reason: string | null;
+    condition: string | null; status: ClaimStatus; note: string | null }[];
+  pdf_sha256: string;
+  pdf_bytes: number;
+  pdf_url: string;
+}
+
+export type CertificateBlocked = "run_active" | "claims_open" | "no_coverage" | "issued" | "no_draft";
+
+/** GET /api/certificates/{run_id} */
+export interface CertificateView {
+  run: Run;
+  client: string | null;
+  client_source: "broker" | "extracted" | null;
+  artifact_id: number | null;
+  version: number | null;
+  certificate: CertificateBlock | null;
+  claims: ClaimItem[];
+  counts: { total: number; open: number; supported: number; overridden: number; removed: number } | null;
+  notices: Notice[];
+  chips: Record<string, Chip>;
+  issue: CertificateIssue | null;
+  issues: CertificateIssue[];
+  can_issue: boolean;
+  blocked: CertificateBlocked[];
+}
+
+export interface Holder {
+  id: number;
+  name: string;
+  address: string;
+  last_used_at: string;
+}
+
+export type CertificateQueueGroup = "in_progress" | "needs_attention" | "ready" | "done_recently";
+
+export interface CertificateQueueItem {
+  run_id: number;
+  workflow_slug: "certificate";
+  workflow_name: string;
+  line: Line;
+  created_at: string | null;
+  client: string | null;
+  client_source: "broker" | "extracted" | null;
+  summary: string;
+  reasons: string[] | null;
+  open_claims: number | null;
+  status: RunStatus;
+  retryable: boolean;
+  finished_at: string | null;
+  queue_state: QueueState;
+  queue_changed_at: string | null;
+  issued_at: string | null;
+}
+
+export type CertificateQueue = { truncated: boolean } & Record<CertificateQueueGroup, CertificateQueueItem[]>;
 
 export type TaskStatus = "open" | "done";
 

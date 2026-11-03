@@ -226,7 +226,7 @@ def test_policy_check_resolve_without_note_or_fingerprint_still_works(pc):
     run_id = _policy_run(pc)
     listing = pc.client.get(f"/api/runs/{run_id}/discrepancies").json()
     item = listing["items"][0]
-    assert item["fingerprint"]  # shown, so a client may send it back
+    assert "fingerprint" not in item  # the Policy Check item shape is pinned (test_tasks OLD_ITEM_KEYS)
     r = pc.client.patch(f"/api/runs/{run_id}/discrepancies/{item['id']}", json={"status": "resolved"})
     assert r.status_code == 200 and r.json()["status"] == "resolved" and r.json()["note"] is None
     out = pc.client.get(f"/api/runs/{run_id}/discrepancies").json()
@@ -236,8 +236,11 @@ def test_policy_check_resolve_without_note_or_fingerprint_still_works(pc):
 def test_policy_check_fingerprint_is_optional_but_checked_when_sent(pc):
     run_id = _policy_run(pc)
     item = pc.client.get(f"/api/runs/{run_id}/discrepancies").json()["items"][0]
+    with pc.ctx.factory() as s:
+        current = next(b for b in models.discrepancy_blocks(s.get(models.Run, run_id).artifact.latest_content())
+                       if b.id == item["id"])
     ok = pc.client.patch(f"/api/runs/{run_id}/discrepancies/{item['id']}",
-                         json={"note": "seen", "expected_fingerprint": item["fingerprint"]})
+                         json={"note": "seen", "expected_fingerprint": models.discrepancy_fingerprint(current)})
     assert ok.status_code == 200
     stale = pc.client.patch(f"/api/runs/{run_id}/discrepancies/{item['id']}",
                             json={"status": "resolved", "expected_fingerprint": "0" * 64})

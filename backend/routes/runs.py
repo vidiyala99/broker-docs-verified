@@ -263,10 +263,10 @@ def _item_out(block: DiscrepancyBlock | ClaimBlock, row: models.DiscrepancyState
         "updated_at": _ts(row.updated_at) if row else None,
         # slice 3b (O4): the item's task, read-only; a task never changes this item's state (R5)
         "task": {"id": task.id, "status": task.status} if task else None,
-        # slice 4 (D15): what the broker saw; a certificate PATCH sends it back as expected_fingerprint
-        "fingerprint": models.item_fingerprint(block),
     })
-    if isinstance(block, ClaimBlock):
+    if isinstance(block, ClaimBlock):  # a Policy Check item keeps its exact shape (D10)
+        # slice 4 (D15): what the broker saw; a certificate PATCH sends it back as expected_fingerprint
+        out["fingerprint"] = models.claim_fingerprint(block)
         out["needs_action"] = certificate.claim_needs_action(block, status)
     return out
 

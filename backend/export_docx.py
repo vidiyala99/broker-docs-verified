@@ -54,6 +54,8 @@ from backend.export import (
 )
 from backend.schemas import (
     Cell,
+    CertificateBlock,
+    ClaimBlock,
     DiscrepancyBlock,
     DiscrepancyItemState,
     EvidenceState,
@@ -452,6 +454,13 @@ class _Writer:
                 self.table(block)
             elif isinstance(block, DiscrepancyBlock):
                 self.discrepancy(block)
+            elif isinstance(block, ClaimBlock):  # slice 4: one certificate check
+                p = self.doc.add_paragraph()
+                p.add_run(clean(f"{block.title} ({str(block.verdict).replace('_', ' ')}): ")).bold = True
+                self.segments(p, block.prose)
+            elif isinstance(block, CertificateBlock):  # slice 4: the printed values
+                for col, f in block.iter_fields():
+                    self.doc.add_paragraph(clean(f"{f.label} ({col}): {f.cell.value or ''}"))
 
     def discrepancy(self, block: DiscrepancyBlock) -> None:
         """Title with severity, state and line of business; the explanation; one row of role slots."""
