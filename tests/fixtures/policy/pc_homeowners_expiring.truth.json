@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261103,
+  "fixture_id": "pc_homeowners_expiring",
+  "case_id": "pc_homeowners",
+  "role": "expiring",
+  "file": "pc_homeowners_expiring.pdf",
+  "variant": "policy_clean",
+  "gate_bucket": "policy_check",
+  "description": "Expiring document of pc_homeowners (clean layout). Not stated: deductible_hurricane, discount_loyalty.",
+  "carrier": "Hollowmere Mutual Insurance Company",
+  "page_count": 3,
+  "size_bytes": 9904,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "policy_number": {
+      "value": "HM-HO-5530-1188",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Number: HM-HO-5530-1188",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_term": {
+      "value": "01/01/2026 to 01/01/2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Term: 01/01/2026 to 01/01/2027",
+      "source": "text",
+      "accepted_values": []
+    },
+    "named_insured": {
+      "value": "Avery and Jordan Pellham",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Avery and Jordan Pellham",
+      "source": "text",
+      "accepted_values": []
+    },
+    "insured_address": {
+      "value": "418 Thornbury Court, Lexington, KY 40502",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Insured Address: 418 Thornbury Court, Lexington, KY 40502",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_a_limit": {
+      "value": "$400,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage A (Dwelling): $400,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_b_limit": {
+      "value": "$40,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage B (Other Structures): $40,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_c_limit": {
+      "value": "$200,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage C (Personal Property): $200,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_d_limit": {
+      "value": "$80,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage D (Loss of Use): $80,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_e_limit": {
+      "value": "$300,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage E (Personal Liability): $300,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_f_limit": {
+      "value": "$5,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage F (Medical Payments): $5,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "deductible_all_peril": {
+      "value": "$1,000",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "All Other Perils Deductible: $1,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "deductible_wind_hail": {
+      "value": "2%",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Wind/Hail Deductible: 2%",
+      "source": "text",
+      "accepted_values": []
+    },
+    "deductible_hurricane": null,
+    "total_premium": {
+      "value": "$2,184.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Premium: $2,184.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "discount_multi_policy": {
+      "value": "10%",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Multi-Policy Discount: 10%",
+      "source": "text",
+      "accepted_values": []
+    },
+    "discount_protective_device": {
+      "value": "3%",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Protective Device Discount: 3%",
+      "source": "text",
+      "accepted_values": []
+    },
+    "discount_claims_free": {
+      "value": "7%",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Claims-Free Discount: 7%",
+      "source": "text",
+      "accepted_values": []
+    },
+    "discount_loyalty": null,
+    "form:HO0003": {
+      "value": "HO 00 03 05 11",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "HO 00 03 05 11 Homeowners 3 Special Form",
+      "source": "text",
+      "accepted_values": [
+        "HO 00 03 (05/11)",
+        "HO 00 03 05/11",
+        "HO 00 03 05/2011"
+      ]
+    },
+    "form:HO0490": {
+      "value": "HO 04 90 05 11",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "HO 04 90 05 11 Personal Property Replacement Cost Loss Settlement",
+      "source": "text",
+      "accepted_values": [
+        "HO 04 90 (05/11)",
+        "HO 04 90 05/11",
+        "HO 04 90 05/2011"
+      ]
+    },
+    "form:HO0416": {
+      "value": "HO 04 16 10 00",
+      "page": 3,
+      "pages": [
+        3
+      ],
+      "quote": "HO 04 16 10 00 Premises Alarm or Fire Protection System",
+      "source": "text",
+      "accepted_values": [
+        "HO 04 16 (10/00)",
+        "HO 04 16 10/00",
+        "HO 04 16 10/2000"
+      ]
+    }
+  },
+  "conflicts": {},
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

@@ -76,3 +76,33 @@ def proposal_doc_truths(proposal_manifest: dict) -> dict[str, dict]:
         e["fixture_id"]: json.loads((PROPOSAL_DIR / e["truth"]).read_text(encoding="utf-8"))
         for e in proposal_manifest["documents"]
     }
+
+
+# Policy Check fixtures (slice 3, T7): their own folder and manifest.
+POLICY_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "policy"
+
+
+@pytest.fixture(scope="session")
+def policy_dir() -> Path:
+    return POLICY_DIR
+
+
+@pytest.fixture(scope="session")
+def policy_manifest() -> dict:
+    return json.loads((POLICY_DIR / "manifest.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def policy_cases(policy_manifest: dict) -> dict[str, dict]:
+    return {
+        e["case_id"]: json.loads((POLICY_DIR / e["truth"]).read_text(encoding="utf-8"))
+        for e in policy_manifest["cases"]
+    }
+
+
+@pytest.fixture(scope="session")
+def policy_doc_truths(policy_manifest: dict) -> dict[str, dict]:
+    return {
+        e["fixture_id"]: json.loads((POLICY_DIR / e["truth"]).read_text(encoding="utf-8"))
+        for e in policy_manifest["documents"]
+    }

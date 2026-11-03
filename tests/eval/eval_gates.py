@@ -42,8 +42,13 @@ Gates (R6, initial bars, tuned after the first live run):
 Everything else is reported, not gated.
 
 Proposal Builder (slice 2, T1): ``score_proposal`` and
-``evaluate_proposal_gates`` at the end of this module score table cells and
-prose of a proposal run (see the section comment there).
+``evaluate_proposal_gates`` score table cells and prose of a proposal run (see
+the section comment there).
+
+Policy Check (slice 3, T7, D16): ``score_policy_case`` and
+``evaluate_policy_gates`` at the end of this module score the discrepancy items
+of a Policy Check run against seeded ground truth (see the section comment
+there).
 """
 
 from __future__ import annotations
@@ -1097,3 +1102,575 @@ def proposal_oracle_output(proposal: Mapping, doc_truths: Mapping[str, Mapping],
     return {"input_tokens": input_tokens, "documents": documents,
             "proposal": {"workflow": proposal.get("workflow"), "run_status": "done",
                          "cells": cells, "prose": prose, "warnings": []}}
+
+
+# ---------------------------------------------------------------------------
+# Policy Check (slice 3, T7): discrepancy items and their slots
+# ---------------------------------------------------------------------------
+#
+# One policy case is one Policy Check run over an expiring policy, a renewal and
+# optionally a quote and an AMS export (``tests/fixtures/policy/*.case.json``).
+# The adapter returns the per-document facts plus a ``policy_check`` block:
+#
+#     {"run_status": str, "roles": {role: path}, "warnings": [str],
+#      "items": [{"id", "key", "title", "severity", "item_state", "explanation",
+#                 "slots": {role: {"document": path, "state": evidence state,
+#                                  "value", "citations": [{"document", "page"}],
+#                                  "conflicts": [{"value", "page"}]}}}]}
+#
+# A role missing from ``slots`` is N/A (no document). Slot evidence states:
+# verified / scan_read show a value; absent is N/A (not stated); failed is
+# Not read; conflicting / not_found / pending is Needs review (D15).
+#
+# Gate (spec section 7, amended by D16):
+#   * hard fails == 0, where a hard fail is
+#       - unverified_value: a verified slot value that differs from the source,
+#         or a value for a key the document does not state (cited value failing
+#         verification; scan_read values are reported only, as R6 and D5);
+#       - missing_citation: a shown slot value with no citation;
+#       - wrong_page_citation: a citation on a page that does not hold the value,
+#         or into another document than the slot's role;
+#       - severity_violates_table: the item's severity is not what the severity
+#         table gives for the change its own slots show (or the slots show no
+#         change at all);
+#       - injection_canary: an injection canary shown in any slot, as a value or
+#         in a conflict list;
+#       - wrong_field: a shown value that belongs to another canonical field of
+#         the same document per the ground truth (or a value printed under a
+#         label that only looks like the field, a ``wrong_field`` decoy);
+#   * seeded-discrepancy recall >= 0.80 (D16 starting value), no data fails;
+#   * no empty result: every case must report at least one item;
+#   * max input tokens per run within the run budget, when reported.
+# Precision, slot accuracy and severity agreement with the truth are reported.
+
+POLICY_RECALL_MIN = 0.80
+POLICY_ROLES = ("expiring", "quote", "renewal", "ams")
+POLICY_OPTIONAL_ROLES = ("quote", "ams")
+POLICY_HARD_FAIL_KINDS = ("unverified_value", "missing_citation", "wrong_page_citation",
+                          "severity_violates_table", "injection_canary", "wrong_field")
+_FORM_PREFIX = "form:"
+
+# Mirror of backend/pipeline/diff.py (FACT_TYPES, SEVERITY_TABLE, UNIVERSAL_SEVERITY,
+# NOT_COMPARED_WITH_EXPIRING). The eval derives the expected severity of an item from its
+# own slots with this copy; backend/tests/test_eval_hook_policy.py checks the copy against
+# the backend so the two cannot drift silently.
+POLICY_FACT_TYPES: dict[str, str] = {
+    "policy_number": "identifier", "policy_term": "term", "named_insured": "text",
+    "insured_address": "address",
+    **{f"coverage_{c}_limit": "limit" for c in "abcdef"},
+    "deductible_all_peril": "deductible", "deductible_wind_hail": "deductible",
+    "deductible_hurricane": "deductible", "total_premium": "premium",
+    "discount_multi_policy": "discount", "discount_protective_device": "discount",
+    "discount_claims_free": "discount", "discount_loyalty": "discount",
+}
+_C, _H, _M, _L = "critical", "high", "medium", "low"
+POLICY_SEVERITY_TABLE: dict[str, dict[str, str]] = {
+    "limit": {"decrease_over_10pct": _C, "decrease": _H, "increase": _H, "changed": _H, "removed": _H,
+              "added": _M},
+    "deductible": {"increase": _C, "added": _C, "decrease": _M, "changed": _H, "removed": _M},
+    "premium": {"increase": _M, "decrease": _L, "changed": _M, "removed": _M, "added": _L},
+    "discount": {"removed": _H, "increase": _L, "decrease": _L, "changed": _L, "added": _L},
+    "form": {"edition_changed": _M, "changed": _M, "removed": _H, "added": _M},
+    "text": {"changed": _M, "removed": _M, "added": _L},
+    "address": {"changed": _M, "removed": _M, "added": _L},
+    "identifier": {"changed": _L, "removed": _L, "added": _L},
+    "term": {},
+    "other": {"increase": _L, "decrease": _L, "changed": _L, "removed": _L, "added": _L},
+}
+POLICY_UNIVERSAL_SEVERITY = {"mismatch": _H, "needs_review": _L}
+POLICY_NOT_COMPARED_WITH_EXPIRING = frozenset({"policy_term"})
+POLICY_NUMERIC_TYPES = frozenset({"limit", "deductible", "premium", "discount", "other"})
+SEVERITY_ORDER = {_C: 0, _H: 1, _M: 2, _L: 3}
+
+_NEEDS_REVIEW_STATES = ("conflicting", "not_found", "pending")
+
+
+def policy_fact_type(key: str) -> str:
+    if key.startswith(_FORM_PREFIX) and len(key) > len(_FORM_PREFIX):
+        return "form"
+    return POLICY_FACT_TYPES.get(key, "other")
+
+
+def policy_severity(ftype: str, change: str) -> str | None:
+    if change in POLICY_UNIVERSAL_SEVERITY:
+        return POLICY_UNIVERSAL_SEVERITY[change]
+    return POLICY_SEVERITY_TABLE.get(ftype, {}).get(change)
+
+
+def slot_view(slot: Mapping | None) -> str:
+    """The slot as the card shows it: value | not_stated | no_document | not_read | needs_review."""
+    if slot is None:
+        return "no_document"
+    state = slot.get("state")
+    if state in DISPLAYED and slot.get("value") not in (None, ""):
+        return "value"
+    if state == "failed":
+        return "not_read"
+    if state in _NEEDS_REVIEW_STATES:
+        return "needs_review"
+    return "not_stated"
+
+
+# ---- value comparison (mirrors diff.py normalization, written independently of it)
+
+_P_AMOUNT = re.compile(
+    r"(?<![\w.,])(-|\()?\s*(?:usd\s*)?(\$)?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*(%|percent\b)?"
+    r"(?:\s*(k|m|mm|thousand|million)\b)?", re.I)
+_P_MULT = {"k": 1_000, "thousand": 1_000, "m": 1_000_000, "mm": 1_000_000, "million": 1_000_000}
+_P_DATE = re.compile(
+    r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b|\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})\b"
+    r"|\b([a-z]{3})[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b", re.I)
+_P_MONTHS = {m: i for i, m in enumerate(
+    ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+_P_ADDRESS = {"st": "street", "ave": "avenue", "av": "avenue", "rd": "road", "dr": "drive", "ln": "lane",
+              "blvd": "boulevard", "ct": "court", "hwy": "highway", "pkwy": "parkway", "pl": "place",
+              "cir": "circle", "ter": "terrace", "apt": "apartment", "ste": "suite", "n": "north",
+              "s": "south", "e": "east", "w": "west"}
+
+
+def _p_amount(value: str | None) -> tuple[Decimal, bool] | None:
+    found = list(_P_AMOUNT.finditer(value or ""))
+    if len(found) != 1:
+        return None
+    mo = found[0]
+    num = Decimal(mo.group(3).replace(",", "") + (mo.group(4) or ""))
+    if mo.group(6):
+        num *= _P_MULT[mo.group(6).lower()]
+    if mo.group(1):
+        num = -num
+    return num, bool(mo.group(5))
+
+
+def _p_dates(value: str | None) -> tuple[str, ...]:
+    out = []
+    for mo in _P_DATE.finditer(value or ""):
+        if mo.group(1):
+            y, m, d = int(mo.group(1)), int(mo.group(2)), int(mo.group(3))
+        elif mo.group(4):
+            m, d, y = int(mo.group(4)), int(mo.group(5)), int(mo.group(6))
+            y = y + 2000 if y < 100 else y
+        else:
+            m = _P_MONTHS.get(mo.group(7).lower())
+            if m is None:
+                continue
+            d, y = int(mo.group(8)), int(mo.group(9))
+        if 1 <= m <= 12 and 1 <= d <= 31:
+            out.append(f"{y:04d}-{m:02d}-{d:02d}")
+    return tuple(out)
+
+
+def _p_text(value: str | None, *, address: bool = False) -> str:
+    words = re.findall(r"[a-z0-9]+", (value or "").replace("&", " and ").casefold())
+    if address:
+        words = [_P_ADDRESS.get(w, w) for w in words]
+    return " ".join(words)
+
+
+def form_edition(key: str, value: str | None) -> str | None:
+    """Edition "MM/YY" of a form value that starts with the key's form number, else None."""
+    if not key.startswith(_FORM_PREFIX) or not value:
+        return None
+    number, i, text = key[len(_FORM_PREFIX):], 0, value.upper()
+    for ch in number:
+        while i < len(text) and not text[i].isalnum():
+            i += 1
+        if i >= len(text) or text[i] != ch:
+            return None
+        i += 1
+    mo = re.match(r"\W*(\d{1,2})\W*(\d{4}|\d{2})(?!\d)", value[i:])
+    if not mo or not 1 <= int(mo.group(1)) <= 12:
+        return None
+    return f"{int(mo.group(1)):02d}/{mo.group(2)[-2:]}"
+
+
+def policy_change(ftype: str, key: str, a: str, b: str) -> str | None:
+    """None when ``a`` (the baseline) and ``b`` are one value, else the table change of b vs a."""
+    if ftype == "form":
+        ea, eb = form_edition(key, a), form_edition(key, b)
+        if ea and eb:
+            return None if ea == eb else "edition_changed"
+        return None if _p_text(a).replace(" ", "") == _p_text(b).replace(" ", "") else "changed"
+    if ftype == "term":
+        da, db = _p_dates(a), _p_dates(b)
+        if da and db:
+            return None if da == db else "changed"
+    if ftype in POLICY_NUMERIC_TYPES:
+        na, nb = _p_amount(a), _p_amount(b)
+        if na is not None and nb is not None:
+            if na[1] != nb[1]:
+                return "changed"
+            va, vb = (abs(na[0]), abs(nb[0])) if ftype == "discount" else (na[0], nb[0])
+            if va == vb:
+                return None
+            if vb > va:
+                return "increase"
+            over = ftype == "limit" and va > 0 and not na[1] and (va - vb) / va > Decimal("0.1")
+            return "decrease_over_10pct" if over else "decrease"
+    addr = ftype == "address"
+    return None if _p_text(a, address=addr) == _p_text(b, address=addr) else "changed"
+
+
+def policy_values_match(key: str, predicted: str | None, truth: str | None,
+                        accepted: Iterable[str] = ()) -> bool:
+    """values_match, plus: a form value matches by form number and edition."""
+    if key.startswith(_FORM_PREFIX) and predicted and truth:
+        ep, et = form_edition(key, predicted), form_edition(key, truth)
+        if ep and et:
+            return ep == et
+    return values_match(predicted, truth, accepted)
+
+
+def expected_item_severity(item: Mapping) -> tuple[str | None, str]:
+    """(severity the table gives for the change the item's own slots show, why). None: the
+    slots support no item at all."""
+    key = item.get("key") or ""
+    ftype = policy_fact_type(key)
+    slots = item.get("slots") or {}
+    view = {r: slot_view(slots.get(r)) for r in POLICY_ROLES}
+    val = {r: (slots.get(r) or {}).get("value") if view[r] == "value" else None for r in POLICY_ROLES}
+    compare_e = key not in POLICY_NOT_COMPARED_WITH_EXPIRING
+    uncertain = [r for r in (("expiring", "renewal") if compare_e else ("renewal",))
+                 if view[r] in ("needs_review", "not_read")]
+    if uncertain:
+        return POLICY_UNIVERSAL_SEVERITY["needs_review"], f"needs review ({', '.join(uncertain)})"
+    if item.get("item_state") == "needs_review":
+        return None, "needs review item with no conflicting or unread expiring or renewal slot"
+    found: list[tuple[str | None, str]] = []
+    if compare_e:
+        if val["expiring"] and val["renewal"]:
+            ch = policy_change(ftype, key, val["expiring"], val["renewal"])
+        elif val["expiring"]:
+            ch = "removed"
+        elif val["renewal"]:
+            ch = "added"
+        else:
+            ch = None
+        if ch:
+            found.append((policy_severity(ftype, ch), ch))
+    for r in POLICY_OPTIONAL_ROLES:
+        if val[r] and (not val["renewal"] or policy_change(ftype, key, val["renewal"], val[r]) is not None):
+            found.append((POLICY_UNIVERSAL_SEVERITY["mismatch"], f"{r} mismatch"))
+    found = [f for f in found if f[0] is not None]
+    if not found:
+        return None, "slots show no difference"
+    best = min(found, key=lambda f: SEVERITY_ORDER[f[0]])
+    return best[0], " + ".join(f[1] for f in found)
+
+
+@dataclass
+class PolicyScore:
+    case_id: str
+    run_status: str | None = None
+    input_tokens: int = 0
+    items: int = 0
+    seeded: int = 0
+    found: int = 0
+    true_positive_items: int = 0
+    slots_checked: int = 0
+    slots_correct: int = 0
+    severity_agree: int = 0
+    scan_read_wrong: list[dict] = field(default_factory=list)
+    hard_fails: list[dict] = field(default_factory=list)
+    misses: list[dict] = field(default_factory=list)
+    false_positives: list[dict] = field(default_factory=list)
+    documents_failed: list[str] = field(default_factory=list)
+    fact_scores: list[DocScore] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+def _canaries(doc_truth: Mapping) -> list[dict]:
+    return [d for d in doc_truth.get("decoys") or [] if d.get("kind") == "injection_canary"]
+
+
+def _hard(sc: PolicyScore, kind: str, item: Mapping, role: str | None, detail: str,
+          predicted=None, truth=None, pages=None) -> None:
+    sc.hard_fails.append({"case_id": sc.case_id, "key": item.get("key"), "role": role, "kind": kind,
+                          "detail": detail, "predicted": predicted, "truth": truth, "pages": pages or []})
+
+
+def _check_slot(sc: PolicyScore, item: Mapping, role: str, slot: Mapping, fid: str | None,
+                doc_truth: Mapping | None, fid_for: Mapping[str | None, str]) -> None:
+    key = item.get("key") or ""
+    value = slot.get("value")
+    canaries = _canaries(doc_truth) if doc_truth else []
+    for c in slot.get("conflicts") or []:
+        cv = c.get("value") if isinstance(c, Mapping) else c
+        if cv and any(values_match(cv, d["value"]) for d in canaries):
+            _hard(sc, "injection_canary", item, role, "injection canary listed as a stated value", cv)
+    if slot_view(slot) != "value":
+        return
+    cites = list(slot.get("citations") or [])
+    if any(values_match(value, d["value"]) for d in canaries):
+        _hard(sc, "injection_canary", item, role, "injection canary shown as a value", value,
+              pages=[c.get("page") for c in cites])
+        return
+    if not cites:
+        _hard(sc, "missing_citation", item, role, "value shown with no citation", value)
+    elif any(fid_for.get(_norm_path(c.get("document"))) != fid for c in cites):
+        _hard(sc, "wrong_page_citation", item, role, "citation points into another document", value,
+              pages=[c.get("page") for c in cites])
+    if doc_truth is None:
+        return
+    facts = doc_truth.get("facts") or {}
+    t = facts.get(key)
+    if t is not None and policy_values_match(key, value, t["value"], t.get("accepted_values", [])):
+        pages = t.get("pages") or [t.get("page")]
+        bad = [c.get("page") for c in cites if fid_for.get(_norm_path(c.get("document"))) == fid
+               and c.get("page") not in pages]
+        if bad:
+            _hard(sc, "wrong_page_citation", item, role, "citation points at a page without the value", value,
+                  t["value"], bad)
+        return
+    other = next((k for k, f in facts.items() if k != key and f is not None
+                  and policy_values_match(k, value, f["value"], f.get("accepted_values", []))), None)
+    decoy = next((d for d in doc_truth.get("decoys") or [] if d.get("kind") == "wrong_field"
+                  and d.get("field") == key and values_match(value, d["value"])), None)
+    if other or decoy:
+        why = (f"value belongs to {other}" if other else
+               f"value is printed under a label that only looks like {key}")
+        _hard(sc, "wrong_field", item, role, why, value, t["value"] if t else None)
+        return
+    if slot.get("state") == "scan_read":
+        sc.scan_read_wrong.append({"case_id": sc.case_id, "key": key, "role": role, "predicted": value,
+                                   "truth": t["value"] if t else None})
+        return
+    _hard(sc, "unverified_value", item, role,
+          "verified value differs from the source" if t else "value for a key the document does not state",
+          value, t["value"] if t else None)
+
+
+def score_policy_case(case: Mapping, doc_truths: Mapping[str, Mapping], output: Mapping,
+                      paths: Mapping[str, str]) -> PolicyScore:
+    """Score one Policy Check run. ``case`` is a ``*.case.json`` truth, ``doc_truths`` maps
+    fixture id to document truth, ``output`` is the adapter's return value and ``paths``
+    maps fixture id to the path given to the adapter."""
+    cid = case["case_id"]
+    roles: Mapping[str, str] = case["roles"]
+    fid_for = {_norm_path(paths[f]): f for f in roles.values()}
+    block = output.get("policy_check") or {}
+    sc = PolicyScore(cid, run_status=block.get("run_status"), input_tokens=int(output.get("input_tokens") or 0),
+                     warnings=list(block.get("warnings") or []))
+    docs = output.get("documents") or {}
+    for fid in roles.values():
+        raw = docs.get(paths[fid])
+        if raw is None:
+            raw = next((v for k, v in docs.items() if _norm_path(k) == _norm_path(paths[fid])), None)
+        raw = raw or {"status": "failed", "failure_reason": "missing_from_adapter_output"}
+        result = DocResult.from_dict({**raw, "fixture_id": fid})
+        if result.status != "ok":
+            sc.documents_failed.append(fid)
+        sc.fact_scores.append(score_document(doc_truths[fid], result))
+
+    items = list(block.get("items") or [])
+    sc.items = len(items)
+    seeds = {d["key"]: d for d in case.get("discrepancies") or []}
+    no_item = {d["key"]: d["reason"] for d in case.get("no_item_keys") or []}
+    sc.seeded = len(seeds)
+    by_key: dict[str, Mapping] = {}
+    for item in items:
+        key = item.get("key") or ""
+        by_key.setdefault(key, item)
+        for role, slot in (item.get("slots") or {}).items():
+            fid = roles.get(role)
+            _check_slot(sc, item, role, slot or {}, fid, doc_truths.get(fid) if fid else None, fid_for)
+        expected, why = expected_item_severity(item)
+        if expected is None or item.get("severity") != expected:
+            _hard(sc, "severity_violates_table", item, None,
+                  f"severity {item.get('severity')!r}, table gives {expected!r} ({why})", item.get("severity"),
+                  expected)
+        seed = seeds.get(key)
+        if seed is not None and item.get("item_state") == seed["item_state"]:
+            sc.true_positive_items += 1
+        else:
+            sc.false_positives.append({"case_id": cid, "key": key, "severity": item.get("severity"),
+                                       "item_state": item.get("item_state"), "title": item.get("title"),
+                                       "expected_no_item": no_item.get(key)})
+
+    for key, seed in seeds.items():
+        item = by_key.get(key)
+        if item is None or item.get("item_state") != seed["item_state"]:
+            sc.misses.append({"case_id": cid, "key": key, "kind": seed.get("kind"),
+                              "reason": "no item" if item is None else f"item_state {item.get('item_state')}",
+                              "expected_severity": seed["severity"]})
+            continue
+        sc.found += 1
+        if item.get("severity") == seed["severity"]:
+            sc.severity_agree += 1
+        for role in POLICY_ROLES:
+            exp = seed["slots"][role]
+            got = (item.get("slots") or {}).get(role)
+            sc.slots_checked += 1
+            view = slot_view(got)
+            if exp["state"] == "value":
+                fid = roles.get(role)
+                t = (doc_truths.get(fid) or {}).get("facts", {}).get(key) if fid else None
+                ok = view == "value" and policy_values_match(key, got.get("value"), exp["value"],
+                                                             (t or {}).get("accepted_values", []))
+            else:
+                ok = view == exp["state"]
+            sc.slots_correct += int(ok)
+    return sc
+
+
+@dataclass
+class PolicyMetrics:
+    cases: list[dict]
+    seeded: int
+    found: int
+    recall: float | None
+    items: int
+    true_positive_items: int
+    precision: float | None
+    slots_checked: int
+    slots_correct: int
+    slot_accuracy: float | None
+    severity_agreement: float | None
+    hard_fails: list[dict]
+    misses: list[dict]
+    false_positives: list[dict]
+    scan_read_wrong: list[dict]
+    empty_cases: list[str]
+    fact_accuracy: float | None
+    documents_failed: list[str]
+    max_run_input_tokens: int | None
+    warnings: list[str] = field(default_factory=list)
+
+
+def aggregate_policy(scores: list[PolicyScore]) -> PolicyMetrics:
+    seeded = sum(s.seeded for s in scores)
+    found = sum(s.found for s in scores)
+    items = sum(s.items for s in scores)
+    tp = sum(s.true_positive_items for s in scores)
+    checked = sum(s.slots_checked for s in scores)
+    correct = sum(s.slots_correct for s in scores)
+    fscores = [f for s in scores for f in s.fact_scores]
+    return PolicyMetrics(
+        cases=[{"case_id": s.case_id, "run_status": s.run_status, "items": s.items, "seeded": s.seeded,
+                "found": s.found, "recall": _ratio(s.found, s.seeded), "hard_fails": len(s.hard_fails),
+                "input_tokens": s.input_tokens} for s in scores],
+        seeded=seeded, found=found, recall=_ratio(found, seeded),
+        items=items, true_positive_items=tp, precision=_ratio(tp, items),
+        slots_checked=checked, slots_correct=correct, slot_accuracy=_ratio(correct, checked),
+        severity_agreement=_ratio(sum(s.severity_agree for s in scores), found),
+        hard_fails=[h for s in scores for h in s.hard_fails],
+        misses=[m for s in scores for m in s.misses],
+        false_positives=[f for s in scores for f in s.false_positives],
+        scan_read_wrong=[w for s in scores for w in s.scan_read_wrong],
+        empty_cases=[s.case_id for s in scores if s.items == 0],
+        fact_accuracy=_ratio(sum(f.correct for f in fscores), sum(f.present for f in fscores)),
+        documents_failed=[d for s in scores for d in s.documents_failed],
+        max_run_input_tokens=max((s.input_tokens for s in scores), default=None),
+        warnings=[f"{s.case_id}: {w}" for s in scores for w in s.warnings],
+    )
+
+
+def evaluate_policy_gates(m: PolicyMetrics) -> GateReport:
+    """The D16 gate. No cases, no seeded discrepancies or an empty result is a failure."""
+    hard = len(m.hard_fails)
+    kinds = ", ".join(f"{k} {sum(1 for h in m.hard_fails if h['kind'] == k)}"
+                      for k in POLICY_HARD_FAIL_KINDS if any(h["kind"] == k for h in m.hard_fails))
+    res = [
+        GateResult("policy_hard_fails (unverified, citation, severity, canary, wrong field)", hard,
+                   f"== {HARD_FAIL_MAX}", True, hard <= HARD_FAIL_MAX, kinds),
+        GateResult("seeded_recall[policy_check]", m.recall, f">= {POLICY_RECALL_MIN:.2f}", True,
+                   m.recall is not None and m.recall >= POLICY_RECALL_MIN,
+                   "no data" if m.recall is None else f"{m.found}/{m.seeded}"),
+        GateResult("empty_result[policy_check] (cases with no item)", len(m.empty_cases) if m.cases else None,
+                   "== 0", True, bool(m.cases) and not m.empty_cases,
+                   ", ".join(m.empty_cases) if m.cases else "no data"),
+    ]
+    if m.max_run_input_tokens is not None:
+        res.append(GateResult("max_run_input_tokens", m.max_run_input_tokens, f"<= {RUN_INPUT_TOKEN_BUDGET}",
+                              True, m.max_run_input_tokens <= RUN_INPUT_TOKEN_BUDGET))
+    res += [
+        GateResult("precision[policy_check]", m.precision, "reported", False, True,
+                   f"{m.true_positive_items}/{m.items} items match a seeded discrepancy"),
+        GateResult("slot_accuracy[policy_check]", m.slot_accuracy, "reported", False, True,
+                   "four slots of every found seeded item"),
+        GateResult("severity_agreement[policy_check]", m.severity_agreement, "reported", False, True,
+                   "found items whose severity equals the truth"),
+        GateResult("scan_read_wrong_values", len(m.scan_read_wrong), "reported", False, True,
+                   "scan-read slot values that differ from the source (labeled unverified, D5)"),
+        GateResult("fact_accuracy[policy documents]", m.fact_accuracy, "reported", False, True),
+        GateResult("documents_failed", len(m.documents_failed), "reported", False, True,
+                   ", ".join(m.documents_failed)),
+    ]
+    return GateReport(res)
+
+
+def format_policy_report(m: PolicyMetrics, g: GateReport) -> str:
+    lines = ["Policy Check eval gates (slice 3, T7, D16)", "-" * 72]
+    for r in g.results:
+        flag = ("PASS" if r.passed else "FAIL") if r.gated else "info"
+        note = f"  ({r.note})" if r.note else ""
+        lines.append(f"{flag:5} {r.name:62} {_fmt(r.value):>8}  {r.threshold}{note}")
+    lines.append("-" * 72)
+    lines.append("case                    status      items  seeded  found  recall  hard  tokens")
+    for c in m.cases:
+        lines.append(f"{c['case_id']:23} {str(c['run_status']):10} {c['items']:6} {c['seeded']:7} "
+                     f"{c['found']:6} {_fmt(c['recall']):>7} {c['hard_fails']:5} {c['input_tokens']:7}")
+    for h in m.hard_fails:
+        lines.append(f"HARD FAIL {h['case_id']}.{h['key']}[{h['role'] or '-'}]: {h['kind']}: {h['detail']} "
+                     f"(predicted {h['predicted']!r}, truth {h['truth']!r}, pages {h['pages']})")
+    for d in m.misses:
+        lines.append(f"MISS {d['case_id']}.{d['key']} ({d['kind']}): {d['reason']}, expected "
+                     f"{d['expected_severity']}")
+    for f in m.false_positives:
+        extra = f"; expected no item: {f['expected_no_item']}" if f["expected_no_item"] else ""
+        lines.append(f"EXTRA {f['case_id']}.{f['key']}: {f['item_state']} {f['severity']} {f['title']!r}{extra}")
+    for w in m.scan_read_wrong:
+        lines.append(f"SCAN_READ {w['case_id']}.{w['key']}[{w['role']}]: predicted {w['predicted']!r}, "
+                     f"truth {w['truth']!r}")
+    for w in m.warnings:
+        lines.append(f"WARNING {w}")
+    lines.append(f"overall: {'PASS' if g.passed else 'FAIL'}")
+    return "\n".join(lines)
+
+
+def policy_report_dict(m: PolicyMetrics, g: GateReport) -> dict:
+    return {"passed": g.passed, "gates": [asdict(r) for r in g.results], "metrics": asdict(m)}
+
+
+def policy_oracle_output(case: Mapping, doc_truths: Mapping[str, Mapping], paths: Mapping[str, str], *,
+                         input_tokens: int = 1000) -> dict:
+    """A perfect adapter output for one case: oracle facts per document and one item per
+    seeded discrepancy with the truth's slots, severity and citations. Self-tests the
+    scorer and documents the adapter shape."""
+    roles: Mapping[str, str] = case["roles"]
+    documents: dict[str, dict] = {}
+    for fid in roles.values():
+        r = oracle_result(doc_truths[fid])
+        documents[paths[fid]] = {"status": r.status, "failure_reason": r.failure_reason,
+                                 "option_count": r.option_count, "ocr_pages": r.ocr_pages,
+                                 "facts": [vars(f) for f in r.facts]}
+    items = []
+    for seed in case.get("discrepancies") or []:
+        slots: dict[str, dict] = {}
+        for role in POLICY_ROLES:
+            exp = seed["slots"][role]
+            if exp["state"] == "no_document":
+                continue
+            fid = roles[role]
+            path = paths[fid]
+            if exp["state"] == "value":
+                t = doc_truths[fid]["facts"][seed["key"]]
+                state = "scan_read" if t.get("source") == "image" else "verified"
+                slots[role] = {"document": path, "state": state, "value": exp["value"],
+                               "citations": [{"document": path, "page": t["page"]}], "conflicts": []}
+            elif exp["state"] == "needs_review":
+                conf = doc_truths[fid]["conflicts"][seed["key"]]
+                slots[role] = {"document": path, "state": "conflicting", "value": None,
+                               "citations": [{"document": path, "page": c["page"]} for c in conf],
+                               "conflicts": [{"value": c["value"], "page": c["page"]} for c in conf]}
+            else:
+                slots[role] = {"document": path, "state": "absent", "value": None, "citations": [],
+                               "conflicts": []}
+        items.append({"id": "disc-" + re.sub(r"[^a-z0-9]+", "-", seed["key"].lower()).strip("-"),
+                      "key": seed["key"], "title": f"{seed['key']} {seed['change']}",
+                      "severity": seed["severity"], "item_state": seed["item_state"],
+                      "explanation": seed["note"], "slots": slots})
+    items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["key"]))
+    return {"input_tokens": input_tokens, "documents": documents,
+            "policy_check": {"workflow": case.get("workflow"), "run_status": "done",
+                             "roles": {r: paths[f] for r, f in roles.items()}, "items": items,
+                             "notices": [], "warnings": []}}

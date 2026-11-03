@@ -80,7 +80,7 @@ def test_absent_proposal_workflow_raises_before_any_model_call(monkeypatch):
 
 def test_unknown_workflow_is_rejected():
     with pytest.raises(ValueError):
-        eval_hook.run_eval_batch([str(QUOTES / "carrier_a_clean.pdf")], workflow="policy-check",
+        eval_hook.run_eval_batch([str(QUOTES / "carrier_a_clean.pdf")], workflow="coi-check",
                                  provider=FakeProvider([]))
 
 

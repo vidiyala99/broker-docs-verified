@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261103,
+  "fixture_id": "pc_homeowners_quote",
+  "case_id": "pc_homeowners",
+  "role": "quote",
+  "file": "pc_homeowners_quote.pdf",
+  "variant": "policy_scanned",
+  "gate_bucket": "policy_check",
+  "description": "Quote document of pc_homeowners (scanned layout). Not stated: insured_address, deductible_hurricane, discount_multi_policy, discount_protective_device, discount_claims_free, discount_loyalty.",
+  "carrier": "Hollowmere Mutual Insurance Company",
+  "page_count": 2,
+  "size_bytes": 278085,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [
+      1,
+      2
+    ],
+    "option_count": 1
+  },
+  "facts": {
+    "policy_number": {
+      "value": "HM-HO-5530-1188",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Number: HM-HO-5530-1188",
+      "source": "image",
+      "accepted_values": []
+    },
+    "policy_term": {
+      "value": "01/01/2027 to 01/01/2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Term: 01/01/2027 to 01/01/2028",
+      "source": "image",
+      "accepted_values": []
+    },
+    "named_insured": {
+      "value": "Avery and Jordan Pellham",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Avery and Jordan Pellham",
+      "source": "image",
+      "accepted_values": []
+    },
+    "insured_address": null,
+    "coverage_a_limit": {
+      "value": "$360,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage A (Dwelling): $360,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "coverage_b_limit": {
+      "value": "$40,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage B (Other Structures): $40,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "coverage_c_limit": {
+      "value": "$170,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage C (Personal Property): $170,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "coverage_d_limit": {
+      "value": "$72,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage D (Loss of Use): $72,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "coverage_e_limit": {
+      "value": "$300,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage E (Personal Liability): $300,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "coverage_f_limit": {
+      "value": "$5,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage F (Medical Payments): $5,000",
+      "source": "image",
+      "accepted_values": []
+    },
+    "deductible_all_peril": {
+      "value": "$2,500",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "All Other Perils Deductible: $2,500",
+      "source": "image",
+      "accepted_values": []
+    },
+    "deductible_wind_hail": {
+      "value": "2%",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Wind/Hail Deductible: 2%",
+      "source": "image",
+      "accepted_values": []
+    },
+    "deductible_hurricane": null,
+    "total_premium": {
+      "value": "$2,412.00",
+      "page": 2,
+      "pages": [
+        2
+      ],
+      "quote": "Total Premium: $2,412.00",
+      "source": "image",
+      "accepted_values": []
+    },
+    "discount_multi_policy": null,
+    "discount_protective_device": null,
+    "discount_claims_free": null,
+    "discount_loyalty": null
+  },
+  "conflicts": {},
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}
