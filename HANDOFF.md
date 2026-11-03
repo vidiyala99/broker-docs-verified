@@ -164,3 +164,13 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Cleanup pending: merged lane worktrees under `.claude/worktrees/` (agent-a76ce5b93a99de08c, agent-a4e0b986261be2a61, agent-ab9097927fb1621d0)
   and branches slice3b-backend/-integrations/-personal-lines can be removed; untracked compare_eval*.log/json in repo root.
 - Fresh session recommended.
+
+## 2026-11-02 23:12: slice 3b complete (T7 merged); work queue spec eng-cleared
+- Main `582d11b`. T7 Tasks UI merged (`8aa474c`): `#/tasks` page, dialog, Create task on discrepancy cards, delete with Undo, deep links. Full e2e on merged main: 32/32, axe 0; tsc clean. Every slice 3b rail item is live.
+- Work queue spec `docs/specs/2026-11-02-work-queue-design.md` (`164c12a`): owner-approved, eng review + Codex outside voice done. Ledger R1 to R11 and amendments M1 to M8 override the text above them. NO UNRESOLVED DECISIONS.
+  Key calls: Compare client fallback = majority verified named_insured (D1); `queue_changed_at` drives Done recently (D2); comparison leaves Ready only when its proposal is done (D3); select by state, cap 500 (D4); poll queue every 3 s while something runs (D5); Build proposal replaces draft with Undo (D6); shared `discrepancy_counts` over current blocks (D7, M6); Retry reopens (D8); Undo on Mark done/Dismiss (D9); cancelled = Needs attention (D10); Activity paging deferred to TODOS (D11).
+  Test plan: `~/.gstack/projects/aakas/aakas-main-eng-review-test-plan-20261102-2315.md`.
+- Next: backend lane (Opus) per the spec's task list, then Queue UI + Activity lane (design stack), then motion lane (W5). Fresh session.
+- T7 open items: backend reuses deleted task ids (SQLite without AUTOINCREMENT; weakens Undo same-id promise); Tasks list does not refetch on hash-only change; chip spacing "...  · Open" at 1440; pre-existing run toolbar clipped at 390; PRODUCT.md missing.
+- **Worktree pitfall:** lane worktrees link `frontend/node_modules` to main's folder; `git worktree remove` deleted main's packages through the link (repaired with `npm install`, lockfile restored). Before removing a worktree, delete its `node_modules` link first (`cmd /c rmdir <wt>\frontend\node_modules` removes only the link). Remaining worktrees: T7 (`agent-a0592be45707cfcc1`, merged) and 8 older merged ones; stray dir `agent-ab9097927fb1621d0` left after a failed removal.
+- Dev stack: backend 8000 (seed dev-data-3b), Vite 5173 from main; restart Vite if a page fails to load an icon/font package.
