@@ -476,6 +476,13 @@ back in the queue: `PATCH queue_state`, its proposal finishing done or partial,
 or its last open discrepancy resolved; `null` until then and again after a
 Retry). See `GET /api/queue`.
 
+`client` and `client_source` (queue navigation, 2026-11-03): the name the run's work
+queue row shows, by the same rule (`client_name` with `"broker"`, else the verified
+extracted `named_insured` with `"extracted"`, else `null` for both; see `GET
+/api/queue` Item). Only in single-run responses (`POST /api/runs`, `GET` and `PATCH
+/api/runs/{id}`, retry, cancel), not in `GET /api/runs`. The report header and the
+crumbs use it; a `PATCH` that clears `client_name` returns the extracted name here.
+
 The UI's label for a run is `"<workflow_name> · Run <id>"` (for example
 `"Policy Check · Run 7"`); `GET /api/tasks` returns it as `run_label`.
 
@@ -638,6 +645,7 @@ lines). Missing or any other value is `422 invalid_request`, like `?line=` on
 
 ```json
 {"run_id": 7, "workflow_slug": "policy-check", "workflow_name": "Policy Check", "line": "personal",
+ "created_at": "...", "carriers": [null, null, null, null],
  "client": "Avery and Jordan Pellham", "client_source": "broker", "summary": "Renewal check",
  "open_counts": {"critical": 2, "high": 5, "medium": 1, "low": 1}, "reasons": null,
  "status": "done", "retryable": false, "finished_at": "...", "queue_state": "open",
@@ -650,6 +658,11 @@ lines). Missing or any other value is `422 invalid_request`, like `?line=` on
   then the expiring policy's, then the quote's. Compare Quotes takes the name
   most quotes state (compared ignoring case and spacing); a tie goes to the
   leftmost quote. Only facts in state `verified` count.
+- `created_at` (queue navigation): the run's own `created_at`, when the work was started (the row's date).
+- `carriers` (queue navigation): one entry per document of the run, in column order: its verified
+  `carrier_name` (spacing normalised), or `null` when it has none (not read, read from a scan, or no carrier
+  printed; Policy Check documents are always `null`). The UI shows short forms of the names, plus "and N more"
+  for the rest, when two rows of the queue share a client.
 - `summary`: `"Renewal check"` (Policy Check), `"3 carriers"` (Compare Quotes,
   one per document), or `"Building proposal"` while the comparison's proposal runs.
 - `open_counts`: open discrepancies per severity for a Policy Check with a

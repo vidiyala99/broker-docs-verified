@@ -68,8 +68,10 @@
   font-size: 17px;
 }
 
-/* "Add client" is the system asking, not a name: it stays Inter. */
-.run-client__value.is-empty {
+/* "Add client" is the system asking, not a name: it stays Inter. So does "Change" (queue navigation: the name itself
+   moved into the page title). */
+.run-client__value.is-empty,
+.run-client__value.is-change {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -110,7 +112,9 @@
 
 .queue-row,
 .queue-list--slim .queue-row {
-  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 12.5rem;
+  /* Queue navigation: the identity column carries the date (and carriers when a client repeats), so it gets
+     the larger share; status texts are short. */
+  grid-template-columns: 32px minmax(0, 3fr) minmax(0, 2fr) 12.5rem;
 }
 
 .toolbar__title .vmark--workflow {

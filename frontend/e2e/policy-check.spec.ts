@@ -115,7 +115,10 @@ test("policy check: rail entry, wizard with AMS, run, list", async ({ page }) =>
 test("policy check: list, filters, resolve, note, review dialog", async ({ page }) => {
   const { full } = await seededRuns(page);
   await page.goto(`/#/runs/${full}`);
-  await expect(page.locator(".toolbar__title")).toContainText(`Policy check, run ${full}`);
+  // Queue navigation (deliberate update): the seeded check has a broker name, so the title is the client and the run
+  // number is metadata under it.
+  await expect(page.locator(".toolbar__title")).toContainText("Avery and Jordan Pellham · Policy check");
+  await expect(page.locator(".toolbar__title")).toContainText(`Run ${full}`);
   await expect(page.locator(".disc")).toHaveCount(10);
   await expect(page.locator(".disc-head__count")).toHaveText("10 discrepancies, 1 resolved");
 

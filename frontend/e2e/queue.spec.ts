@@ -196,7 +196,8 @@ test("In progress rows have no Mark done or Dismiss (M1)", async ({ page }) => {
   await row(page, 5).getByRole("button", { name: /^Actions for / }).click();
   await expect(page.getByRole("menuitem", { name: "Mark done" })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Dismiss" })).toHaveCount(0);
-  await expect(page.getByRole("menuitem", { name: "Open run" })).toBeVisible();
+  // Queue navigation (2026-11-03): "Open run" says what it opens now.
+  await expect(page.getByRole("menuitem", { name: "Open comparison" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Move to Personal lines" })).toBeVisible();
   // The menu opens over the rows below, not clipped by the live row (its sweep line clips only itself).
   const hit = await page.getByRole("menuitem", { name: "Move to Personal lines" }).evaluate((el) => {
@@ -373,14 +374,20 @@ test("Client field: set on Compare and Policy Check start, edited and cleared in
   await expect(page.getByLabel(/^Client/)).toHaveValue("Pellham household");
   await page.unroute(/\/api\/runs$/);
 
-  // Run header: next to Line. Enter saves (PATCH client_name), "" clears, Esc cancels.
+  // Run header: next to Line. Enter saves (PATCH client_name), "" clears, Esc cancels. Queue navigation
+  // (2026-11-03, deliberate update): the name moved into the title, the button reads "Change" ("Change client: <name>"
+  // to a screen reader), and clearing a typed name falls back to the documents' name, so run 6 shows "Change" with the
+  // "name from the documents" tag rather than "Add client" (that is checked on run 1 in queue-nav.spec.ts).
   const before = (await (await page.request.get(`${API}/api/runs/6`)).json()).client_name as string;
+  const title = page.locator(".toolbar__title");
   try {
     await page.goto("/#/runs/6");
-    const button = page.getByRole("button", { name: `Client: ${before}. Edit` });
+    const button = page.getByRole("button", { name: `Change client: ${before}` });
     await expect(button).toBeVisible();
+    await expect(button).toHaveText("Change");
     await button.click();
     const input = page.getByRole("textbox", { name: "Client" });
+    await expect(input).toHaveValue(before);
     await input.fill("Cedar Hollow Hotels");
     const [patch] = await Promise.all([
       page.waitForRequest((r) => r.method() === "PATCH" && /\/api\/runs\/6$/.test(r.url())),
@@ -388,19 +395,23 @@ test("Client field: set on Compare and Policy Check start, edited and cleared in
     ]);
     expect(patch.postDataJSON()).toEqual({ client_name: "Cedar Hollow Hotels" });
     await expect(toast(page)).toContainText("Client name saved.");
-    await expect(page.getByRole("button", { name: "Client: Cedar Hollow Hotels. Edit" })).toBeFocused();
+    await expect(page.getByRole("button", { name: "Change client: Cedar Hollow Hotels" })).toBeFocused();
+    await expect(title).toContainText("Cedar Hollow Hotels · Compare Quotes");
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText(/Cedar Hollow Hotels$/);
     await shot(page, "1440-run-header-client");
 
-    await page.getByRole("button", { name: "Client: Cedar Hollow Hotels. Edit" }).click();
+    await page.getByRole("button", { name: "Change client: Cedar Hollow Hotels" }).click();
     await page.getByRole("textbox", { name: "Client" }).fill("Something else");
     await page.getByRole("textbox", { name: "Client" }).press("Escape");
-    await expect(page.getByRole("button", { name: "Client: Cedar Hollow Hotels. Edit" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Change client: Cedar Hollow Hotels" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Client: Cedar Hollow Hotels. Edit" }).click();
+    await page.getByRole("button", { name: "Change client: Cedar Hollow Hotels" }).click();
     await page.getByRole("textbox", { name: "Client" }).fill("");
     await page.getByRole("textbox", { name: "Client" }).press("Enter");
     await expect(toast(page)).toContainText("Client name cleared.");
-    await expect(page.getByRole("button", { name: "Add client" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Change client: Cedar Hollow Hospitality LLC" })).toBeVisible();
+    await expect(title).toContainText("Cedar Hollow Hospitality LLC · Compare Quotes");
+    await expect(title).toContainText("name from the documents");
     expect((await (await page.request.get(`${API}/api/runs/6`)).json()).client_name).toBeNull();
   } finally {
     await patchRun(page, 6, { client_name: before });

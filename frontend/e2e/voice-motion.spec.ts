@@ -60,7 +60,10 @@ test("390: the Compare queue has no sideways overflow and the row menus are insi
   await expect(page.locator(".queue-item").first()).toBeVisible();
   const overflow = await page.evaluate(() =>
     [...document.querySelectorAll("main, main *")]
-      .filter((e) => !e.classList.contains("sr-only") && getComputedStyle(e).overflowX !== "visible" && e.scrollWidth > e.clientWidth + 1)
+      // Queue navigation (deliberate update): text set to end in an ellipsis (the one-line meta's carriers) is a
+      // chosen truncation, not sideways overflow.
+      .filter((e) => !e.classList.contains("sr-only") && getComputedStyle(e).textOverflow !== "ellipsis")
+      .filter((e) => getComputedStyle(e).overflowX !== "visible" && e.scrollWidth > e.clientWidth + 1)
       .map((e) => `${e.className} ${e.scrollWidth}/${e.clientWidth}`),
   );
   expect(overflow).toEqual([]);

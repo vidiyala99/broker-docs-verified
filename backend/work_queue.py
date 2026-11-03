@@ -98,6 +98,7 @@ class QueueRun:
     client_source: str | None = None  # "broker" | "extracted" | None
     proposal_run_id: int | None = None
     retryable: bool = False
+    carriers: tuple[str | None, ...] = ()  # per document, column order: verified carrier_name or None
 
 
 @dataclass(frozen=True)
@@ -191,6 +192,9 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
             "workflow_slug": run.workflow_slug,
             "workflow_name": run.workflow_name,
             "line": run.line,
+            # Queue navigation (2026-11-03): rows that share a client are told apart by date and carriers.
+            "created_at": _iso(run.created_at),
+            "carriers": list(run.carriers),
             "client": run.client,
             "client_source": run.client_source,
             "summary": summary(run, building_proposal=building),
@@ -278,6 +282,32 @@ def resolve_client(broker: str | None, extracted: str | None) -> tuple[str | Non
     return None, None
 
 
+def carriers_of(positions: Sequence[int], facts: Sequence[tuple[int, str]]) -> tuple[str | None, ...]:
+    """One entry per document of the run, in column order (`positions`): the document's verified `carrier_name`
+    (spacing normalised; `facts` holds (position, value)), or None when it has none (not read, read from a scan,
+    or no carrier printed). The first verified value of a document wins."""
+    named: dict[int, str] = {}
+    for pos, value in facts:
+        name = " ".join((value or "").split())
+        if name and pos not in named:
+            named[pos] = name
+    return tuple(named.get(p) for p in sorted(positions))
+
+
+def run_client(session: Session, run: models.Run) -> tuple[str | None, str | None]:
+    """(client, client_source) of one run by the queue's rule (W4, M7): `GET /api/runs/{id}` shows the same
+    name, with the same source, as the run's queue row."""
+    if run.client_name:
+        return run.client_name, "broker"
+    where = {rd.document_id: (rd.slot, rd.position) for rd in run.documents}
+    rows = session.execute(select(models.Fact.document_id, models.Fact.value)
+                           .where(models.Fact.run_id == run.id, models.Fact.field == "named_insured",
+                                  models.Fact.state == str(EvidenceState.VERIFIED)))
+    facts = [(*where[d], v) for d, v in rows if d in where and v]
+    slug = run.workflow.slug if run.workflow else ""
+    return resolve_client(None, extracted_client(slug, facts))
+
+
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
 
@@ -341,14 +371,20 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
                                    .where(models.DiscrepancyState.run_id.in_(list(reports)))):
             states[row.run_id][row.item_id] = row
 
-    unnamed = [r.id for r in runs if not r.client_name]
+    # One statement for both: named_insured (runs without a broker name) and carrier_name (every run).
+    unnamed = {r.id for r in runs if not r.client_name}
     names: dict[int, list[tuple[int, str]]] = defaultdict(list)  # run -> (document id, value)
-    if unnamed:
-        for run_id, doc_id, value in session.execute(
-                select(models.Fact.run_id, models.Fact.document_id, models.Fact.value)
-                .where(models.Fact.run_id.in_(unnamed), models.Fact.field == "named_insured",
+    carrier_facts: dict[int, list[tuple[int, str]]] = defaultdict(list)
+    if runs:
+        for run_id, doc_id, field, value in session.execute(
+                select(models.Fact.run_id, models.Fact.document_id, models.Fact.field, models.Fact.value)
+                .where(models.Fact.run_id.in_([r.id for r in runs]),
+                       models.Fact.field.in_(("named_insured", "carrier_name")),
                        models.Fact.state == str(EvidenceState.VERIFIED))):
-            names[run_id].append((doc_id, value))
+            if field == "carrier_name":
+                carrier_facts[run_id].append((doc_id, value))
+            elif run_id in unnamed:
+                names[run_id].append((doc_id, value))
 
     classified = []
     for run in runs:
@@ -367,6 +403,8 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
             has_report=run.id in reports, client=client, client_source=source,
             proposal_run_id=run.proposal_run_id,
             retryable=not active and status in NEEDS_ATTENTION,
+            carriers=carriers_of([pos for _, pos in where.values()],
+                                 [(where[d][1], v) for d, v in carrier_facts.get(run.id, ()) if d in where]),
         )
         counts = None
         if run.id in reports:

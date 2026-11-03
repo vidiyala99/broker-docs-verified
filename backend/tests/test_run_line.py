@@ -49,7 +49,9 @@ def _error(r, status, code):
 def test_line_defaults_to_commercial_and_is_in_every_run_payload(api):
     run = _run(api, [api.upload_pages(DOC_A)])
     assert run["line"] == "commercial"
-    assert set(run) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS  # D7: the old keys, plus line (+ queue, see top)
+    # D7: the old keys, plus line (+ queue, see top). Queue navigation (2026-11-03, deliberate update): single-run
+    # responses also carry the resolved `client` / `client_source`; the list does not (API.md "Run").
+    assert set(run) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS | {"client", "client_source"}
     listed = api.client.get("/api/runs").json()["runs"][0]
     assert listed["line"] == "commercial" and set(listed) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS
     with api.ctx.factory() as s:
@@ -111,7 +113,8 @@ def test_patch_line_moves_a_run_between_lines(api):
     assert r.status_code == 200, r.text
     out = r.json()
     assert out["line"] == "personal" and out["id"] == run["id"]
-    assert set(out) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS  # the Run shape, like GET /api/runs/{id}
+    # the Run shape, like GET /api/runs/{id} (queue navigation, deliberate update: + client, client_source)
+    assert set(out) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS | {"client", "client_source"}
     assert api.client.get(f"/api/runs/{run['id']}").json()["line"] == "personal"
     back = api.client.patch(f"/api/runs/{run['id']}", json={"line": "commercial"}).json()
     assert back["line"] == "commercial"
