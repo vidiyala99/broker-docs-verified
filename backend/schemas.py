@@ -452,8 +452,79 @@ class IssueBlock(BaseModel):
     follow_form: str | None = None
 
 
+# --------------------------------------------------------------------- policy check discrepancy (slice 3, T5)
+#
+# D7 A: a Policy Check discrepancy is one block of the ordinary ArtifactContent,
+# so versions, chips, stale flags, chat and export keep working. Resolve state
+# (open / resolved) is NOT stored here: it lives in the discrepancy_state table,
+# so a regenerate never wipes a decision.
+#
+# Slot conventions (one Cell per role; the diff in pipeline/diff.py fills them):
+#   role missing from `slots`, or state `absent`     -> "N/A" (no document, or it does not state the value)
+#   state `failed`                                   -> "Not read" (D11: the document or its budget failed)
+#   state `conflicting` / `not_found`                -> "Needs review" in that slot (D15), conflicts listed
+#   state `verified` / `scan_read`                   -> the value with its chips
+# `item_state` needs_review (D15): the renewal or expiring value is conflicting
+# or unverified, so the key is never reported as removed or as equal.
+
+
+class PolicyRole(StrEnum):
+    """Document roles of a Policy Check run, in display order (the D8 input slot keys)."""
+
+    EXPIRING = "expiring"
+    QUOTE = "quote"
+    RENEWAL = "renewal"
+    AMS = "ams"
+
+    @property
+    def label(self) -> str:
+        return "AMS" if self is PolicyRole.AMS else self.value.capitalize()
+
+
+class Severity(StrEnum):
+    """Severity tiers of the rule table (pipeline/diff.py), most severe first."""
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+    @property
+    def label(self) -> str:
+        return self.value.capitalize()
+
+
+class DiscrepancyItemState(StrEnum):
+    DISCREPANCY = "discrepancy"  # the renewal differs from a compared role
+    NEEDS_REVIEW = "needs_review"  # D15: a renewal or expiring value is conflicting or unverified
+
+
+class DiscrepancyBlock(BaseModel):
+    """One Policy Check discrepancy: canonical key, severity, deterministic text (D14), slots per role."""
+
+    type: Literal["discrepancy"] = "discrepancy"
+    id: str  # derived from `key` by the diff, stable across regeneration
+    key: str  # canonical fact key, e.g. coverage_a_limit or form:<normalized number>
+    title: str
+    severity: Severity
+    item_state: DiscrepancyItemState = DiscrepancyItemState.DISCREPANCY
+    lob: str | None = None
+    prose: list[Segment] = Field(default_factory=list)  # the explanation
+    slots: dict[PolicyRole, Cell] = Field(default_factory=dict)
+
+    def slot(self, role: PolicyRole) -> Cell | None:
+        return self.slots.get(role)
+
+    def passage_ids(self) -> set[int]:
+        """Citations in the explanation and in every slot (outside finding 6)."""
+        found: set[int] = {p for s in self.prose for p in s.passage_ids}
+        for cell in self.slots.values():
+            found.update(cell.passage_ids)
+        return found
+
+
 Block = Annotated[
-    HeadingBlock | ParagraphBlock | ListBlock | TableBlock | IssueBlock,
+    HeadingBlock | ParagraphBlock | ListBlock | TableBlock | IssueBlock | DiscrepancyBlock,
     Field(discriminator="type"),
 ]
 
@@ -515,6 +586,8 @@ class ArtifactContent(BaseModel):
                 for row in block.rows:
                     for cell in row.cells.values():
                         found.update(cell.passage_ids)
+            elif isinstance(block, DiscrepancyBlock):
+                found.update(block.passage_ids())
         return found
 
     # ---- edits (return a new object; the receiver is never mutated)
