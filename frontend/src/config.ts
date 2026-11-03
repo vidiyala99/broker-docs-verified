@@ -8,3 +8,6 @@ export const WORKFLOW_NAME = "Compare Quotes";
 
 /** `workflow_name` of slice 2 proposal runs (backend seed). */
 export const PROPOSAL_WORKFLOW = "Proposal Builder";
+
+/** `workflow_name` of slice 3 Policy Check runs (backend seed). */
+export const POLICY_WORKFLOW = "Policy Check";

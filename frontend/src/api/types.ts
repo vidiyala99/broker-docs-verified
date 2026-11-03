@@ -29,6 +29,8 @@ export interface DocumentInfo {
   parse_error: string | null;
   warning: string | null;
   created_at: string;
+  /** Only on the POST /api/documents/ams response. */
+  ams?: AmsSummary;
 }
 
 export interface Rejection {
@@ -46,6 +48,8 @@ export interface RunDocument {
   document_id: number;
   position: number;
   letter: string;
+  /** Input slot key (slice 3): "quotes", or a Policy Check role. Older payloads may omit it. */
+  slot?: string;
   filename: string;
   status: DocStatus;
   progress: string | null;
@@ -148,7 +152,62 @@ export type Block =
       impact: Segment[];
       affected_layers: string;
       follow_form: string;
-    };
+    }
+  | DiscrepancyBlock;
+
+// ---------------------------------------------------------------- policy check (slice 3)
+
+export type PolicyRole = "expiring" | "quote" | "renewal" | "ams";
+export const POLICY_ROLES: PolicyRole[] = ["expiring", "quote", "renewal", "ams"];
+export type Severity = "critical" | "high" | "medium" | "low";
+export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low"];
+
+export interface DiscrepancyBlock {
+  type: "discrepancy";
+  id: string;
+  key: string;
+  title: string;
+  severity: Severity;
+  item_state: "discrepancy" | "needs_review";
+  lob: string | null;
+  prose: Segment[];
+  slots: Partial<Record<PolicyRole, Cell>>;
+}
+
+/** One cited fact behind a slot's chips (GET /discrepancies `sources`). */
+export interface SlotSource {
+  passage_id: number;
+  page_no: number | null;
+  rects: [number, number, number, number][];
+  /** AMS documents only: the field the fact cites ("Cov A"). */
+  field: string | null;
+}
+
+export interface DiscrepancyItem extends DiscrepancyBlock {
+  status: "open" | "resolved";
+  note: string | null;
+  changed_since_resolved: boolean;
+  updated_at: string | null;
+  sources?: Partial<Record<PolicyRole, SlotSource[]>>;
+}
+
+export interface DiscrepancyList {
+  run_id: number;
+  artifact_id: number;
+  version: number;
+  total: number;
+  resolved: number;
+  counts: Record<Severity, number>;
+  open_counts: Record<Severity, number>;
+  items: DiscrepancyItem[];
+}
+
+export interface AmsSummary {
+  format: "json" | "csv";
+  field_count: number;
+  unmapped: string[];
+  notices: string[];
+}
 
 export interface Section {
   id: string;

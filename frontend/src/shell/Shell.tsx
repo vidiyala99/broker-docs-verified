@@ -17,7 +17,7 @@ import {
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
 
-export type Section = "workflows" | "proposals";
+export type Section = "workflows" | "proposals" | "policy-check";
 
 interface RailItem {
   label: string;
@@ -25,15 +25,17 @@ interface RailItem {
   /** Live items link somewhere; the rest are "coming in a later slice". */
   href?: string;
   section?: Section;
+  tip?: string;
 }
 
-// DG1: the full rail from the reference. Live: Workflows (slice 1) and Proposals (slice 2, the wizard).
+// DG1: the full rail from the reference. Live: Workflows (slice 1), Proposals (slice 2, the wizard) and
+// Policy check (slice 3, the new-check wizard). `tip` is the tooltip and accessible name of a live item.
 const GROUPS: RailItem[][] = [
   [
     { label: "Workflows", icon: <Briefcase size={20} aria-hidden />, href: "#/", section: "workflows" },
-    { label: "Proposals", icon: <FileText size={20} aria-hidden />, href: "#/proposals/new", section: "proposals" },
+    { label: "Proposals", icon: <FileText size={20} aria-hidden />, href: "#/proposals/new", section: "proposals", tip: "Proposals: new proposal" },
     { label: "Personal lines", icon: <Heartbeat size={20} aria-hidden /> },
-    { label: "Policy check", icon: <ShieldCheck size={20} aria-hidden /> },
+    { label: "Policy check", icon: <ShieldCheck size={20} aria-hidden />, href: "#/policy-check/new", section: "policy-check", tip: "Policy check: new check" },
     { label: "Certificates", icon: <Stamp size={20} aria-hidden /> },
     { label: "Tasks", icon: <ListChecks size={20} aria-hidden /> },
     { label: "Integrations", icon: <PlugsConnected size={20} aria-hidden /> },
@@ -58,12 +60,12 @@ export function Rail({ section }: { section: Section }) {
           {group.map((item) => (
             <li key={item.label}>
               {item.href ? (
-                <Tip text={item.section === "proposals" ? "Proposals: new proposal" : item.label} side="right">
+                <Tip text={item.tip ?? item.label} side="right">
                   <a
                     href={item.href}
                     className={`rail__item${item.section === section ? " is-active" : ""}`}
                     aria-current={item.section === section ? "page" : undefined}
-                    aria-label={item.section === "proposals" ? "Proposals, new proposal" : item.label}
+                    aria-label={item.tip ? item.tip.replace(": ", ", ") : item.label}
                   >
                     {item.icon}
                   </a>

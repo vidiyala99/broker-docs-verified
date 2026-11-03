@@ -16,7 +16,7 @@ import {
   FileText,
 } from "@phosphor-icons/react";
 import { api, ApiError, downloadExport, type ExportFormat } from "../api/client";
-import { PROPOSAL_WORKFLOW } from "../config";
+import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW } from "../config";
 import { useRunEvents } from "../api/useRunEvents";
 import type { Artifact, Chip, EditResult, Run, RunDocument, Workspace } from "../api/types";
 import { Accordion } from "../ui/Accordion";
@@ -24,7 +24,9 @@ import { useToast } from "../ui/Toast";
 import { Tip } from "../ui/Tip";
 import { LeftPanel, type Viewport } from "../shell/layout";
 import { RecentRuns } from "../launch/RecentRuns";
-import { Report, type ReportActions } from "../report/Report";
+import { Notices, Report, type ReportActions } from "../report/Report";
+import { Discrepancies } from "../policy/Discrepancies";
+import { ROLE_INFO } from "../policy/draft";
 import { Outline, warningSummary, type TrustFilter } from "../report/Outline";
 import type { CellRef } from "../report/Table";
 import { hueOf } from "../report/Chip";
@@ -181,7 +183,7 @@ export function RunView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       const t = e.target as HTMLElement;
-      if (t.closest("input, textarea, .left-panel--overlay")) return;
+      if (t.closest("input, textarea, dialog, .left-panel--overlay")) return;
       if (split || tab !== "report") exitSplit();
     };
     window.addEventListener("keydown", onKey);
@@ -365,10 +367,16 @@ export function RunView({
   const summary = artifact ? warningSummary(artifact) : null;
   const running = Boolean(run?.active);
   const isProposal = run?.workflow_name === PROPOSAL_WORKFLOW;
+  const isPolicy = run?.workflow_name === POLICY_WORKFLOW;
 
   const reportBody = (
     <div className="report-scroll" ref={setScrollRoot} data-filter={(isProposal && preview ? undefined : filter) ?? undefined} data-preview={isProposal && preview ? "" : undefined}>
-      {artifact && actions ? (
+      {artifact && actions && run && isPolicy ? (
+        <article className="report" aria-label={artifact.title}>
+          <Notices notices={artifact.content.notices} actions={actions} />
+          <Discrepancies run={run} artifact={artifact} chips={artifact.chips} onOpen={openSource} editable={!run.active} />
+        </article>
+      ) : artifact && actions ? (
         <Report artifact={artifact} actions={actions} />
       ) : (
         <RunPlaceholder run={run} artifactError={artifactError} onRetryRun={() => void retryRun()} onReload={() => void loadArtifact()} />
@@ -404,6 +412,8 @@ export function RunView({
           <Accordion title="Input parameters">
             {isProposal && run ? (
               <ProposalParams parameters={run.parameters} />
+            ) : isPolicy && run ? (
+              <RoleParams run={run} />
             ) : (
               <p className="hint">Compare Quotes has no parameters. Column order follows the upload order.</p>
             )}
@@ -411,8 +421,8 @@ export function RunView({
           <Accordion title="Recent runs" count={runs?.length}>
             {runs && <RecentRuns runs={runs} compact currentId={runId} />}
           </Accordion>
-          <a href={isProposal ? "#/proposals/new" : "#/"} className="btn btn--ghost btn--block new-run">
-            <Plus size={16} aria-hidden /> {isProposal ? "New proposal" : "New comparison"}
+          <a href={isProposal ? "#/proposals/new" : isPolicy ? "#/policy-check/new" : "#/"} className="btn btn--ghost btn--block new-run">
+            <Plus size={16} aria-hidden /> {isProposal ? "New proposal" : isPolicy ? "New check" : "New comparison"}
           </a>
         </div>
         {run && (
@@ -420,6 +430,7 @@ export function RunView({
             runId={run.id}
             artifact={artifact}
             proposal={isProposal}
+            policy={isPolicy}
             open={chatOpen}
             onToggle={setChatOpen}
             onOpen={openSource}
@@ -472,7 +483,7 @@ export function RunView({
 
         <div className="toolbar">
           <h1 id="pane-title" className="toolbar__title">
-            {isProposal ? (artifact?.title ?? "Proposal") : "Compare Quotes"}, run {runId}
+            {isProposal ? (artifact?.title ?? "Proposal") : isPolicy ? "Policy check" : "Compare Quotes"}, run {runId}
             {artifact && (
               <span className="toolbar__version">
                 Version {artifact.version}
@@ -549,7 +560,7 @@ export function RunView({
                 <SquareSplitHorizontal size={18} aria-hidden />
               </button>
             </Tip>
-            <Tip text={outlineOpen ? "Hide outline" : "Show outline"}>
+            {!isPolicy && <Tip text={outlineOpen ? "Hide outline" : "Show outline"}>
               <button
                 type="button"
                 className="icon-btn"
@@ -560,7 +571,7 @@ export function RunView({
               >
                 <ListBullets size={18} aria-hidden />
               </button>
-            </Tip>
+            </Tip>}
           </div>
         </div>
 
@@ -568,7 +579,7 @@ export function RunView({
           {showReport && (
             <div className="report-area">
               {reportBody}
-              {artifact && !split && (outlineOpen ? (
+              {artifact && !split && !isPolicy && (outlineOpen ? (
                 <Outline artifact={artifact} hideTrust={isProposal && preview} filter={filter} onFilter={setFilter} scrollRoot={scrollRoot} focusFirstCount={focusCount} />
               ) : (
                 <Tip text={summary ? `Outline. ${summary}` : "Outline"} side="bottom">
@@ -621,6 +632,34 @@ function uploadSummary(run: Run): string {
   if (failed) return `${noun}, ${failed} failed`;
   if (read === n) return `${noun}, all read`;
   return `${noun}, ${read} read`;
+}
+
+/** Input parameters of a Policy Check run: which document fills each role (RunDocument.slot). */
+function RoleParams({ run }: { run: Run }) {
+  return (
+    <dl className="params">
+      {ROLE_INFO.map((r) => {
+        const d = run.documents.find((x) => x.slot === r.role);
+        return (
+          <div key={r.role} className="params__row">
+            <dt>{r.name}</dt>
+            <dd>
+              {d ? (
+                <>
+                  <span className={`doc-letter hue-${hueOf(d.letter)} role-params__letter`} aria-hidden>
+                    {d.letter}
+                  </span>
+                  {d.filename}
+                </>
+              ) : (
+                "Not used"
+              )}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
 }
 
 /** Input parameters of a proposal run (the stored, validated `run.parameters`). */

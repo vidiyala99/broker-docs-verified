@@ -7,6 +7,7 @@ frontend renders both with one component.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
@@ -97,6 +98,57 @@ def chips(session: Session, run: models.Run, content: ArtifactContent) -> dict[s
             "page_no": p.page_no, "verified": bool(p.verified), "rects": p.rects or [],
             "page_width": pg.width if pg else None, "page_height": pg.height if pg else None,
         }
+    return out
+
+
+AMS_FIELD_MAX = 100  # ams.AmsLimits.max_name_chars
+
+
+def ams_field_name(quote: str | None, value: str | None) -> str | None:
+    """The AMS field a verified AMS fact cites. The rendered AMS PDF prints one line per field,
+    "name: value" (ams.render_pdf), and that line is the fact's quote, so the name is the part
+    before ": " (the value is matched from the end first, so a name holding ": " survives)."""
+    if not quote:
+        return None
+    if value and quote.endswith(f": {value}"):
+        name = quote[: -(len(value) + 2)]
+    elif ": " in quote:
+        name = quote.split(": ", 1)[0]
+    elif quote.endswith(":"):
+        name = quote[:-1]
+    else:
+        return None
+    name = name.strip()
+    return name[:AMS_FIELD_MAX] or None
+
+
+def discrepancy_sources(session: Session, run: models.Run, blocks: Iterable[Any]) -> dict[str, dict[str, list]]:
+    """Per item and role, the cited facts behind a slot's chips: passage, page, the fact's own
+    highlight rects (a passage's rects are every fact on that page) and, for an AMS document,
+    the field name. Read-only; the artifact is unchanged."""
+    blocks = list(blocks)
+    ids = {fid for b in blocks for cell in b.slots.values() for fid in cell.fact_ids}
+    if not ids:
+        return {}
+    facts = {f.id: f for f in session.scalars(select(models.Fact).where(models.Fact.id.in_(ids),
+                                                                         models.Fact.run_id == run.id))}
+    kinds = {rd.document_id: rd.document.kind for rd in run.documents}
+    out: dict[str, dict[str, list]] = {}
+    for b in blocks:
+        per_role: dict[str, list] = {}
+        for role, cell in b.slots.items():
+            entries = []
+            for fid in cell.fact_ids:
+                f = facts.get(fid)
+                if f is None or f.passage_id is None or f.passage_id not in cell.passage_ids:
+                    continue
+                field = ams_field_name(f.quote, f.value) if kinds.get(f.document_id) == "ams" else None
+                entries.append({"passage_id": f.passage_id, "page_no": f.page_no, "rects": f.rects or [],
+                                "field": field})
+            if entries:
+                per_role[str(role)] = entries
+        if per_role:
+            out[b.id] = per_role
     return out
 
 

@@ -304,8 +304,25 @@ function ContextField({ value, max, error, onChange }: { value: string; max: num
   );
 }
 
-/** "Choose from uploaded files": quotes already on this machine (GET /api/documents). */
-function UploadedPicker({ selected, max, onChange }: { selected: DocumentInfo[]; max: number; onChange: (docs: DocumentInfo[]) => void }) {
+/** "Choose from uploaded files": documents already on this machine (GET /api/documents). */
+export function UploadedPicker({
+  selected,
+  max,
+  onChange,
+  filter,
+  label = "Choose from uploaded files",
+  emptyText = "No files uploaded yet. Drop quote PDFs above.",
+  fullText,
+}: {
+  selected: DocumentInfo[];
+  max: number;
+  onChange: (docs: DocumentInfo[]) => void;
+  /** Which uploaded documents to offer (Policy Check: PDFs or AMS exports). Default: everything but AMS. */
+  filter?: (d: DocumentInfo) => boolean;
+  label?: string;
+  emptyText?: string;
+  fullText?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [docs, setDocs] = useState<DocumentInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -322,20 +339,22 @@ function UploadedPicker({ selected, max, onChange }: { selected: DocumentInfo[];
 
   // Same file uploaded more than once (same sha256): show only the newest copy.
   const shown = useMemo(() => {
+    const keep = filter ?? ((d: DocumentInfo) => d.kind !== "ams");
+    const pool = (docs ?? []).filter(keep);
     const newest = new Map<string, DocumentInfo>();
-    for (const d of docs ?? []) {
+    for (const d of pool) {
       const cur = newest.get(d.sha256);
       if (!cur || d.created_at > cur.created_at || (d.created_at === cur.created_at && d.id > cur.id)) newest.set(d.sha256, d);
     }
-    return (docs ?? []).filter((d) => newest.get(d.sha256) === d);
-  }, [docs]);
+    return pool.filter((d) => newest.get(d.sha256) === d);
+  }, [docs, filter]);
   const hashes = new Set(selected.map((d) => d.sha256));
   const full = selected.length >= max;
 
   return (
     <div className={`picker${open ? " is-open" : ""}`}>
       <button type="button" className="picker__toggle" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((o) => !o)}>
-        Choose from uploaded files
+        {label}
         <CaretDown size={16} aria-hidden className="picker__caret" />
       </button>
       <div id={bodyId} hidden={!open} className="picker__body">
@@ -352,11 +371,11 @@ function UploadedPicker({ selected, max, onChange }: { selected: DocumentInfo[];
             <span />
           </div>
         ) : shown.length === 0 ? (
-          <p className="hint">No files uploaded yet. Drop quote PDFs above.</p>
+          <p className="hint">{emptyText}</p>
         ) : (
           <fieldset>
             <legend className="sr-only">Uploaded files</legend>
-            {full && <p className="hint">This proposal has {max} quotes, the most a run can use.</p>}
+            {full && <p className="hint">{fullText ?? `This proposal has ${max} quotes, the most a run can use.`}</p>}
             <ul className="picker__list">
               {shown.map((d) => {
                 const on = hashes.has(d.sha256);
@@ -371,7 +390,7 @@ function UploadedPicker({ selected, max, onChange }: { selected: DocumentInfo[];
                       />
                       <span className="picker__name">{d.filename}</span>
                       <span className="picker__meta">
-                        {d.page_count ?? "?"} pages, {formatWhen(d.created_at)}
+                        {d.kind === "ams" ? "AMS export" : `${d.page_count ?? "?"} pages`}, {formatWhen(d.created_at)}
                       </span>
                     </label>
                   </li>

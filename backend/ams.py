@@ -41,6 +41,8 @@ import fitz
 from backend.schemas import POLICY_CHECK_FIELDS, ExtractedFact, scalar_fields
 
 AmsFormat = Literal["json", "csv"]
+# Display label of each canonical key, for notices ("Coverage E (Personal Liability)", not the raw key).
+FIELD_LABELS: dict[str, str] = {f.key: f.label for f in POLICY_CHECK_FIELDS}
 _KB = 1024
 
 
@@ -428,8 +430,8 @@ def map_facts(rendered: RenderedAms) -> MappedFacts:
             facts.append(candidates[0])
         else:
             conflicts[key] = candidates
-            notices.append(f"AMS fields {', '.join(names[key])} give different values for {key}; "
-                           "shown as Needs review.")
+            notices.append(f"AMS fields {', '.join(names[key])} give different values for "
+                           f"{FIELD_LABELS.get(key, key)}; shown as Needs review.")
     if unmapped:
         notices.append(f"AMS fields not compared (no matching policy field): {', '.join(unmapped)}.")
     return MappedFacts(facts, unmapped, conflicts, notices)

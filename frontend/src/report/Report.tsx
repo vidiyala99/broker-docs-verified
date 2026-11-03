@@ -106,6 +106,14 @@ function BlockView({ block, actions, skeleton }: { block: Block; actions: Report
       );
     case "table":
       return <ReportTable block={block} actions={actions} />;
+    case "discrepancy":
+      // Policy Check runs render their items in the discrepancy view; this is the fallback.
+      return (
+        <article className="issue">
+          <h3 className="report-subheading">{block.title}</h3>
+          <p className="prose">{block.prose.map((p) => p.text).join("")}</p>
+        </article>
+      );
     case "issue":
       return (
         <article className="issue">

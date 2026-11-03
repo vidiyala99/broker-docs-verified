@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { ArrowsClockwise, CheckCircle, Circle, StopCircle, WarningCircle } from "@phosphor-icons/react";
-import type { Run, RunDocument } from "../api/types";
+import type { PolicyRole, Run, RunDocument } from "../api/types";
+import { ROLE_LABEL } from "../policy/draft";
 import { hueOf } from "../report/Chip";
 import { MoreRow, useFold } from "../ui/Fold";
 import { statusText } from "../launch/RecentRuns";
@@ -76,6 +77,7 @@ export function RunProgress({
               </span>
               <span className="doc-row__name" title={d.filename}>
                 <span className="sr-only">Document {d.letter}: </span>
+                {d.slot && d.slot !== "quotes" && <span className="doc-row__role">{ROLE_LABEL[d.slot as PolicyRole] ?? d.slot}</span>}
                 {d.filename}
               </span>
               {pages != null && (

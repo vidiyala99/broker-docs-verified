@@ -149,6 +149,24 @@ See `frontend/LEFT-PANEL-BRIEF.md`. No new tokens.
 - Disclosure motion: caret rotation (`--dur-base`), body fades in 150ms on pointer opens only;
   keyboard opens are instant.
 
+## Policy Check (slice 3, 2026-11-02)
+See `frontend/POLICY-CHECK-BRIEF.md`. New tokens: `--severity-critical-fg` `#B42318` (6.57:1 on
+white), `--severity-high-fg` `#93370D` (7.52:1), `--severity-medium-fg` `#35383B`, `--severity-low-fg`
+`#4B5563`, `--severity-tick-off` `#D1D5DB` (decoration only).
+- Severity: plain uppercase bold word (the status-word rule) plus a four-tick meter (4 Critical to 1 Low),
+  so the tier reads without colour. No pills.
+- Severity filters: toggle buttons with the 6px control radius; pressed = primary tint, primary border
+  and a check glyph.
+- Card: one hairline-bordered unit per discrepancy (no shadow); four slots always in role order
+  (Expiring, Quote, Renewal, AMS); the renewal slot takes `--color-primary-tint` (the document being
+  checked). Slots reflow by the list's width: 4 columns, 2 x 2, one per row.
+- Slot states reuse the evidence silhouettes: value + chip, dashed chip + "Read from scan, unverified",
+  N/A with "No document" or "Not stated", Not read with the refresh glyph and the document's reason,
+  Needs review with the triangle glyph. "Changed since resolved" reuses the stale tag.
+- AMS chip label "AMS · <field>"; every Policy Check chip boxes the cited fact, not the whole page.
+- Review dialog: native `<dialog>`, opacity + scale 0.98 at `--dur-base` on pointer open only; full
+  screen below 900px with the source stacked under the item.
+
 ## Open item: collapsed-outline warning mark (recommendation, not decided)
 Recommend: when the outline is collapsed and any value is scan-read,
 couldn't verify, or failed, the collapse handle shows the triangle glyph from

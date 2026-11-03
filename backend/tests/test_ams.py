@@ -316,7 +316,9 @@ def test_two_fields_for_one_key_with_different_values_are_a_conflict_not_a_guess
     assert [f.field for f in mapped.facts] == ["policy_number"]  # agreeing duplicates collapse
     assert set(mapped.conflicts) == {"coverage_a_limit"}
     assert [c.value for c in mapped.conflicts["coverage_a_limit"]] == ["$350,000", "$360,000"]
-    assert any("coverage_a_limit" in n for n in mapped.notices)
+    # The notice names the field by its label, not the raw key (T9 fix pass).
+    assert any("Coverage A (Dwelling)" in n for n in mapped.notices)
+    assert not any("coverage_a_limit" in n for n in mapped.notices)
 
 
 def test_facts_from_original_bytes_match_upload_time_render():
