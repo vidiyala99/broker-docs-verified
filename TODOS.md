@@ -50,3 +50,10 @@
 - **Pros:** every run stays reachable. **Cons:** one API parameter, three UI controls and their tests, for a case the demo does not reach yet.
 - **Context:** `docs/specs/2026-11-02-rail-completion-design.md`, decision ledger SC6/D5. Upgrade when a workspace passes 100 runs.
 - **Depends on:** slice 3b merged.
+
+## Re-OCR a reused document when the OCR method changes
+- **What:** stamp `page.ocr_key` (vision model id + OCR prompt hash) on every page at OCR time and re-OCR a page whose key no longer matches, also when a document is reused as itself.
+- **Why:** slice 4 D17 checks `ocr_key` only when pages are copied to a re-uploaded file; a document reused as the same record keeps its stored OCR forever (`backend/pipeline/runner.py` `_cached_pages`), so OCR fixes never reach it.
+- **Pros:** one page-reuse rule for every workflow; OCR fixes reach existing scanned documents. **Cons:** re-OCR costs tokens on old documents.
+- **Context:** `docs/specs/2026-11-03-certificates-design.md` Engineering review, O6 / D17 and D18. Start in `runner._cached_pages`.
+- **Depends on:** slice 4 D17 (`page.ocr_key` column).
