@@ -88,6 +88,7 @@ _STATES = {EvidenceState.VERIFIED: "verified", EvidenceState.SCAN_READ: "scan_re
 
 PROPOSAL_SLUG = "proposal-builder"
 POLICY_SLUG = db.POLICY_CHECK_SLUG
+CERTIFICATE_SLUG = db.CERTIFICATE_SLUG
 POLICY_ROLES = ("expiring", "quote", "renewal", "ams")
 _AMS_SUFFIXES = (".json", ".csv")
 PROPOSAL_TEMPLATE_TABLE = "proposal_template"
@@ -113,7 +114,7 @@ def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
         raise ValueError(f"{len(paths)} documents; one run takes at most "
                          f"{DEFAULT_LIMITS.max_documents_per_run} (D3)")
     slug = workflow or db.COMPARE_QUOTES_SLUG
-    known = (db.COMPARE_QUOTES_SLUG, PROPOSAL_SLUG, POLICY_SLUG)
+    known = (db.COMPARE_QUOTES_SLUG, PROPOSAL_SLUG, POLICY_SLUG, CERTIFICATE_SLUG)
     if slug not in known:
         raise ValueError(f"unknown eval workflow {slug!r}; known: {', '.join(known)}")
     role_of: dict[str, str] | None = None
@@ -224,6 +225,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                role_of: Mapping[str, str] | None = None) -> dict[str, Any]:
     proposal = slug == PROPOSAL_SLUG
     policy = slug == POLICY_SLUG
+    cert = slug == CERTIFICATE_SLUG
+    client_name: str | None = None
     engine = db.make_engine("sqlite://")
     try:
         db.init_db(engine)
@@ -240,6 +243,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 raise WorkflowUnavailable(f"workflow {slug!r} is not seeded in this backend")
             if proposal:
                 run_params, warnings = proposal_parameters(s, parameters, template)
+            if cert:
+                run_params, client_name = certificate_parameters(parameters)
             for path in paths:
                 try:
                     data = Path(path).read_bytes()
@@ -272,6 +277,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                                    "warnings": warnings + ["no readable document: no run"]}
             if policy:
                 out["policy_check"] = _empty_policy_block(slug, role_of, ["no readable document: no run"])
+            if cert:
+                out["certificate"] = _empty_certificate_block(["no readable document: no run"])
             return out
 
         def load(ref: DocumentRef) -> bytes:
@@ -280,8 +287,9 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
         def load_original(ref: DocumentRef) -> bytes:
             return originals[ref.id]
 
+        # D9: an eval always reads live, never an earlier read of the same bytes (the cache is off).
         manager = RunManager(factory, provider, load_bytes=load, load_original=load_original,
-                             budget_limit=budget_limit)
+                             budget_limit=budget_limit, extraction_cache=False)
         try:
             if proposal:
                 run_id, _ = manager.submit(workflow_id, [doc_id for _, doc_id in order], run_params)
@@ -295,6 +303,9 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                         documents.setdefault(path, _failed("not_run"))
                     out["policy_check"] = _empty_policy_block(slug, role_of, [f"run not created: {exc}"])
                     return out
+            elif cert:
+                run_id, _ = manager.submit(workflow_id, [doc_id for _, doc_id in order], run_params,
+                                           client_name=client_name)
             else:
                 run_id, _ = manager.submit(workflow_id, [doc_id for _, doc_id in order])
             await manager.wait(run_id)
@@ -326,6 +337,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 out["proposal"] = _proposal_block(s, run, slug, order, warnings)
             if policy:
                 out["policy_check"] = _policy_block(s, run, slug, order, role_of)
+            if cert:
+                out["certificate"] = _certificate_block(s, run, order)
         return out
     finally:
         engine.dispose()
@@ -449,6 +462,84 @@ def _proposal_block(s: Any, run: models.Run, slug: str, order: list[tuple[str, i
                 prose(section.id, b.id, [Segment(text=b.text)])
             elif isinstance(b, IssueBlock):
                 prose(section.id, b.id, [Segment(text=b.title), *b.impact])
+    return block
+
+
+# --------------------------------------------------------------------- certificates (slice 4, C10 adapter)
+
+_CERT_PARAM_KEYS = ("holder_name", "holder_address", "wording", "certificate_date", "description")
+
+
+def certificate_parameters(parameters: Mapping[str, Any] | None) -> tuple[dict[str, Any], str | None]:
+    """(run parameters, client name) for a certificate eval run, validated by the same model the
+    POST /api/runs route uses (pipeline.certificate.CertificateParameters)."""
+    from backend.pipeline.certificate import CertificateParameters
+
+    raw = dict(parameters or {})
+    params = {k: v for k, v in raw.items() if k in _CERT_PARAM_KEYS}
+    try:
+        stored = CertificateParameters.model_validate(params).stored()
+    except Exception as exc:  # pydantic ValidationError: a bad case file
+        raise ValueError(f"invalid certificate parameters: {exc}") from exc
+    client = raw.get("client_name")
+    return stored, (" ".join(str(client).split()) or None) if client else None
+
+
+def _empty_certificate_block(warnings: list[str]) -> dict[str, Any]:
+    return {"workflow": CERTIFICATE_SLUG, "run_status": None, "claims": [], "notices": [], "warnings": list(warnings)}
+
+
+def gate_claim_key(claim: Any, policy_number: str | None, line: str | None) -> str | None:
+    """The eval gate's claim key (tests/eval/certificate_gate.py): wording:<wording>:<line>,
+    in_force:<normalized policy number>, insured_consistent, description_reviewed. The backend keys
+    claims by document letter (stable when a document is added); edited-value claims are not scored."""
+    from backend.pipeline import coi_checks
+
+    kind = str(claim.kind)
+    if kind == "wording":
+        return f"wording:{claim.wording}:{line or 'other'}"
+    if kind == "in_force":
+        number = coi_checks.normalize_policy_number(policy_number)
+        return f"in_force:{number or claim.policy_letter}"
+    return {"insured": "insured_consistent", "description": "description_reviewed"}.get(kind)
+
+
+def _certificate_block(s: Any, run: models.Run, order: list[tuple[str, int]]) -> dict[str, Any]:
+    """Every claim of the run's current draft with its check verdict (before any broker decision),
+    citations as (document path, page), and the notices with their kind and document."""
+    from backend.pipeline import certificate
+
+    path_by_doc = {doc_id: path for path, doc_id in order}
+    path_by_letter = {rd.letter: path_by_doc.get(rd.document_id) for rd in run.documents}
+    block = _empty_certificate_block([])
+    block["run_status"] = str(run.status)
+    if run.artifact is None or not run.artifact.versions:
+        block["warnings"].append("the run produced no artifact")
+        return block
+    analysis = certificate.analyse(s, run)
+    policies = {p.letter: p for p in analysis.joined.policies}
+    wanted = {pid for c in analysis.claims for pid in c.passage_ids()}
+    passages = {p.id: p for p in s.scalars(select(models.Passage).where(models.Passage.id.in_(wanted)))}
+    for c in analysis.claims:
+        p = policies.get(c.policy_letter) if c.policy_letter else None
+        pn = p.fact("cert:policy_number") if p is not None else None
+        key = gate_claim_key(c, pn.value if pn is not None and pn.cited else None, p.line if p else None)
+        if key is None:
+            continue
+        cites = []
+        for pid in sorted(c.passage_ids()):
+            psg = passages.get(pid)
+            if psg is not None:
+                cites.append({"document": path_by_doc.get(psg.document_id), "page": psg.page_no})
+        block["claims"].append({"key": key, "backend_key": c.key, "kind": str(c.kind),
+                                "status": "supported" if str(c.verdict) == "supported" else "not_supported",
+                                "reason": c.reason, "condition": c.condition, "citations": cites})
+    block["notices"] = [{"kind": n.kind, "message": n.message, "document": path_by_letter.get(n.document_letter)}
+                        for n in analysis.joined.notices]
+    for rd in run.documents:
+        if str(rd.status) == "failed":
+            block["notices"].append({"kind": "document_not_read", "message": rd.error or "Not read",
+                                     "document": path_by_doc.get(rd.document_id)})
     return block
 
 

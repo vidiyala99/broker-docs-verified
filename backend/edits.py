@@ -30,9 +30,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from sqlalchemy import select
+
 from backend import db, models
 from backend.context import AppContext
-from backend.pipeline import compose, runner
+from backend.pipeline import certificate, compose, runner
 from backend.schemas import (
     ArtifactContent,
     Cell,
@@ -95,6 +97,10 @@ def all_passage_ids(content: ArtifactContent) -> set[int]:
     ids = set(content.passage_ids())
     for *_, cell in iter_cells(content):
         ids.update(cell.original_passage_ids)
+    cert = content.find_certificate()  # slice 4: an edited printed value keeps its original chips
+    if cert is not None:
+        for _, f in cert.iter_fields():
+            ids.update(f.cell.original_passage_ids)
     return ids
 
 
@@ -184,12 +190,27 @@ def save_cell_edit(ctx: AppContext, artifact_id: int, block_id: str, row_key: st
             raise EditError(409, "version_conflict",
                             f"The report changed (now version {art.current_version}). Reload and edit again.")
         previous = art.current_version
+        _refuse_issued(s, art)
         try:
             content, stale = apply_cell_edit(art.latest_content(), block_id, row_key, column_key, value)
         except KeyError:
             raise EditError(404, "cell_not_found", "That table cell does not exist in this report.") from None
-        version = models.snapshot_version(s, art, content, note=f"{note} {block_id}/{row_key}/{column_key}"[:200])
+        label = f"{note} {block_id}/{row_key}/{column_key}"[:200]
+        if runner.is_certificate(art.run):  # D12: the rebuild adds an "Edited by broker" sign-off claim
+            version = certificate.rebuild(s, art.run, base=content, note=label)
+            return SavedVersion(art.id, version.version, previous, [])
+        version = models.snapshot_version(s, art, content, note=label)
         return SavedVersion(art.id, version.version, previous, stale)
+
+
+def _refuse_issued(s, art: models.Artifact) -> None:
+    """An issued certificate version is read-only (slice 4): New version first."""
+    if not runner.is_certificate(art.run):
+        return
+    issued = s.scalar(select(models.CertificateIssue.id).where(models.CertificateIssue.artifact_id == art.id,
+                                                              models.CertificateIssue.version == art.current_version))
+    if issued is not None:
+        raise EditError(409, "issued", "This version is issued and read-only. Start a new version to change it.")
 
 
 def restore(ctx: AppContext, artifact_id: int, version: int, *, base_version: int | None = None) -> SavedVersion:
@@ -204,6 +225,16 @@ def restore(ctx: AppContext, artifact_id: int, version: int, *, base_version: in
             raise EditError(409, "version_conflict",
                             f"The report changed (now version {art.current_version}). Reload first.")
         previous = art.current_version
+        _refuse_issued(s, art)
+        if runner.is_certificate(art.run):
+            # Slice 4: the restored version's edits come back; removals follow the current decisions, so the
+            # printed certificate and its check list always agree.
+            try:
+                base = ArtifactContent.model_validate(art.version_row(version).content)
+            except LookupError:
+                raise EditError(404, "version_not_found", f"This report has no version {version}.") from None
+            row = certificate.rebuild(s, art.run, base=base, note=f"restore v{version}")
+            return SavedVersion(art.id, row.version, previous, [])
         try:
             row = models.restore_version(s, art, version)
         except LookupError:
@@ -237,6 +268,19 @@ async def regenerate_prose(ctx: AppContext, artifact_id: int, *, base_version: i
             if base_version is not None and base_version != art.current_version:
                 raise EditError(409, "version_conflict",
                                 f"The report changed (now version {art.current_version}). Reload first.")
+            if runner.is_certificate(art.run):  # slice 4: rebuilt in code from the facts, no model call
+                _refuse_issued(s, art)
+                cert_content = certificate.content_for_run(s, art.run)
+            else:
+                cert_content = None
+        if cert_content is not None:
+            with db.session_scope(ctx.factory) as s:
+                art = s.get(models.Artifact, artifact_id)
+                previous = art.current_version
+                version = models.snapshot_version(s, art, cert_content, note="regenerate")
+            return Regenerated(artifact_id, version.version, previous, False, None)
+        with ctx.factory() as s:
+            art = s.get(models.Artifact, artifact_id)
             latest = art.latest_content()
             known = edit_keys(latest)
             inp = runner.compose_input_for_run(art.run, compose_edits(latest))

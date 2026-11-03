@@ -12,15 +12,24 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from sqlalchemy import select
 
 from backend import db, models, proposal, work_queue
 from backend.context import AppContext
+from backend.pipeline import certificate
 from backend.pipeline.runner import SlotError, format_sse
 from backend.routes.common import ApiError, get_ctx, not_found
 from backend.routes.workspace import find_workflow
-from backend.schemas import DiscrepancyBlock, ParameterErrors, Severity
+from backend.schemas import ClaimBlock, DiscrepancyBlock, ParameterErrors, Severity
 from backend.views import discrepancy_sources, run_out
 
 router = APIRouter(tags=["runs"])
@@ -79,6 +88,30 @@ def _check_source_run(s, value: Any) -> models.Run:
     return source
 
 
+_CERT_FIELD_NAMES = {"holder_name": "Holder name", "holder_address": "Holder address",
+                     "description": "Description of operations", "certificate_date": "Certificate date",
+                     "wording": "Requested wording"}
+
+
+def certificate_parameters(raw: Any) -> dict[str, Any]:
+    """Validated certificate parameters as stored on the run (the date fixed to today when omitted).
+    A bad or over-long field is 422 invalid_request naming the field (D6)."""
+    try:
+        return certificate.CertificateParameters.model_validate(raw).stored()
+    except ValidationError as exc:
+        fields, names = [], []
+        for e in exc.errors():
+            loc = [str(x) for x in e.get("loc", ())]
+            fields.append({"loc": ["body", "parameters", *loc], "message": e.get("msg", "")})
+            name = _CERT_FIELD_NAMES.get(loc[0] if loc else "", loc[0] if loc else "parameters")
+            if name not in names:
+                names.append(name)
+        limits = {"Holder name": models.MAX_HOLDER_NAME_CHARS, "Holder address": models.MAX_HOLDER_ADDRESS_CHARS,
+                  "Description of operations": models.MAX_DESCRIPTION_CHARS}
+        detail = "; ".join(f"{n} (at most {limits[n]} characters)" if n in limits else n for n in names)
+        raise ApiError(422, "invalid_request", f"Check these certificate fields: {detail}.", fields=fields) from None
+
+
 def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
     with ctx.factory() as s:
         run = s.get(models.Run, run_id)
@@ -115,6 +148,8 @@ async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSO
                           for loc, msg in exc.errors]
                 raise ApiError(422, "invalid_request", "The proposal settings are not valid.",
                                fields=fields) from None
+        if wf.slug == db.CERTIFICATE_SLUG:
+            parameters = certificate_parameters(body.parameters)  # D6: bounds, 422 naming the field
         if source is not None:
             # M3: inside parameters, so the same documents built from two comparisons are two runs.
             parameters = {**parameters, "source_run_id": source.id}
@@ -215,19 +250,24 @@ _SEVERITIES = tuple(s.value for s in Severity)
 MAX_NOTE_CHARS = 2000
 
 
-def _item_out(block: DiscrepancyBlock, row: models.DiscrepancyState | None,
+def _item_out(block: DiscrepancyBlock | ClaimBlock, row: models.DiscrepancyState | None,
               sources: dict[str, dict[str, list]] | None = None,
               task: models.Task | None = None) -> dict[str, Any]:
     out = block.model_dump(mode="json")
+    status = row.status if row else "open"
     out.update({
         "sources": (sources or {}).get(block.id, {}),
-        "status": row.status if row else "open",
+        "status": status,
         "note": row.note if row else None,
         "changed_since_resolved": bool(row.changed_since_resolved) if row else False,
         "updated_at": _ts(row.updated_at) if row else None,
         # slice 3b (O4): the item's task, read-only; a task never changes this item's state (R5)
         "task": {"id": task.id, "status": task.status} if task else None,
     })
+    if isinstance(block, ClaimBlock):  # a Policy Check item keeps its exact shape (D10)
+        # slice 4 (D15): what the broker saw; a certificate PATCH sends it back as expected_fingerprint
+        out["fingerprint"] = models.claim_fingerprint(block)
+        out["needs_action"] = certificate.claim_needs_action(block, status)
     return out
 
 
@@ -249,6 +289,10 @@ def _current_blocks(s, run_id: int) -> tuple[models.Run, list[DiscrepancyBlock]]
     return run, models.discrepancy_blocks(run.artifact.latest_content())
 
 
+def _is_certificate(run: models.Run) -> bool:
+    return run.workflow is not None and run.workflow.slug == db.CERTIFICATE_SLUG
+
+
 @router.get("/runs/{run_id}/discrepancies")
 async def list_discrepancies(run_id: int, severity: str | None = Query(None, max_length=100),
                              hide_resolved: bool = Query(False),
@@ -265,6 +309,16 @@ async def list_discrepancies(run_id: int, severity: str | None = Query(None, max
     with ctx.factory() as s:
         run, blocks = _current_blocks(s, run_id)
         rows = _discrepancy_rows(s, run_id)
+        if _is_certificate(run):  # slice 4: the draft's claims, in check-list order
+            claims = models.claim_blocks(run.artifact.latest_content())
+            tasks = models.item_tasks(s, run_id)
+            tally = certificate.claim_counts(claims, rows)
+            return {"run_id": run_id, "artifact_id": run.artifact.id, "version": run.artifact.current_version,
+                    "items": [_item_out(b, rows.get(b.id), None, tasks.get(b.id)) for b in claims],
+                    "counts": dict.fromkeys(_SEVERITIES, 0), "open_counts": dict.fromkeys(_SEVERITIES, 0),
+                    "total": tally.total, "resolved": tally.overridden,
+                    "claims": {"total": tally.total, "open": tally.open, "supported": tally.supported,
+                               "overridden": tally.overridden, "removed": tally.removed}}
         sources = discrepancy_sources(s, run, blocks)
         tasks = models.item_tasks(s, run_id)
         all_items = [_item_out(b, rows.get(b.id), sources, tasks.get(b.id)) for b in blocks]
@@ -279,8 +333,11 @@ async def list_discrepancies(run_id: int, severity: str | None = Query(None, max
 class DiscrepancyPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["open", "resolved"] | None = None
+    # "removed" is for certificate claims only (D10: a Policy Check item answers 422)
+    status: Literal["open", "resolved", "removed"] | None = None
     note: str | None = Field(None, max_length=MAX_NOTE_CHARS)
+    # D15: the item fingerprint the broker saw; required for certificate claims, optional for Policy Check
+    expected_fingerprint: str | None = Field(None, max_length=64)
 
     @field_validator("note")
     @classmethod
@@ -295,20 +352,31 @@ class DiscrepancyPatch(BaseModel):
             raise ValueError("send a status, a note, or both")
         if "status" in self.model_fields_set and self.status is None:
             raise ValueError("status must be open or resolved")
+        if not self.model_fields_set - {"expected_fingerprint"}:
+            raise ValueError("send a status, a note, or both")
         return self
 
 
 @router.patch("/runs/{run_id}/discrepancies/{item_id}")
 async def patch_discrepancy(run_id: int, item_id: str, body: DiscrepancyPatch,
                             ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
-    """Set one item's status and/or note (`note: null` clears it)."""
+    """Set one item's status and/or note (`note: null` clears it). Policy Check: open | resolved, note
+    optional (D10, unchanged). Certificate claims (slice 4): see `_patch_claim`."""
     with db.session_scope(ctx.factory) as s:
         run, blocks = _current_blocks(s, run_id)
+        if _is_certificate(run):
+            return _patch_claim(ctx, s, run, item_id, body)
+        if body.status == "removed":
+            raise ApiError(422, "invalid_request", "A Policy Check discrepancy is open or resolved; "
+                                                   "removed is only for certificate claims.")
         block = next((b for b in blocks if b.id == item_id), None)
         if block is None:
             raise ApiError(404, "discrepancy_not_found", "This report has no such discrepancy.")
         if not _discrepancy_rows(s, run_id).get(item_id):  # a version stored before T6: reconcile first
             models.reconcile_discrepancy_states(s, run_id, s.get(models.Run, run_id).artifact.latest_content())
+        if body.expected_fingerprint is not None and body.expected_fingerprint != models.item_fingerprint(block):
+            raise ApiError(409, "item_changed", "This discrepancy changed since it was loaded. Review it again.",
+                           item=_item_out(block, _discrepancy_rows(s, run_id).get(item_id)))
         kwargs: dict[str, Any] = {}
         if "status" in body.model_fields_set:
             kwargs["status"] = body.status
@@ -316,6 +384,66 @@ async def patch_discrepancy(run_id: int, item_id: str, body: DiscrepancyPatch,
             kwargs["note"] = body.note
         row = models.update_discrepancy_state(s, run_id, item_id, **kwargs)
         return _item_out(block, row, discrepancy_sources(s, run, [block]), models.item_tasks(s, run_id).get(item_id))
+
+
+def _patch_claim(ctx: AppContext, s, run: models.Run, item_id: str, body: DiscrepancyPatch) -> dict[str, Any]:
+    """A certificate claim decision (D1, D10, D13, D15):
+
+        run still reading ──────────────────────► 409 run_active
+        current version issued ──────────────────► 409 issued (New version first)
+        no expected_fingerprint ─────────────────► 422 fingerprint_required
+        fingerprint is not the current one ─────► 409 item_changed (with the current item)
+        resolved (Override) without a note ─────► 422 note_required (the note is the reason)
+        removed on a claim that cannot be removed (insured) ─► 422 not_removable
+        removed, or open after removed ─────────► the draft is rebuilt as a new version (D13)
+    """
+    if ctx.manager.is_active(run.id) or str(run.status) in _ACTIVE:
+        raise ApiError(409, "run_active", "This certificate is still being read. Decide when it finishes.",
+                       run_status=str(run.status))
+    if issue_for_current(s, run) is not None:
+        raise ApiError(409, "issued", "This version is issued and read-only. Start a new version to change it.")
+    claims = models.claim_blocks(run.artifact.latest_content())
+    block = next((b for b in claims if b.id == item_id), None)
+    if block is None:
+        raise ApiError(404, "discrepancy_not_found", "This certificate has no such claim.")
+    if not body.expected_fingerprint:
+        raise ApiError(422, "fingerprint_required", "Send the claim's fingerprint as expected_fingerprint, so "
+                                                    "the decision applies to the evidence on screen.")
+    rows = _discrepancy_rows(s, run.id)
+    if not rows.get(item_id):
+        models.reconcile_discrepancy_states(s, run.id, run.artifact.latest_content())
+        rows = _discrepancy_rows(s, run.id)
+    if body.expected_fingerprint != models.claim_fingerprint(block):
+        raise ApiError(409, "item_changed", "This claim changed since it was loaded. Review the new evidence.",
+                       item=_item_out(block, rows.get(item_id)))
+    if body.status == "resolved" and not body.note:
+        raise ApiError(422, "note_required", "Give the reason for the override; it is saved on the issued record.")
+    if body.status == "removed" and not block.removable:
+        raise ApiError(422, "not_removable", "This claim cannot be removed. Override it with a reason, or remove "
+                                             "the policy whose named insured differs.")
+    before = rows[item_id].status
+    kwargs: dict[str, Any] = {"allowed": models.CLAIM_STATUSES}
+    if "status" in body.model_fields_set:
+        kwargs["status"] = body.status
+    if "note" in body.model_fields_set:
+        kwargs["note"] = body.note
+    row = models.update_discrepancy_state(s, run.id, item_id, **kwargs)
+    if "removed" in (before, row.status) and before != row.status:
+        verb = "remove" if row.status == "removed" else "restore"
+        certificate.rebuild(s, run, note=f"{verb} {block.key}")
+        s.flush()
+        current = next((b for b in models.claim_blocks(run.artifact.latest_content()) if b.id == item_id), block)
+        return _item_out(current, row, None, models.item_tasks(s, run.id).get(item_id))
+    return _item_out(block, row, None, models.item_tasks(s, run.id).get(item_id))
+
+
+def issue_for_current(s, run: models.Run) -> models.CertificateIssue | None:
+    """The issue of the run's current artifact version, if it was issued (read-only, D2/D5)."""
+    if run.artifact is None:
+        return None
+    return s.scalar(select(models.CertificateIssue).where(
+        models.CertificateIssue.artifact_id == run.artifact.id,
+        models.CertificateIssue.version == run.artifact.current_version))
 
 
 @router.get("/runs/{run_id}/events")

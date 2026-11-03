@@ -1,4 +1,4 @@
-# BrokerDocs local API (slices 1 to 3b, work queue)
+# BrokerDocs local API (slices 1 to 4, work queue)
 
 Covers Compare Quotes (slice 1), Proposal Builder (slice 2), Policy Check (slice 3), the
 rail completion of slice 3b (run `line` for Personal lines, Tasks) and the broker work queue
@@ -810,6 +810,160 @@ characters are stripped from the note; `note: null` clears it. A status change c
 `changed_since_resolved`. Returns the item in the GET shape (with `task`); `404 discrepancy_not_found`
 when the current version has no such item. Resolving an open item that leaves the current version with
 no open item sets the run's `queue_changed_at` (work queue, D2: the check moves to Done recently).
+
+Slice 4 additions (pinned for Policy Check, D10: the item shape is unchanged). The body may send
+`expected_fingerprint` (`models.discrepancy_fingerprint` of the item); for Policy Check it is optional, and when sent and
+not current the answer is `409 item_changed` with `error.item` (the current item). `status: "removed"`
+on a Policy Check item is `422 invalid_request`; Policy Check statuses stay open | resolved and the note
+stays optional. Certificate claims use the same route with their own rules (see Certificates below).
+
+## Certificates (slice 4)
+
+Spec `docs/specs/2026-11-03-certificates-design.md` (ledger D1 to D18). Workflow slug `certificate`, one
+input slot `policies` (1 to 8 PDFs: declarations and endorsements). The draft is built in code after
+extraction (no compose call). Claims live in the same `discrepancy_state` table as Policy Check items.
+
+### Creating one: `POST /api/runs`
+
+`{"workflow": "certificate", "document_ids": [...], "client_name": "Cedar Hollow LLC", "parameters": {...}}`
+
+| Parameter | Rule |
+|---|---|
+| `holder_name` | required, 1 to 120 characters (one line) |
+| `holder_address` | 0 to 300 characters (line breaks kept) |
+| `wording` | `{"additional_insured": bool, "waiver_of_subrogation": bool, "primary_noncontributory": bool}` |
+| `certificate_date` | `YYYY-MM-DD`; omitted = today, fixed on the run |
+| `description` | description of operations, 0 to 1,500 characters |
+
+Anything else, or text over a bound, is `422 invalid_request`; the message names the field ("Holder name
+(at most 120 characters)") and `error.fields[].loc` is `["body", "parameters", <field>]`. Free text is
+escaped when printed (a holder "Smith & <Sons>" prints as typed).
+
+### Extraction (`cert:` keys)
+
+Scalar facts per document: `cert:named_insured, cert:insured_address, cert:producer, cert:carrier,
+cert:naic, cert:policy_number, cert:line, cert:effective_date, cert:expiration_date`, limits
+`cert:gl_each_occurrence, cert:gl_general_aggregate, cert:gl_products_completed_ops_aggregate,
+cert:gl_personal_advertising_injury, cert:gl_damage_to_rented_premises, cert:gl_medical_expense,
+cert:auto_combined_single_limit, cert:umbrella_each_occurrence, cert:umbrella_aggregate, cert:wc_statutory,
+cert:wc_el_each_accident, cert:wc_el_disease_each_employee, cert:wc_el_disease_policy_limit`.
+Endorsements come back in the same call as an `endorsements` array (each item: `form_number`, `edition`,
+`page`, `quote`, and `type` / `policy_number` / `named_party` / `condition`, each `{value, page, quote}`);
+each becomes facts `cert:endorsement:<FORM>:<attribute>` (FORM = form number letters and digits,
+upper case; `form_number` holds "<number> <edition>", `type` the printed title). The endorsement type
+(`additional_insured_blanket`, `additional_insured_scheduled`, `waiver_of_subrogation`,
+`primary_noncontributory`) is classified in code from the cited title (or the ISO form number), never
+taken from the model.
+
+### Claims (`ClaimBlock`, in section `checks`)
+
+| `key` | Claim | Supported when |
+|---|---|---|
+| `in_force:<letter>` | the policy is in force on the certificate date | both dates verified, effective <= date <= expiration |
+| `<wording>:<letter>` | a requested wording on one printed policy line (D14) | a joined endorsement of that type with a verified form; scheduled: names the holder; a condition ("where required by written contract") makes it Not supported until overridden |
+| `insured` | the named insured is the same on every printed policy | verified everywhere, equal ignoring case, spacing, dots and commas; cannot be removed |
+| `description` | the description of operations | never: a sign-off (D11) |
+| `edited:<column>:<field>` | a printed value the broker edited | never: a sign-off (D12) |
+
+`<letter>` is the policy's document letter (A to H); wording keys are `additional_insured`,
+`waiver_of_subrogation`, `primary_noncontributory`. Additional insured and primary and non-contributory
+apply to general liability, auto and umbrella lines; waiver also to workers compensation. A claim block
+has `kind`, `title`, `verdict` (`supported` | `not_supported` | `needs_signoff`), `reason`, `condition`,
+`wording`, `policy_letter`, `removable` and `prose` (citing its evidence). Endorsements join policies by
+policy number compared without case, spaces, dashes, dots or slashes (D7); an endorsement with no
+verified number joins the policy of its own document; unmatched numbers, two policies with one number,
+package policies (C7) and unread documents are run notices.
+
+### `CertificateBlock` (section `certificate`)
+
+`certificate_date`, `holder_name`, `holder_address`, `description`, `producer`, `insured[]`,
+`insurers[]` (`letter`, `name`, `naic`), `policies[]` (`letter`, `insurer`, `line`, `line_label`,
+`wording[]`, `fields[]`). Each field is `{key, label, cell}`; `cell.value` is what prints: the value when
+VERIFIED, else `"Not stated"` (state, chips and conflicts kept). Cell edits use `PATCH
+/api/artifacts/{id}/cells` with `block_id: "certificate"`, `row_key` = the field key, `column_key` = the
+policy letter or `insured`; each edit adds an `edited:` claim. Undo and regenerate rebuild the draft.
+
+### Claim decisions: `PATCH /api/runs/{id}/discrepancies/{item_id}`
+
+`{"status": "open" | "resolved" | "removed", "note": "...", "expected_fingerprint": "<item fingerprint>"}`.
+
+| Case | Answer |
+|---|---|
+| run queued, running or composing | `409 run_active` |
+| current version issued | `409 issued` (start a new version) |
+| no `expected_fingerprint` | `422 fingerprint_required` |
+| fingerprint not current | `409 item_changed`, `error.item` = the current claim |
+| `resolved` (Override) without a `note` | `422 note_required` (the note is the reason on the record) |
+| `removed` on `insured` | `422 not_removable` |
+| `removed` (or `open` after removed) | the draft is rebuilt as a new version without (or with) the content (D13) |
+
+Remove effects: a wording claim takes the wording off that policy's line; `in_force:<letter>` takes the
+policy's coverage row off (and its wording claims); `description` clears the description; `edited:`
+restores the extracted value. A removed or overridden claim reopens when its evidence changes
+(`changed_since_resolved`), and comes back if the evidence returns. `GET .../discrepancies` on a
+certificate lists the claims (each with `status`, `note`, `fingerprint`, `needs_action`) plus `claims`:
+`{total, open, supported, overridden, removed}` (`open` = claims needing action).
+
+### `GET /api/certificates/{run_id}`
+
+`{run, client, client_source, artifact_id, version, certificate, claims[], counts, notices[], chips,
+issue, issues[], can_issue, blocked[]}`. `blocked` lists what stops Issue: `run_active`, `claims_open`,
+`no_coverage`, `issued`, `no_draft`. `404 not_a_certificate` for another workflow's run.
+
+### `POST /api/certificates/{run_id}/documents` (Add document, D2)
+
+`{"document_ids": [...]}` (1 to 8, PDFs not already on the run). `202` with the certificate view; the run
+goes back to `queued`, reads only the new documents, keeps the other facts and decisions, and writes a new
+version. `409 run_active`, `409 issued`, `409 not_reopenable` (failed or cancelled: retry instead),
+`422 invalid_run` (duplicate, AMS, over 8), `404` unknown document or not a certificate.
+
+### `POST /api/certificates/{run_id}/issue` (D5, D13, D16)
+
+`{"version": N}` = the version on screen. Same version already issued: `200` `{"issue", "created": false,
+"certificate"}` (idempotent). Otherwise `409 run_active`, `409 version_changed` (`current_version`),
+`409 claims_open` (`open`), `409 no_coverage` (no printed policy whose in-force claim is supported),
+`500 issue_failed` (the PDF could not be made; nothing stored). Success: `200` `{"issue": {id, version,
+issued_at, holder, claims (each with status and note), pdf_sha256, pdf_url}, "created": true,
+"certificate"}`. The PDF bytes are stored in the issue row in the same transaction; the holder is saved
+for the client (by normalized client name). An issued version is read-only (edits, decisions and Add
+document answer `409 issued`).
+
+### `POST /api/certificates/{run_id}/new-version`
+
+An editable copy of the issued current version (decisions carry over). `409 not_issued` otherwise.
+
+### `GET /api/certificates/{run_id}/issues/{version}/pdf`
+
+The issued PDF (one page, own layout), `Content-Disposition: attachment`. `404 issue_not_found`.
+
+### `GET /api/certificates/holders?client=Cedar%20Hollow%20LLC`
+
+`{"client_key", "holders": [{id, name, address, last_used_at}]}`, last used first. Client names match
+ignoring case and spacing.
+
+### `GET /api/certificates/documents?client=...`
+
+The client's documents (from runs whose broker client name, or extracted named insured, matches), newest
+upload per sha256: the document shape plus `already_read` and `read_at` (a certificate read of the same
+bytes exists, so picking it makes no extraction call).
+
+### `GET /api/certificates/queue`
+
+`{in_progress, needs_attention, ready, done_recently, truncated}`. Items: `run_id`, `client`,
+`client_source`, `summary` ("Reading documents", "N checks to resolve", "Draft not ready", "Ready to
+issue", "Issued", "Closed"), `reasons`, `open_claims`, `status`, `retryable`, `created_at`, `finished_at`,
+`issued_at`, `queue_state`, `queue_changed_at`. Certificate runs are not in `GET /api/queue` (C8); Activity
+(`GET /api/runs`) lists them like any run.
+
+### Extraction cache (all workflows, D3, D8, D9, D17)
+
+Before a document is read, a DONE read of the same bytes (sha256) under the same key (field definitions,
+extraction prompts, workflow instructions, extract and vision model ids, OCR prompt, `EXTRACTION_VERSION`
+in `backend/pipeline/cache.py`) in another run is copied: facts, pages and passages (remapped onto the new
+document when it is another upload). Run documents (REST and SSE) carry `reused_from_run_id` (null for a
+live read) and `read_at` (when the facts were first read). `BROKERDOCS_EXTRACTION_CACHE=off` always reads
+live; evals and the dev seed run with it off. Bump `EXTRACTION_VERSION` when verify, merge or windows
+behaviour changes.
 
 ## Tasks (slice 3b)
 

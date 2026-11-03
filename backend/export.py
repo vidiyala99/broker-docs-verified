@@ -38,6 +38,8 @@ from openpyxl.utils import get_column_letter
 from backend.schemas import (
     ArtifactContent,
     Cell,
+    CertificateBlock,
+    ClaimBlock,
     DiscrepancyBlock,
     DiscrepancyItemState,
     EvidenceState,
@@ -403,6 +405,13 @@ def to_pdf(data: ExportData) -> bytes:
                 story += [Spacer(1, 4), t, Spacer(1, 6)]
             elif isinstance(block, DiscrepancyBlock):
                 story += _pdf_discrepancy(data, block, body, small, width)
+            elif isinstance(block, ClaimBlock):  # slice 4: one certificate check
+                story.append(Paragraph(f"<b>{escape(block.title)}</b> ({escape(str(block.verdict).replace('_', ' '))}): "
+                                       + _seg_markup(data, block.prose), body))
+            elif isinstance(block, CertificateBlock):  # slice 4: the printed values (issued PDF: own layout)
+                for col, f in block.iter_fields():
+                    story.append(Paragraph(f"<b>{escape(f.label)}</b> ({escape(col)}): {_cell_markup(data, f.cell)}",
+                                           small))
     if data.chips:
         story.append(toc_mark(Paragraph("Sources", head2), 0, "Sources"))
         rows = [[Paragraph(f"<b>{h}</b>", small) for h in ("Chip", "File", "Page", "Evidence")]]

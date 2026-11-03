@@ -46,6 +46,8 @@ from backend.schemas import (
     CITED_STATES,
     ArtifactContent,
     Cell,
+    CertificateBlock,
+    ClaimBlock,
     DiscrepancyBlock,
     EvidenceState,
     IssueBlock,
@@ -101,6 +103,12 @@ def _section_prose(section) -> str:
             parts.append(f"{block.code} {block.title}: {segs(block.impact)}")
         elif isinstance(block, DiscrepancyBlock):
             parts.append(f"{block.title} ({block.severity.label}): {segs(block.prose)}".rstrip(": "))
+        elif isinstance(block, ClaimBlock):  # slice 4: a certificate check
+            parts.append(f"{block.title} ({str(block.verdict).replace('_', ' ')}): {segs(block.prose)}")
+        elif isinstance(block, CertificateBlock):  # slice 4: what the certificate prints
+            for col, f in block.iter_fields():
+                cites = f" [passages {', '.join(map(str, f.cell.passage_ids))}]" if f.cell.passage_ids else ""
+                parts.append(f"{f.label} ({col}): {f.cell.value}{cites}")
     return "\n".join(p for p in parts if p)
 
 
@@ -409,7 +417,7 @@ def _outline(content: ArtifactContent) -> dict[str, Any]:
         if hasattr(block, "rows"):
             columns = columns or [c.label for c in block.columns]
             rows.extend(r.label for r in block.rows)
-        elif isinstance(block, DiscrepancyBlock):
+        elif isinstance(block, DiscrepancyBlock | ClaimBlock):
             discrepancies.append(block.title)
     return {"sections": [f"{s.number} {s.title}" for s in content.sections], "documents": columns,
             "fields": rows, **({"discrepancies": discrepancies} if discrepancies else {})}

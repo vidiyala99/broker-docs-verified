@@ -17,10 +17,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend import models
-from backend.schemas import POLICY_CHECK_FIELDS, FactField, OutlineBlock, SectionPlanItem
+from backend.schemas import CERTIFICATE_FIELDS, POLICY_CHECK_FIELDS, FactField, OutlineBlock, SectionPlanItem
+from backend.slugs import CERTIFICATE_SLUG, COMPARE_QUOTES_SLUG, POLICY_CHECK_SLUG, PROPOSAL_BUILDER_SLUG
+
+# Re-exported for the modules that read db.*_SLUG; the one definition is backend/slugs.py (D4).
+__all__ = ["CERTIFICATE_SLUG", "COMPARE_QUOTES_SLUG", "POLICY_CHECK_SLUG", "PROPOSAL_BUILDER_SLUG"]
 
 DEFAULT_WORKSPACE_ID = 1
-COMPARE_QUOTES_SLUG = "compare-quotes"
 
 
 def data_dir() -> Path:
@@ -107,14 +110,46 @@ def check_schema(engine: Engine) -> None:
         missing.append(f"the run (line, queue_state) index ({QUEUE_INDEX})")
     if "task" not in names:
         missing.append("the task table")
+    missing += _certificate_schema_gaps(insp, names)
     if not missing:
         return
     where = engine.url.database or "the in-memory database"
     raise SchemaOutdated(
-        f"The database {where} was created before a 2026-11-02 schema change (slice 3b or the work queue) "
+        f"The database {where} was created before a schema change (slice 3b, the work queue or slice 4 "
+        f"certificates) "
         f"and lacks {', '.join(missing)}. There are no migrations: stop the server, delete {where} (and its "
         f"-wal and -shm files if present), then start again for an empty database, or reseed dev data with: "
         f"{RESEED_COMMAND} (with BROKERDOCS_DATA_DIR set to a scratch folder).")
+
+
+CACHE_COLUMNS = ("extraction_key", "reused_from_run_id", "read_at")  # run_document (slice 4, D3/D8)
+CACHE_INDEX = "ix_run_document_extraction_key"
+DISCREPANCY_STATUS_CONSTRAINT = "ck_discrepancy_status"
+
+
+def _certificate_schema_gaps(insp, names: set[str]) -> list[str]:
+    """Slice 4 (D10 extended): the cache columns and index on run_document, page.ocr_key, the widened
+    discrepancy_state status rule (open | resolved | removed) and its reset_from column, and the holder
+    and certificate_issue tables."""
+    missing = []
+    if "run_document" in names:
+        columns = {c["name"] for c in insp.get_columns("run_document")}
+        missing += [f"the run_document.{c} column" for c in CACHE_COLUMNS if c not in columns]
+        if CACHE_INDEX not in {i.get("name") for i in insp.get_indexes("run_document")}:
+            missing.append(f"the run_document extraction_key index ({CACHE_INDEX})")
+    if "page" in names and "ocr_key" not in {c["name"] for c in insp.get_columns("page")}:
+        missing.append("the page.ocr_key column")
+    if "discrepancy_state" in names:
+        if "reset_from" not in {c["name"] for c in insp.get_columns("discrepancy_state")}:
+            missing.append("the discrepancy_state.reset_from column")
+        rule = next((c for c in insp.get_check_constraints("discrepancy_state")
+                     if c.get("name") == DISCREPANCY_STATUS_CONSTRAINT), None)
+        if rule is None or "removed" not in str(rule.get("sqltext", "")):
+            missing.append("the discrepancy_state status rule with 'removed'")
+    for table in ("holder", "certificate_issue"):
+        if table not in names:
+            missing.append(f"the {table} table")
+    return missing
 
 
 def exit_if_outdated(url: str | None = None) -> None:
@@ -144,7 +179,7 @@ def seed(session: Session) -> None:
     if session.get(models.Workspace, DEFAULT_WORKSPACE_ID) is None:
         session.add(models.Workspace(id=DEFAULT_WORKSPACE_ID, name="Local workspace"))
         session.flush()
-    for spec in (COMPARE_QUOTES, PROPOSAL_BUILDER, POLICY_CHECK):
+    for spec in (COMPARE_QUOTES, PROPOSAL_BUILDER, POLICY_CHECK, CERTIFICATE):
         _upsert(session, models.Workflow, spec, workspace_id=DEFAULT_WORKSPACE_ID)
     for spec in PROPOSAL_TEMPLATES:
         _upsert(session, models.ProposalTemplate, spec, workspace_id=DEFAULT_WORKSPACE_ID)
@@ -251,8 +286,6 @@ COMPARE_QUOTES: dict = {
 # sub-tables. Its `section_plan` is the catalogue of fact sections that outline
 # blocks bind to (D3); a proposal run always composes from its outline.
 
-PROPOSAL_BUILDER_SLUG = "proposal-builder"
-
 _CYBER_FIELDS = [
     FactField(key="cyber_aggregate_limit", label="Cyber Aggregate Limit", section="cyber",
               description="Cyber liability policy aggregate limit. Null if the quote has no cyber coverage."),
@@ -317,8 +350,6 @@ PROPOSAL_BUILDER: dict = {
 # combined extraction schema (T3, schemas.POLICY_CHECK_FIELDS): scalar fields plus the forms
 # field. PDF roles extract it; the AMS role fills the scalar keys from the AMS key table (D5).
 
-POLICY_CHECK_SLUG = "policy-check"
-
 POLICY_CHECK: dict = {
     "slug": POLICY_CHECK_SLUG,
     "name": "Policy Check",
@@ -339,6 +370,33 @@ POLICY_CHECK: dict = {
                         guidance="Differences between the renewal and the other documents.").model_dump(),
     ],
     "fact_schema": [f.model_dump() for f in POLICY_CHECK_FIELDS],
+}
+
+
+# --------------------------------------------------------------------- Certificate seed (slice 4)
+#
+# One slot, 1 to 8 PDFs: each a policy's declarations or an endorsement (C7, D2). The fact schema is the
+# combined cert: pass (schemas.CERTIFICATE_FIELDS). COMPOSING builds the draft in code
+# (pipeline.certificate, C5: no model call after extraction).
+
+CERTIFICATE: dict = {
+    "slug": CERTIFICATE_SLUG,
+    "name": "Certificate of Insurance",
+    "category": "Certificates",
+    "input_slots": [
+        {"key": "policies", "label": "Policies", "accepts": "application/pdf", "min": 1, "max": 8},
+    ],
+    "instructions": (
+        "Read an insurance policy document for a certificate of insurance: its declarations and any "
+        "additional insured, waiver of subrogation or primary and non-contributory endorsements. Report only "
+        "values stated in the document, each with the page and an exact quote."
+    ),
+    "section_plan": [
+        SectionPlanItem(id="certificate", number="1", title="Certificate").model_dump(),
+        SectionPlanItem(id="checks", number="2", title="Checks",
+                        guidance="Each claim the certificate makes, checked against the policies.").model_dump(),
+    ],
+    "fact_schema": [f.model_dump() for f in CERTIFICATE_FIELDS],
 }
 
 
