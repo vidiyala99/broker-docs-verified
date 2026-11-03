@@ -32,8 +32,8 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("href", "#/policy-check/new");
   // Slice 3b T6 (D7 allowed edit): Personal lines is live now, so its "coming in a later slice" check became this link check.
   await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Personal lines" })).toHaveAttribute("href", "#/personal-lines");
-  // 10 before slice 3b; Integrations (T5) and Personal lines (T6) are live now (D7 allowed edit, 9 -> 8). The Tasks lane lowers it again.
-  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(8);
+  // 10 before slice 3b; Integrations (T5), Personal lines (T6) and Tasks (T7) are live now (D7 allowed edits, 9 -> 8 -> 7).
+  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(7);
   await shot(page, "1440-01-launch");
   await axe(page, "launch");
 

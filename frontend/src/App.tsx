@@ -12,9 +12,21 @@ import { ProposalWizard } from "./wizard/ProposalWizard";
 import { PolicyWizard } from "./policy/PolicyWizard";
 import { PERSONAL_LIMIT, PersonalLinesPage } from "./personal/PersonalLinesPage";
 import { lineFromHash } from "./personal/LineChoice";
+import { TasksPage } from "./tasks/TasksPage";
+import { taskIdFromHash } from "./tasks/taskUtil";
 
 // `line` is the entry preset from the hash query (`#/?line=personal`, `#/policy-check/new?line=personal`, slice 3b T6).
-type Route = { runId: number | null; wizard: boolean; policy: boolean; integrations: boolean; personal: boolean; line: Line | null };
+// `taskId` is the Tasks deep link (`#/tasks?task=<id>`, slice 3b T7, O7).
+type Route = {
+  runId: number | null;
+  wizard: boolean;
+  policy: boolean;
+  integrations: boolean;
+  personal: boolean;
+  tasks: boolean;
+  taskId: number | null;
+  line: Line | null;
+};
 
 function parseRoute(hash: string): Route {
   const m = /^#\/runs\/(\d+)/.exec(hash);
@@ -24,6 +36,8 @@ function parseRoute(hash: string): Route {
     policy: /^#\/policy-check\/new/.test(hash),
     integrations: /^#\/integrations\b/.test(hash),
     personal: /^#\/personal-lines\b/.test(hash),
+    tasks: /^#\/tasks\b/.test(hash),
+    taskId: /^#\/tasks\b/.test(hash) ? taskIdFromHash(hash) : null,
     line: lineFromHash(hash),
   };
 }
@@ -67,7 +81,7 @@ export function App() {
   const policyRun = runOfRoute?.workflow_name === POLICY_WORKFLOW;
   const personalRun = runOfRoute?.line === "personal";
   // An entry screen opened from Personal lines (`?line=personal`) belongs to Personal lines.
-  const personalEntry = route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations;
+  const personalEntry = route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks;
 
   // Which runs the shell lists: Personal lines = personal, newest 100 (D5); a run view = the run's own line (unknown
   // until the run loads); everywhere else = the entry line, commercial by default (Workflows = commercial, D9).
@@ -98,7 +112,9 @@ export function App() {
   }, [route.runId, route.wizard, route.policy, route.personal, loadRuns]);
 
   useEffect(() => {
-    document.title = route.integrations
+    document.title = route.tasks
+      ? "Tasks"
+      : route.integrations
       ? "Integrations"
       : route.personal
         ? "Personal lines"
@@ -109,11 +125,13 @@ export function App() {
             : route.runId
               ? `Run ${route.runId}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
               : "Compare Quotes";
-  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, proposalRun, policyRun]);
+  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, proposalRun, policyRun]);
 
   // Rail: Personal lines for its page and its entry screens; a run view highlights its workflow whatever its line
   // (the rail names the tool, the crumb names the book; PERSONAL-LINES-BRIEF.md).
-  const section: Section = route.integrations
+  const section: Section = route.tasks
+    ? "tasks"
+    : route.integrations
     ? "integrations"
     : route.personal || personalEntry
       ? "personal-lines"
@@ -132,7 +150,9 @@ export function App() {
       : personalRun
         ? [{ label: WORKFLOW_NAME, href: `#/${preset}` }, { label: `Run ${route.runId}` }]
         : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: `Run ${route.runId}` }];
-  const crumbs: Crumb[] = route.integrations
+  const crumbs: Crumb[] = route.tasks
+    ? [{ label: "Tasks" }]
+    : route.integrations
     ? [{ label: "Integrations" }]
     : route.personal
       ? [{ label: "Personal lines" }]
@@ -162,7 +182,7 @@ export function App() {
         <Rail section={section} />
         <div className="app__main">
           <TopBar crumbs={crumbs} />
-          {viewport === "narrow" && !route.wizard && !route.policy && !route.integrations && !route.personal && !policyRun && <NarrowNotice />}
+          {viewport === "narrow" && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !policyRun && <NarrowNotice />}
           {route.integrations ? (
             // Static mock: needs nothing from the server, so it renders even when the backend is down.
             <IntegrationsPage />
@@ -187,6 +207,8 @@ export function App() {
             </main>
           ) : route.wizard ? (
             <ProposalWizard workspace={workspace} viewport={viewport} />
+          ) : route.tasks ? (
+            <TasksPage targetId={route.taskId} />
           ) : route.personal ? (
             <PersonalLinesPage runs={runs} runsError={runsError} onRetry={loadRuns} />
           ) : route.policy ? (

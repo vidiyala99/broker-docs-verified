@@ -17,7 +17,7 @@ import {
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
 
-export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "integrations";
+export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "tasks" | "integrations";
 
 interface RailItem {
   label: string;
@@ -29,8 +29,8 @@ interface RailItem {
 }
 
 // DG1: the full rail from the reference. Live: Workflows (slice 1), Proposals (slice 2, the wizard),
-// Policy check (slice 3, the new-check wizard), Integrations (slice 3b, a static mock) and Personal lines (slice 3b T6,
-// runs tagged personal). `tip` is the tooltip and accessible name of a live item.
+// Policy check (slice 3, the new-check wizard), Integrations (slice 3b, a static mock), Personal lines (slice 3b T6,
+// runs tagged personal) and Tasks (slice 3b T7). `tip` is the tooltip and accessible name of a live item.
 const GROUPS: RailItem[][] = [
   [
     { label: "Workflows", icon: <Briefcase size={20} aria-hidden />, href: "#/", section: "workflows" },
@@ -38,7 +38,7 @@ const GROUPS: RailItem[][] = [
     { label: "Personal lines", icon: <Heartbeat size={20} aria-hidden />, href: "#/personal-lines", section: "personal-lines" },
     { label: "Policy check", icon: <ShieldCheck size={20} aria-hidden />, href: "#/policy-check/new", section: "policy-check", tip: "Policy check: new check" },
     { label: "Certificates", icon: <Stamp size={20} aria-hidden /> },
-    { label: "Tasks", icon: <ListChecks size={20} aria-hidden /> },
+    { label: "Tasks", icon: <ListChecks size={20} aria-hidden />, href: "#/tasks", section: "tasks" },
     { label: "Integrations", icon: <PlugsConnected size={20} aria-hidden />, href: "#/integrations", section: "integrations" },
   ],
   [

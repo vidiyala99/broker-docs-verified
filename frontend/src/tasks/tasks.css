@@ -1,0 +1,667 @@
+/* Slice 3b T7 Tasks. Tokens only (DESIGN.md); decisions in frontend/TASKS-BRIEF.md. */
+
+/* ------------------------------------------------------------------ page */
+
+.tasks__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8);
+}
+
+.tasks__head,
+.tasks__list,
+.tasks__body > .notice,
+.tasks-skeleton {
+  width: 100%;
+  max-width: 1120px;
+}
+
+.tasks__head {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.tasks__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.tasks__count {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: var(--numeric-table);
+}
+
+.tasks__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tasks__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+}
+
+.tasks__search {
+  position: relative;
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+
+.tasks__search .input {
+  height: 40px;
+  padding-left: 40px;
+  font-size: var(--text-sm);
+}
+
+.tasks__search-icon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.tasks__sort-phone {
+  display: none;
+}
+
+.tasks__empty {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  max-width: 560px;
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.tasks__empty .state-block__title {
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+}
+
+.tasks-skeleton {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tasks-skeleton > span:not(.sr-only) {
+  height: 52px;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+/* ------------------------------------------------------------------ table */
+
+/* Fixed layout: column widths do not jump when the rows change (search, filter, delete). */
+.tasks-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.tasks-table th {
+  height: 40px;
+  padding: 0 var(--space-3);
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  border-bottom: var(--border-width) solid var(--color-hairline);
+}
+
+.tasks-table td {
+  padding: var(--space-3);
+  vertical-align: top;
+  border-bottom: var(--border-width) solid var(--color-hairline);
+}
+
+.tasks-table .tasks-table__check {
+  width: 52px;
+  padding: var(--space-1) 0 var(--space-1) var(--space-1);
+}
+
+.tasks-table .tasks-table__menu {
+  width: 56px;
+  padding: var(--space-1);
+  text-align: right;
+}
+
+.tasks-table__due {
+  width: 136px;
+}
+
+.tasks-table__created {
+  width: 104px;
+}
+
+.tasks-table__link {
+  width: 34%;
+}
+
+.tasks-table td.tasks-table__due,
+.tasks-table td.tasks-table__created {
+  font-variant-numeric: var(--numeric-table);
+  white-space: nowrap;
+}
+
+/* Header sort button: the label plus a caret; the active column is in text colour. */
+.sort-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 32px;
+  margin-left: calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-fast) ease;
+}
+
+.sort-btn::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.sort-btn.is-on {
+  color: var(--color-text);
+}
+
+.sort-btn:active {
+  transform: scale(var(--press-scale));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sort-btn:hover {
+    background: var(--color-canvas);
+    color: var(--color-text);
+  }
+  .task-title:hover {
+    color: var(--color-primary);
+  }
+}
+
+.sort-btn:focus-visible,
+.task-title:focus-visible,
+.task-link a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Done checkbox: native, 44px hit area via the label. */
+.task-check {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.task-check input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.task-title {
+  display: block;
+  width: 100%;
+  min-height: 20px;
+  margin-top: var(--space-1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  text-align: left;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color var(--dur-fast) ease;
+}
+
+.task-row.is-done .task-title {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+/* Deep-link target (O7): the selected-row tint while the URL names it. */
+.task-row.is-target {
+  background: var(--color-primary-tint);
+}
+
+.task-due,
+.tasks-table td.tasks-table__created {
+  color: var(--color-text-muted);
+}
+
+.task-due {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+.tasks-table td.tasks-table__created {
+  padding-top: calc(var(--space-3) + var(--space-1));
+}
+
+.task-row:not(.is-done) .task-due time {
+  color: var(--color-text);
+}
+
+/* Overdue: glyph + word in the warning token; colour is the second signal. */
+.task-overdue {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-stale-fg);
+  font-weight: var(--weight-semibold);
+}
+
+/* Phone-only inline labels ("Due", "Created"); the column headers name them on wider screens. */
+.task-cell__label {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ linked item */
+
+.task-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  margin-top: var(--space-1);
+}
+
+.task-link__run {
+  position: relative;
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  border-radius: var(--radius-chip);
+}
+
+.task-link__run::before {
+  content: "";
+  position: absolute;
+  inset: -12px -4px;
+}
+
+.task-link--gone {
+  flex-direction: row;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+/* The one expressive element: a tag that carries the discrepancy's live state back to its card. */
+.task-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px var(--space-2);
+  border: var(--border-width) solid var(--color-hairline);
+  border-radius: var(--radius-chip);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  text-decoration: none;
+  transition: border-color var(--dur-fast) ease;
+}
+
+.task-chip::before {
+  content: "";
+  position: absolute;
+  inset: -10px -2px;
+}
+
+.task-chip__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-chip__state {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: pre;
+  font-weight: var(--weight-semibold);
+}
+
+.task-chip__state svg {
+  margin-left: 2px;
+  color: var(--color-text);
+}
+
+.task-chip--dropped {
+  border-style: dashed;
+  border-color: var(--color-border-input);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .task-chip:hover {
+    border-color: var(--color-primary);
+  }
+}
+
+/* ------------------------------------------------------------------ row menu */
+
+.row-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.row-menu__list {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: var(--z-popover);
+  display: grid;
+  min-width: 160px;
+  padding: var(--space-1);
+  border: var(--border-width) solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  transform-origin: top right;
+}
+
+/* Pointer opens only; keyboard opens are instant (DESIGN.md motion). */
+.row-menu__list--animate {
+  animation: row-menu-in var(--dur-fast) var(--ease-out);
+}
+
+@keyframes row-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.row-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-menu__item--danger {
+  color: var(--color-danger-fg);
+}
+
+.row-menu__item:focus-visible,
+.row-menu__item:focus {
+  outline: none;
+  background: var(--color-canvas);
+}
+
+.row-menu__item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row-menu__item:hover {
+    background: var(--color-canvas);
+  }
+}
+
+/* ------------------------------------------------------------------ dialog */
+
+.task-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: var(--border-width) solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  overflow: auto;
+}
+
+.task-dialog::backdrop {
+  background: color-mix(in srgb, var(--color-text) 48%, transparent);
+}
+
+.task-dialog--animate[open] {
+  animation: task-dialog-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes task-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.task-form {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-6);
+}
+
+.task-form__title {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.task-form__date {
+  max-width: 220px;
+}
+
+.task-form__error {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.task-form__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ discrepancy card */
+
+.disc__task {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.disc__task::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.disc__task:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* `#/runs/<id>?discrepancy=<item>` target (O7): outlined in primary, not a coloured side border. */
+.disc.is-target {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ narrow */
+
+@media (max-width: 1199px) {
+  .tasks-table__created {
+    width: 88px;
+  }
+  .tasks-table__due {
+    width: 116px;
+  }
+  .tasks-table__link {
+    width: 30%;
+  }
+}
+
+/* Phone: the same table, each row a two-to-four line block; headers stay for screen readers. */
+@media (max-width: 699px) {
+  .tasks__body {
+    padding: var(--space-6) var(--space-4);
+    gap: var(--space-5);
+  }
+  .tasks__title-row .page-title {
+    font-size: var(--text-lg);
+    line-height: var(--leading-lg);
+    letter-spacing: 0;
+  }
+  .tasks__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .tasks__search {
+    max-width: none;
+    flex: none;
+  }
+  .tasks__sort-phone {
+    display: grid;
+    gap: var(--space-1);
+  }
+  .tasks__sort-phone .field__label {
+    font-size: var(--text-sm);
+  }
+  .tasks__sort-phone .input {
+    height: 40px;
+    font-size: var(--text-sm);
+  }
+  .tasks-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tasks-table,
+  .tasks-table tbody {
+    display: block;
+  }
+  .tasks-table tr.task-row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    grid-template-areas:
+      "check title menu"
+      ". due due"
+      ". link link"
+      ". created created";
+    column-gap: var(--space-1);
+    padding: var(--space-2) 0;
+    border-bottom: var(--border-width) solid var(--color-hairline);
+  }
+  .tasks-table tr.task-row > td {
+    display: block;
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+  .tasks-table td.tasks-table__check {
+    grid-area: check;
+  }
+  .tasks-table td.tasks-table__title {
+    grid-area: title;
+    padding-top: var(--space-2);
+  }
+  .tasks-table td.tasks-table__menu {
+    grid-area: menu;
+  }
+  .tasks-table td.tasks-table__due {
+    grid-area: due;
+  }
+  .tasks-table td.tasks-table__link {
+    grid-area: link;
+  }
+  .tasks-table td.tasks-table__created {
+    grid-area: created;
+    padding: var(--space-1) 0 0;
+  }
+  .tasks-table td.tasks-table__due:has(.sr-only:only-child),
+  .tasks-table td.tasks-table__link:has(> .sr-only:only-child) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .task-due {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+  }
+  .task-cell__label {
+    display: inline;
+    color: var(--color-text-muted);
+  }
+  .task-link {
+    margin-top: var(--space-2);
+  }
+  /* Room to read the whole item on a phone: the chip wraps instead of cutting the title. */
+  .task-chip {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .task-chip__title {
+    white-space: normal;
+  }
+}
