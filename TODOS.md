@@ -43,3 +43,10 @@
 - **Scanned retention miss:** `carrier_c_scanned.retention` came back `not_found` once in the 19:53 live eval (Compare Quotes, scanned bucket, otherwise 0.983). A one-off so far; watch it in the next live run before acting.
 - **Context:** `docs/specs/2026-11-02-policy-check-design.md`, "Amendments after build". Multi-location policies are the separate "Coverage identity" entry above.
 - **Depends on:** slice 3 Policy Check backend.
+
+## Run-list paging past 100 runs (slice 3b, D5/D11)
+- **What:** add `offset` paging to `GET /api/runs` and a "Load more" control on Personal lines, Workflows' recent runs and the task run picker.
+- **Why:** slice 3b shows the newest 100 runs only (`routes/runs.py:76` caps `limit` at 100; eng review D5). Older runs drop off those lists silently.
+- **Pros:** every run stays reachable. **Cons:** one API parameter, three UI controls and their tests, for a case the demo does not reach yet.
+- **Context:** `docs/specs/2026-11-02-rail-completion-design.md`, decision ledger SC6/D5. Upgrade when a workspace passes 100 runs.
+- **Depends on:** slice 3b merged.
