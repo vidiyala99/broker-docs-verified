@@ -214,3 +214,11 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Servers: backend 8000 (fresh seed `scratchpad/dev-data-1103c` of session 482d9799), Vite 5173 from main.
 - Cleanup: worktrees `agent-a4dda978897d04506` (rail) and `agent-a25dd99f37bfb7d26` (queue) merged; own node_modules (npm ci), not links.
 - Next candidates: "run" wording pass; phone row order; template library; extraction cache 2c; Standard-template eval; slice 4 (COI). Fresh session.
+
+## 2026-11-03 11:00: "run" wording pass + phone queue rows merged (main 69ebf9b)
+- Descriptive text no longer says "run": queue footer "See everything in Activity", report tab "Activity", left panel "Recent work", Activity subtitle "Every comparison, check and proposal, newest first.", upload limits "per comparison" (proposal drop zone "per proposal"), Personal lines hint, no-key hint, load errors "Couldn't load recent work.", cancelled "This was cancelled before a report was written.". Run numbers ("Run 5, version 1", "Compare Quotes, run 5", Tasks picker) stay as reference IDs (owner call).
+- Phone (<700px): queue meta line wraps so carriers are never clipped (the two Cedar Hollow rows were "Harborline, N..." vs "Harborline, J..."; "date first" would not help, both are Nov 3). DESIGN.md updated; queue-nav e2e asserts no clipped summary at 390.
+- Verified: tsc clean; full e2e 57/58 on the branch before the test update, the one failure was the old one-line-at-390 assertion; queue-nav suite 4/4 after; axe 0.
+- e2e regenerates tracked qa-screenshots from a mutated seed: restore them (`git checkout -- frontend/qa-screenshots`) unless a shot is evidence for the change.
+- Servers: backend 8000 + Vite 5173 still up; the 8000 DB was mutated by e2e, reseed before demoing.
+- Next candidates: template library; extraction cache 2c; Standard-template eval; slice 4 (COI). Proposal-mark / left-panel icon calls still open. Fresh session.
