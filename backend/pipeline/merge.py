@@ -638,6 +638,19 @@ def form_edition(key: str, value: str | None) -> str | None:
     """The edition of a form fact's value as "MM/YY" ("HO 00 03 05 11", "HO 00 03 (05/11)" and
     "HO0003 5/2011" all give "05/11"), or None when the value does not start with the key's form
     number or states no edition after it."""
+    split = split_form_value(key, value)
+    if split is None:
+        return None
+    mo = _EDITION_RE.match(split[1])
+    if not mo:
+        return None
+    month, year = int(mo.group(1)), mo.group(2)[-2:]
+    return f"{month:02d}/{year}" if 1 <= month <= 12 else None
+
+
+def split_form_value(key: str, value: str | None) -> tuple[str, str] | None:
+    """(the form number as printed, the rest) of a form fact's value, or None when the value
+    does not start with the key's form number (case, spacing and separators ignored)."""
     if not is_form_key(key) or not value:
         return None
     number = key[len(FORM_KEY_PREFIX):]
@@ -648,11 +661,7 @@ def form_edition(key: str, value: str | None) -> str | None:
         if i >= len(text) or text[i] != ch:
             return None
         i += 1
-    mo = _EDITION_RE.match(value[i:])
-    if not mo:
-        return None
-    month, year = int(mo.group(1)), mo.group(2)[-2:]
-    return f"{month:02d}/{year}" if 1 <= month <= 12 else None
+    return value[:i].strip(), value[i:]
 
 
 def _group_key(key: str, value: str | None) -> tuple[str, ...]:
@@ -681,5 +690,6 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
 
 __all__ = ["AMEND_RE", "DATED_FIELDS", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "TEMPORAL_FIELDS",
            "MergedFact", "conflict_message", "contained_in", "definition_body", "form_edition", "implausible_reason",
-           "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "states_date", "states_time",
+           "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "split_form_value",
+           "states_date", "states_time",
            "value_key"]
