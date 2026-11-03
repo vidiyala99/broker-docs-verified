@@ -1,0 +1,153 @@
+/* Slice 3b T5 Integrations mock. Tokens only (DESIGN.md); decisions in frontend/INTEGRATIONS-BRIEF.md. */
+
+.integrations__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-8);
+}
+
+.integrations__head,
+.integrations__group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1040px;
+}
+
+.integrations__head {
+  gap: var(--space-4);
+}
+
+.integrations__group {
+  gap: var(--space-4);
+}
+
+/* The one emphasised element: the only true statement on the page reads at body size. */
+.integrations__notice {
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+}
+
+.integrations__group-title {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.integrations__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+/* Desktop tile (evidence shot): glyph + name, category under, Connect bottom-right. */
+.integ-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "icon name"
+    "desc desc"
+    "foot foot";
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+
+.integ-card__icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: var(--border-width) solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-text-muted);
+}
+
+.integ-card__name {
+  grid-area: name;
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-semibold);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.integ-card__desc {
+  grid-area: desc;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+/* Connect pinned to the bottom-right so the buttons line up across a row. */
+.integ-card__foot {
+  grid-area: foot;
+  align-self: end;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-2);
+}
+
+/*
+ * The inert Connect is dimmed (DESIGN.md disabled rule), but opacity would also dim its focus ring.
+ * Draw the ring on the tooltip anchor instead, at full strength.
+ */
+.integ-card__foot .tip-anchor {
+  border-radius: var(--radius-control);
+}
+
+.integ-card__foot .btn[aria-disabled="true"]:focus-visible {
+  outline: none;
+}
+
+.integ-card__foot .tip-anchor:has(.btn:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Glyph on the first line when the notice wraps (390). */
+.integrations__notice {
+  align-items: flex-start;
+  /* One line sits centred in the 44px notice; more lines grow downward. */
+  padding-block: calc((var(--size-button) - var(--leading-md)) / 2);
+}
+
+.integrations__notice > svg {
+  margin-top: 2px;
+}
+
+.vp-narrow .integrations__body {
+  padding: var(--space-4);
+  gap: var(--space-6);
+}
+
+/* Phone: one row per vendor so ten tiles are not ten screens of scroll. */
+.vp-narrow .integrations__grid {
+  gap: var(--space-2);
+}
+
+.vp-narrow .integ-card {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "icon name foot"
+    ".    desc desc";
+  gap: 0 var(--space-3);
+  padding: var(--space-3);
+}
+
+.vp-narrow .integ-card__foot {
+  align-self: center;
+  padding-top: 0;
+}

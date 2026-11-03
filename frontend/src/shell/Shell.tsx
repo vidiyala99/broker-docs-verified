@@ -17,7 +17,7 @@ import {
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
 
-export type Section = "workflows" | "proposals" | "policy-check";
+export type Section = "workflows" | "proposals" | "policy-check" | "integrations";
 
 interface RailItem {
   label: string;
@@ -28,8 +28,8 @@ interface RailItem {
   tip?: string;
 }
 
-// DG1: the full rail from the reference. Live: Workflows (slice 1), Proposals (slice 2, the wizard) and
-// Policy check (slice 3, the new-check wizard). `tip` is the tooltip and accessible name of a live item.
+// DG1: the full rail from the reference. Live: Workflows (slice 1), Proposals (slice 2, the wizard),
+// Policy check (slice 3, the new-check wizard) and Integrations (slice 3b, a static mock). `tip` is the tooltip and accessible name of a live item.
 const GROUPS: RailItem[][] = [
   [
     { label: "Workflows", icon: <Briefcase size={20} aria-hidden />, href: "#/", section: "workflows" },
@@ -38,7 +38,7 @@ const GROUPS: RailItem[][] = [
     { label: "Policy check", icon: <ShieldCheck size={20} aria-hidden />, href: "#/policy-check/new", section: "policy-check", tip: "Policy check: new check" },
     { label: "Certificates", icon: <Stamp size={20} aria-hidden /> },
     { label: "Tasks", icon: <ListChecks size={20} aria-hidden /> },
-    { label: "Integrations", icon: <PlugsConnected size={20} aria-hidden /> },
+    { label: "Integrations", icon: <PlugsConnected size={20} aria-hidden />, href: "#/integrations", section: "integrations" },
   ],
   [
     { label: "Assistant", icon: <ChatCircleText size={20} aria-hidden /> },

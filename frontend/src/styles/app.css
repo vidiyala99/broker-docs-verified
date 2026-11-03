@@ -413,11 +413,13 @@ a {
     border-color var(--dur-fast) ease;
 }
 
-.btn:active:not(:disabled) {
+.btn:active:not(:disabled):not([aria-disabled="true"]) {
   transform: scale(var(--press-scale));
 }
 
+/* aria-disabled buttons stay focusable so their explanation (tooltip + description) is reachable. */
 .btn:disabled,
+.btn[aria-disabled="true"],
 .icon-btn:disabled,
 .link-btn:disabled {
   opacity: var(--disabled-opacity);
@@ -444,8 +446,8 @@ a {
   .btn--primary:hover:not(:disabled) {
     background: var(--color-primary-hover);
   }
-  .btn--secondary:hover:not(:disabled),
-  .btn--ghost:hover:not(:disabled) {
+  .btn--secondary:hover:not(:disabled):not([aria-disabled="true"]),
+  .btn--ghost:hover:not(:disabled):not([aria-disabled="true"]) {
     background: var(--color-canvas);
   }
   .icon-btn:hover:not(:disabled) {
