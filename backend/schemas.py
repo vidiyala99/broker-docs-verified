@@ -7,6 +7,7 @@ layer can use these types without a database.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Collection, Sequence
 from enum import StrEnum
 from typing import Annotated, Any, Literal
@@ -82,12 +83,18 @@ class RunDocumentStatus(StrEnum):
 
 
 class FactField(BaseModel):
-    """One field of a workflow's fact schema (stored as JSON on `workflow`)."""
+    """One field of a workflow's fact schema (stored as JSON on `workflow`).
+
+    kind (slice 3, D13): "scalar" is one value per document (every field before slice 3);
+    "forms" asks the same extraction call for a forms array, and each form becomes a fact
+    keyed form:<normalized number> (see the policy check fact schema below).
+    """
 
     key: str
     label: str
     description: str = ""
     section: str | None = None  # section-plan id the field is usually reported in
+    kind: Literal["scalar", "forms"] = "scalar"
 
 
 class SectionPlanItem(BaseModel):
@@ -349,6 +356,76 @@ class ExtractionOutput(BaseModel):
     facts: list[ExtractedFact]
     option_count: int = 1
     option_label: str | None = None
+
+
+# --------------------------------------------------------------------- policy check fact schema (slice 3, T3)
+#
+# D13 A: one extraction pass per window returns the scalar fields below plus a forms array;
+# each form becomes a fact keyed form:<normalized number> (form_key), so the same form aligns
+# across expiring, quote and renewal however its number is spaced. Special provisions are not
+# extracted as items (no stable identity across documents). Single-location policies only
+# (D17: multi-location and multi-schedule coverage identity is a TODO).
+
+FORM_KEY_PREFIX = "form:"
+MAX_FORM_NUMBER_CHARS = 40
+_FORM_NUMBER_JUNK = re.compile(r"[^0-9A-Z]")
+
+
+def form_key(number: str | None) -> str | None:
+    """form:<number> with case, spacing and separators removed ("HO 00 03", "ho-00-03" and
+    "HO0003" are one form), or None for an empty or oversized number."""
+    compact = _FORM_NUMBER_JUNK.sub("", unicodedata.normalize("NFKC", number or "").upper())
+    if not compact or len(compact) > MAX_FORM_NUMBER_CHARS:
+        return None
+    return FORM_KEY_PREFIX + compact
+
+
+def is_form_key(key: str | None) -> bool:
+    return bool(key) and key.startswith(FORM_KEY_PREFIX) and len(key) > len(FORM_KEY_PREFIX)
+
+
+def scalar_fields(fields: Sequence[FactField]) -> list[FactField]:
+    return [f for f in fields if f.kind == "scalar"]
+
+
+def _pc(key: str, label: str, description: str, section: str, kind: str = "scalar") -> FactField:
+    return FactField(key=key, label=label, description=description, section=section, kind=kind)
+
+
+POLICY_CHECK_FIELDS: list[FactField] = [
+    _pc("policy_number", "Policy Number", "Policy number as printed on the declarations.", "policy"),
+    _pc("policy_term", "Policy Term", "Policy period: effective and expiration dates as printed.", "policy"),
+    _pc("named_insured", "Named Insured", "Name of the named insured as printed.", "insured"),
+    _pc("insured_address", "Insured Address", "Mailing or residence premises address of the named insured.",
+        "insured"),
+    _pc("coverage_a_limit", "Coverage A (Dwelling)", "Coverage A, Dwelling, limit of liability.", "coverage"),
+    _pc("coverage_b_limit", "Coverage B (Other Structures)", "Coverage B, Other Structures, limit.", "coverage"),
+    _pc("coverage_c_limit", "Coverage C (Personal Property)", "Coverage C, Personal Property, limit.", "coverage"),
+    _pc("coverage_d_limit", "Coverage D (Loss of Use)", "Coverage D, Loss of Use, limit.", "coverage"),
+    _pc("coverage_e_limit", "Coverage E (Personal Liability)", "Coverage E, Personal Liability, each occurrence.",
+        "coverage"),
+    _pc("coverage_f_limit", "Coverage F (Medical Payments)", "Coverage F, Medical Payments to Others, each person.",
+        "coverage"),
+    _pc("deductible_all_peril", "All Other Perils Deductible",
+        "Deductible that applies to all other perils (AOP), amount or percent as printed.", "deductible"),
+    _pc("deductible_wind_hail", "Wind/Hail Deductible",
+        "Windstorm or hail deductible, amount or percent as printed. Null when the policy has none.", "deductible"),
+    _pc("deductible_hurricane", "Hurricane Deductible",
+        "Named storm or hurricane deductible, amount or percent as printed. Null when the policy has none.",
+        "deductible"),
+    _pc("total_premium", "Total Premium", "Total annual premium payable, as one figure.", "premium"),
+    _pc("discount_multi_policy", "Multi-Policy Discount",
+        "Multi-policy or package discount, amount or percent as printed. Null when not applied.", "discount"),
+    _pc("discount_protective_device", "Protective Device Discount",
+        "Protective device, alarm or sprinkler discount, as printed. Null when not applied.", "discount"),
+    _pc("discount_claims_free", "Claims-Free Discount",
+        "Claims-free or loss-free discount, as printed. Null when not applied.", "discount"),
+    _pc("discount_loyalty", "Loyalty Discount",
+        "Loyalty, renewal or years-insured discount, as printed. Null when not applied.", "discount"),
+    _pc("forms", "Forms and Endorsements",
+        "Every policy form and endorsement the document lists or prints, with its form number and edition date.",
+        "forms", kind="forms"),
+]
 
 
 # --------------------------------------------------------------------- artifact content
