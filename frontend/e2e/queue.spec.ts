@@ -108,7 +108,7 @@ test("both pages show the seeded runs in the right groups, named by client", asy
   await expect(row(page, 8).getByRole("button", { name: /^Retry/ })).toBeVisible();
   // Commercial runs never show on Personal lines; Done recently starts collapsed when present.
   for (const id of [1, 2, 3, 4, 5, 6]) await expect(row(page, id)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "See every run in Activity" })).toHaveAttribute("href", "#/activity?line=personal");
+  await expect(page.getByRole("link", { name: "See everything in Activity" })).toHaveAttribute("href", "#/activity?line=personal");
   await shot(page, "1440-personal");
   await axe(page, "personal 1440");
 
@@ -421,7 +421,7 @@ test("Client field: set on Compare and Policy Check start, edited and cleared in
 test("Activity: line filter, links in and out, cap note", async ({ page }) => {
   const all = (await (await page.request.get(`${API}/api/runs?limit=100`)).json()).runs as { id: number; line: string }[];
   await page.goto("/#/personal-lines");
-  await page.getByRole("link", { name: "See every run in Activity" }).click();
+  await page.getByRole("link", { name: "See everything in Activity" }).click();
   await expect(page).toHaveURL(/#\/activity\?line=personal$/);
   await expect(page).toHaveTitle("Activity");
   await expect(page.getByRole("heading", { level: 1, name: "Activity" })).toBeVisible();
@@ -439,9 +439,9 @@ test("Activity: line filter, links in and out, cap note", async ({ page }) => {
   await shot(page, "1440-activity");
   await axe(page, "activity 1440");
 
-  // The run view's All runs tab opens Activity.
+  // The run view's Activity tab opens Activity.
   await page.goto("/#/runs/7");
-  await expect(page.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "#/activity");
+  await expect(page.getByRole("link", { name: "Activity", exact: true })).toHaveAttribute("href", "#/activity");
 
   // D11: at 100 runs the cap is said out loud.
   const one = (await (await page.request.get(`${API}/api/runs/6`)).json()) as Record<string, unknown>;

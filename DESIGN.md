@@ -182,7 +182,7 @@ See `frontend/QUEUE-BRIEF.md`. No new tokens.
 - Queue navigation (2026-11-03, `frontend/QUEUE-NAV-BRIEF.md`): the client name is the link to the row's report (text
   colour, 1px resting underline in `--color-border-input`, `currentColor` on hover); no separate "Open" link. The meta
   line is one line: what (or, when a client shows on two rows, the carriers' short names), then the start date; the
-  "name from the documents" tag sits beside the name. Phone drops the workflow word and the time. Identity and status
+  "name from the documents" tag sits beside the name. Phone drops the workflow word and the time, and lets the line wrap so the carriers are never cut. Identity and status
   columns split 3fr / 2fr. The report header names the client ("<client> · Compare Quotes"), run number and version
   as text-xs metadata under it; the client button reads "Change" when a name exists.
 - Motion primitives in `ui/motion.tsx` / `ui/motion.css` (for reuse by the motion lane): list enter (opacity +

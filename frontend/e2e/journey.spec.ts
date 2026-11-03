@@ -26,7 +26,7 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   // 1. Opens app: rail, drop zone with limits, recent runs (DG1, DG6).
   await page.goto("/");
   await expect(page.getByText("Drop quote PDFs to compare").first()).toBeVisible();
-  await expect(page.getByText(/up to 300 pages and 50 MB each, 8 files per run/).first()).toBeVisible();
+  await expect(page.getByText(/up to 300 pages and 50 MB each, 8 files per comparison/).first()).toBeVisible();
   // Slices 2 and 3: Proposals and Policy check are live; the rest of the rail still says "coming in a later slice".
   await expect(page.getByRole("link", { name: "Proposals, new proposal" })).toHaveAttribute("href", "#/proposals/new");
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("href", "#/policy-check/new");
@@ -152,7 +152,7 @@ test("seeded states: failed, cancelled, budget, fallback, partial", async ({ pag
 
   for (const [name, id, text] of [
     ["failed", failed.id, "No report was written."],
-    ["cancelled", cancelled.id, "This run was cancelled"],
+    ["cancelled", cancelled.id, "This was cancelled"],
     ["budget", budget.id, "token budget ran out"],
     ["fallback", fallback.id, "Retry prose"],
     ["partial", partial.id, "could not be read"],

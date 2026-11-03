@@ -284,6 +284,15 @@
   .queue-row__clock {
     display: none;
   }
+  /* The column is too narrow for one line: the carriers were cut right where two rows for one client differ
+     ("Harborline, N..." vs "Harborline, J..."), so the line wraps instead and the date keeps the end. */
+  .queue-row__what {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .queue-row__summary {
+    overflow: visible;
+  }
 }
 
 .queue-row__status {

@@ -78,7 +78,7 @@ export function LaunchView({
                 {!starting && <ArrowRight size={16} aria-hidden />}
               </button>
               {!workspace.model_configured && (
-                <p className="hint">No model key is set on the server, so runs will fail until one is configured.</p>
+                <p className="hint">No model key is set on the server, so documents can't be read until one is configured.</p>
               )}
             </div>
           </Accordion>

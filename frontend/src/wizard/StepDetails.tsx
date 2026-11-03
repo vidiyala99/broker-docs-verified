@@ -113,7 +113,7 @@ export function StepDetails({
         </h3>
         <p className="hint">Each quote becomes a column in the proposal tables, in this order.</p>
         <div id="f-document_ids" tabIndex={-1} className="details__drop" aria-describedby={docError ? "e-document_ids" : undefined}>
-          <DropZone limits={workspace.limits} onFiles={addFiles} title="Drop quote PDFs for this proposal" disabled={draft.docs.length >= maxDocs} />
+          <DropZone limits={workspace.limits} onFiles={addFiles} title="Drop quote PDFs for this proposal" limitsLine={`PDF, up to ${workspace.limits.max_pages} pages and ${workspace.limits.max_megabytes} MB each, ${maxDocs} files per proposal`} disabled={draft.docs.length >= maxDocs} />
         </div>
         {docError && (
           <p id="e-document_ids" className="field__error" role="alert">
@@ -375,7 +375,7 @@ export function UploadedPicker({
         ) : (
           <fieldset>
             <legend className="sr-only">Uploaded files</legend>
-            {full && <p className="hint">{fullText ?? `This proposal has ${max} quotes, the most a run can use.`}</p>}
+            {full && <p className="hint">{fullText ?? `This proposal has ${max} quotes, the most a proposal can use.`}</p>}
             <ul className="picker__list">
               {shown.map((d) => {
                 const on = hashes.has(d.sha256);

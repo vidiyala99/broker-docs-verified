@@ -192,8 +192,8 @@ test("Re-tag from the run header moves the run between the lists; a failed PATCH
   await expect(crumbs(page)).toHaveText(/^Personal lines.*Policy check.*Avery and Jordan Pellham$/);
   // The rail names the tool: Policy check stays current for a personal Policy Check run.
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("aria-current", "page");
-  // Work queue lane (D7 allowed edit): the run view's All runs tab opens Activity (spec section 2).
-  await expect(page.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "#/activity");
+  // Work queue lane (D7 allowed edit): the run view's Activity tab opens Activity (spec section 2).
+  await expect(page.getByRole("link", { name: "Activity", exact: true })).toHaveAttribute("href", "#/activity");
 
   // Personal -> Commercial: PATCH body exactly {"line": "commercial"}, crumbs and toast follow.
   const [patch] = await Promise.all([

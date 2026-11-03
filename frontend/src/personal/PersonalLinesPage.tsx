@@ -48,7 +48,7 @@ export function PersonalLinesPage() {
               <div className="queue-empty">
                 <Glyph name="blank" size={32} className="muted-glyph" />
                 <h2 className="queue-empty__title">No personal-lines work yet.</h2>
-                <p className="hint">Start a comparison or a renewal check. A run can also be moved here from its own page.</p>
+                <p className="hint">Start a comparison or a renewal check. Work can also be moved here from its report.</p>
                 <Actions />
               </div>
             }

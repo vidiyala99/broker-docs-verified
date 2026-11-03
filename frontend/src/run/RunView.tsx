@@ -521,7 +521,7 @@ export function RunView({
               <p className="hint">Compare Quotes has no parameters. Column order follows the upload order.</p>
             )}
           </Accordion>
-          <Accordion title="Recent runs" count={runs?.length}>
+          <Accordion title="Recent work" count={runs?.length}>
             {runs && <RecentRuns runs={runs} compact currentId={runId} />}
           </Accordion>
           <a
@@ -548,7 +548,7 @@ export function RunView({
       <main className="pane" id="main" tabIndex={-1} aria-labelledby="pane-title">
         <nav className="tabs" aria-label="Report and sources">
           <a href="#/activity" className="tab">
-            <ClockCounterClockwise size={16} aria-hidden /> All runs
+            <ClockCounterClockwise size={16} aria-hidden /> Activity
           </a>
           <button
             type="button"
@@ -882,7 +882,7 @@ function RunPlaceholder({
   if (run.status === "cancelled") {
     return (
       <div className="state-block">
-        <p className="state-block__title">This run was cancelled before a report was written.</p>
+        <p className="state-block__title">This was cancelled before a report was written.</p>
         <p className="hint">Retry reads the documents that did not finish.</p>
         {(
           <button type="button" className="btn btn--primary" onClick={onRetryRun}>

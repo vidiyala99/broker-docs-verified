@@ -266,7 +266,7 @@ export function QueueView({ data, line, empty }: { data: QueueData; line: Line; 
         ))}
         <p className="queue__footer">
           <a href={activityHref(line)} className="link-btn">
-            See every run in Activity
+            See everything in Activity
           </a>
         </p>
       </>

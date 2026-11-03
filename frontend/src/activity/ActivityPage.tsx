@@ -19,7 +19,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 /**
  * Work queue W2: every run, newest first (the existing RecentRuns list, unchanged), with a line filter. Linked from the
- * bottom of the queue and the run view's "All runs" tab; `?line=` presets the filter and follows it (QUEUE-BRIEF.md).
+ * bottom of the queue and the run view's "Activity" tab; `?line=` presets the filter and follows it (QUEUE-BRIEF.md).
  */
 export function ActivityPage({ preset }: { preset: Line | null }) {
   const [filter, setFilter] = useState<Filter>(preset ?? "all");
@@ -44,7 +44,7 @@ export function ActivityPage({ preset }: { preset: Line | null }) {
         setRuns(r);
         setLoads((l) => l + 1);
       },
-      (e: unknown) => n === seq.current && setError(e instanceof ApiError ? e.message : "Couldn't load the runs."),
+      (e: unknown) => n === seq.current && setError(e instanceof ApiError ? e.message : "Couldn't load recent work."),
     );
   }, [filter]);
 
@@ -66,7 +66,7 @@ export function ActivityPage({ preset }: { preset: Line | null }) {
             <h1 id="activity-title" className="page-title">
               Activity
             </h1>
-            <p className="personal__sub">Every run, newest first.</p>
+            <p className="personal__sub">Every comparison, check and proposal, newest first.</p>
             <fieldset className="line-choice activity__filter">
               <legend className="line-choice__legend">Show</legend>
               <div className="line-choice__seg">

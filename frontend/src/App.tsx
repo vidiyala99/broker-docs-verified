@@ -108,7 +108,7 @@ export function App() {
   const personalEntry =
     route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks && !route.activity;
 
-  // Which runs the shell lists: only the run view's "Recent runs" section reads this list now (the run's own line,
+  // Which runs the shell lists: only the run view's "Recent work" section reads this list now (the run's own line,
   // unknown until the run loads). Personal lines and the Compare screen show the work queue; Activity loads its own.
   const listLine: Line | null = route.runId != null ? (runOfRoute?.line ?? null) : null;
   const listLimit = 20;
@@ -122,7 +122,7 @@ export function App() {
         if (seq === listSeq.current) setRuns(r);
       },
       (e: unknown) => {
-        if (seq === listSeq.current) setRunsError(e instanceof ApiError ? e.message : "Couldn't load recent runs.");
+        if (seq === listSeq.current) setRunsError(e instanceof ApiError ? e.message : "Couldn't load recent work.");
       },
     );
   }, [listLine, listLimit]);

@@ -21,7 +21,7 @@ export function formatBytes(n: number): string {
 }
 
 export function limitsText(l: Limits): string {
-  return `PDF, up to ${l.max_pages} pages and ${l.max_megabytes} MB each, ${l.max_documents_per_run} files per run`;
+  return `PDF, up to ${l.max_pages} pages and ${l.max_megabytes} MB each, ${l.max_documents_per_run} files per comparison`;
 }
 
 /** DG6 drop zone: states the limits, "Choose files" primary button, inline rejections naming the limit. */
@@ -104,7 +104,7 @@ export function useUploads(limits: Limits | null) {
       seq.current += 1;
       const key = `f${seq.current}`;
       if (accepted >= max) {
-        next.push({ key, name: f.name, size: f.size, status: "rejected", progress: 0, message: `A run compares at most ${max} files. Remove one to add this file.` });
+        next.push({ key, name: f.name, size: f.size, status: "rejected", progress: 0, message: `A comparison takes at most ${max} files. Remove one to add this file.` });
         continue;
       }
       accepted += 1;

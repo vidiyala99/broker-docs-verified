@@ -82,7 +82,7 @@ test("the row menu says what it opens; a row without a next step has no Open lin
   await expect(nameLink(page, 2)).toHaveAttribute("href", "#/runs/2");
 });
 
-test("rows show when the work started, and carriers when a client shows twice; one line at 1440, 1024 and 390", async ({ page }) => {
+test("rows show when the work started, and carriers when a client shows twice; one line at 1440 and 1024, full carriers at 390", async ({ page }) => {
   const q = await (await page.request.get(`${API}/api/queue?line=commercial`)).json();
   const items = ["ready", "needs_attention"].flatMap((g) => q[g]) as { run_id: number; client: string | null; created_at: string }[];
   // Seeded: runs 5 and 6 (earlier suites may add more comparisons of the Cedar Hollow fixtures).
@@ -109,9 +109,20 @@ test("rows show when the work started, and carriers when a client shows twice; o
       await expect(row(page, 4).locator(".queue-row__summary")).toHaveText("2 carriers", { useInnerText: true });
       await expect(row(page, 6).locator(".queue-row__when")).toHaveText(/^[A-Z][a-z]{2} \d{1,2}$/, { useInnerText: true });
     }
-    // One line each.
-    const heights = await page.locator(".queue-row__what").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-    for (const hgt of heights) expect(hgt).toBeLessThan(26);
+    if (w > 700) {
+      // One line each.
+      const heights = await page.locator(".queue-row__what").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+      for (const hgt of heights) expect(hgt).toBeLessThan(26);
+    } else {
+      // Phone (run-wording pass): the line wraps so the carriers are never cut where the two Cedar Hollow rows differ.
+      const clipped = await page
+        .locator(".queue-row__summary")
+        .evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).length);
+      expect(clipped).toBe(0);
+      const five = await row(page, 5).locator(".queue-row__summary").innerText();
+      const six = await row(page, 6).locator(".queue-row__summary").innerText();
+      expect(five).not.toBe(six);
+    }
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
       .toBeLessThanOrEqual(0);

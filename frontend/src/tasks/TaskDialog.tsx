@@ -69,7 +69,7 @@ export function TaskDialog({
     let live = true;
     api.runs(100).then(
       (r) => live && setRuns(r),
-      (e: unknown) => live && setRunsError(e instanceof ApiError ? e.message : "Couldn't load the runs."),
+      (e: unknown) => live && setRunsError(e instanceof ApiError ? e.message : "Couldn't load recent work."),
     );
     return () => {
       live = false;
