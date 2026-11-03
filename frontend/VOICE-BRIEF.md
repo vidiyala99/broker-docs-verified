@@ -188,7 +188,7 @@ heavier at 22px.
 3. Final capture on a fresh seed; axe (wcag2a/aa, 21aa) 0 violations for A, B, C on `#/`, `#/personal-lines`,
    `#/runs/7` at 1440 and on the two queue pages at 390. No open findings from the rounds beyond C's weak spots
    above. The final capture ran as one Playwright MCP code block (navigate, wait, screenshot, axe) for consistency
-   across 26 shots; the design passes before it were driven step by step.
+   across 20 shots; the design passes before it were driven step by step.
 
 Pre-existing, not caused here: at 390 the Compare queue (`#/`) scrolls sideways and clips the row menu (present
 in `current-390-queue.png`); severity counts wrap mid-phrase at 390 ("1 / medium").
