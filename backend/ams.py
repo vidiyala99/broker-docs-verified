@@ -38,7 +38,7 @@ from typing import Literal
 
 import fitz
 
-from backend.schemas import ExtractedFact
+from backend.schemas import POLICY_CHECK_FIELDS, ExtractedFact, scalar_fields
 
 AmsFormat = Literal["json", "csv"]
 _KB = 1024
@@ -359,25 +359,19 @@ def render_pdf(record: AmsRecord) -> RenderedAms:
 
 # --------------------------------------------------------------------- key table (D5)
 
-# Canonical fact keys an AMS field can fill. Forms are not in an AMS flat record, so no form:<n> keys here.
-CANONICAL_KEYS: tuple[str, ...] = (
-    "policy_number", "policy_term", "effective_date", "expiration_date", "carrier_name",
-    "named_insured", "address",
-    "coverage_a_limit", "coverage_b_limit", "coverage_c_limit", "coverage_d_limit",
-    "coverage_e_limit", "coverage_f_limit",
-    "deductible_all_peril", "deductible_wind_hail", "deductible_hurricane",
-    "total_premium",
-)
+# Canonical fact keys an AMS field can fill: the policy-check scalar fields (schemas.POLICY_CHECK_FIELDS
+# is the truth, so the AMS role and the PDF roles align on one key list). Forms are not in an AMS flat
+# record, so no form:<n> keys here. Fields with no policy-check key (effective date and expiration date
+# on their own, carrier, agent notes) are unmapped and named in a notice (D5), never mapped to a near key:
+# an effective date alone compared with a printed policy term would be a false mismatch.
+CANONICAL_KEYS: tuple[str, ...] = tuple(f.key for f in scalar_fields(POLICY_CHECK_FIELDS))
 
 _ALIASES: dict[str, tuple[str, ...]] = {
     "policy_number": ("policy number", "policy no", "policy num", "policy #", "pol no", "policy id", "policy"),
-    "policy_term": ("policy term", "term"),
-    "effective_date": ("effective date", "eff date", "policy effective date", "effective"),
-    "expiration_date": ("expiration date", "exp date", "expiry date", "policy expiration date", "expiration"),
-    "carrier_name": ("carrier", "carrier name", "company", "insurer", "writing company"),
+    "policy_term": ("policy term", "term", "policy period"),
     "named_insured": ("named insured", "insured", "insured name", "primary insured", "client name"),
-    "address": ("address", "insured address", "mailing address", "property address", "location address",
-                "risk address"),
+    "insured_address": ("address", "insured address", "mailing address", "property address", "location address",
+                        "risk address", "residence premises"),
     "coverage_a_limit": ("coverage a", "coverage a limit", "cov a", "cov a limit", "coverage a dwelling",
                          "dwelling", "dwelling limit"),
     "coverage_b_limit": ("coverage b", "coverage b limit", "cov b", "cov b limit", "coverage b other structures",
@@ -395,6 +389,12 @@ _ALIASES: dict[str, tuple[str, ...]] = {
                              "windstorm hail deductible"),
     "deductible_hurricane": ("hurricane deductible", "deductible hurricane"),
     "total_premium": ("total premium", "premium", "annual premium", "written premium", "policy premium"),
+    "discount_multi_policy": ("multi policy discount", "multi-policy discount", "multipolicy discount",
+                              "package discount", "bundle discount"),
+    "discount_protective_device": ("protective device discount", "alarm discount", "security discount",
+                                   "sprinkler discount"),
+    "discount_claims_free": ("claims free discount", "claim free discount", "loss free discount"),
+    "discount_loyalty": ("loyalty discount", "years insured discount", "renewal discount"),
 }
 
 KEY_TABLE: dict[str, str] = {normalize_name(alias): key for key, aliases in _ALIASES.items() for alias in aliases}

@@ -14,6 +14,10 @@ page numbers; reports without them render exactly as in slice 1.
 
 DOCX lives in backend/export_docx.py and reuses cell_note and _source_note.
 
+Policy Check discrepancies (slice 3): the PDF renders each one (title, severity, the
+explanation and one row of role slots with chips, export_docx.slot_text wording); the XLSX
+gets a Discrepancies sheet with one row per item, so the export holds the comparison too.
+
 Both functions take plain data (`ExportData`), so they run in a worker thread.
 """
 
@@ -34,7 +38,10 @@ from openpyxl.utils import get_column_letter
 from backend.schemas import (
     ArtifactContent,
     Cell,
+    DiscrepancyBlock,
+    DiscrepancyItemState,
     EvidenceState,
+    PolicyRole,
     HeadingBlock,
     IssueBlock,
     ListBlock,
@@ -247,12 +254,38 @@ def to_xlsx(data: ExportData) -> bytes:
         _text(src, i, 5, "Verified in the PDF text" if c["verified"] else "Read from scan, unverified")
     for col, width in zip("ABCDE", (8, 10, 40, 8, 28)):
         src.column_dimensions[col].width = width
-    if not tables:
+    discrepancies = [b for _, b in data.content.iter_blocks() if isinstance(b, DiscrepancyBlock)]
+    if discrepancies:
+        _discrepancy_sheet(wb.create_sheet(_sheet_name("Discrepancies", used), 0), data, discrepancies)
+    elif not tables:
         ws = wb.create_sheet(_sheet_name("Report", used), 0)
         _text(ws, 1, 1, "This report has no tables.")
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def _discrepancy_sheet(ws, data: ExportData, blocks: list[DiscrepancyBlock]) -> None:
+    from backend.export_docx import slot_text  # export_docx imports this module
+
+    heads = ["Severity", "Discrepancy", *(r.label for r in PolicyRole), "Explanation"]
+    _text(ws, 1, 1, f"{data.title}: Discrepancies (version {data.version})", bold=True)
+    for j, head in enumerate(heads, start=1):
+        _text(ws, 2, j, head, bold=True).fill = _HEADER_FILL
+    for i, b in enumerate(blocks, start=3):
+        review = " (needs review)" if b.item_state == DiscrepancyItemState.NEEDS_REVIEW else ""
+        _text(ws, i, 1, b.severity.label)
+        _text(ws, i, 2, b.title + review)
+        for j, role in enumerate(PolicyRole, start=3):
+            cell = b.slot(role)
+            x = _text(ws, i, j, slot_text(cell))
+            note = _source_note(data, cell.passage_ids) if cell is not None else ""
+            if note:
+                x.comment = Comment(note, "BrokerDocs", width=320, height=120)
+        _text(ws, i, len(heads), " ".join(seg.text for seg in b.prose))
+    ws.freeze_panes = "C3"
+    for j, width in enumerate((10, 40, 24, 24, 24, 24, 60), start=1):
+        ws.column_dimensions[get_column_letter(j)].width = width
 
 
 # --------------------------------------------------------------------- PDF
@@ -368,6 +401,8 @@ def to_pdf(data: ExportData) -> bytes:
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ]))
                 story += [Spacer(1, 4), t, Spacer(1, 6)]
+            elif isinstance(block, DiscrepancyBlock):
+                story += _pdf_discrepancy(data, block, body, small, width)
     if data.chips:
         story.append(toc_mark(Paragraph("Sources", head2), 0, "Sources"))
         rows = [[Paragraph(f"<b>{h}</b>", small) for h in ("Chip", "File", "Page", "Evidence")]]
@@ -385,6 +420,34 @@ def to_pdf(data: ExportData) -> bytes:
     else:
         doc.build(story)
     return buf.getvalue()
+
+
+def _pdf_discrepancy(data: ExportData, block: DiscrepancyBlock, body, small, width: float) -> list[Any]:
+    """One Policy Check discrepancy: title with severity, explanation, a row of role slots."""
+    from reportlab.lib import colors
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+
+    from backend.export_docx import slot_text  # export_docx imports this module
+
+    review = ", needs review" if block.item_state == DiscrepancyItemState.NEEDS_REVIEW else ""
+    out: list[Any] = [Paragraph(f"<b>{escape(block.title)}</b> ({escape(block.severity.label)}{review})", body)]
+    if block.prose:
+        out.append(Paragraph(_seg_markup(data, block.prose), body))
+    roles = list(PolicyRole)
+    cells = []
+    for role in roles:
+        cell = block.slot(role)
+        labels = _labels(data, cell.passage_ids) if cell is not None else []
+        chip = f' <font color="#6356F0" size="7">[{", ".join(labels)}]</font>' if labels else ""
+        cells.append(Paragraph(escape(slot_text(cell)) + chip, small))
+    t = Table([[Paragraph(f"<b>{escape(r.label)}</b>", small) for r in roles], cells],
+              colWidths=[width / len(roles)] * len(roles))
+    t.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E5E7EB")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F3F4F6")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    return [*out, Spacer(1, 2), t, Spacer(1, 8)]
 
 
 def _pdf_front_pages(data: ExportData, fm: FrontMatter, styles, body, small, head1) -> list[Any]:

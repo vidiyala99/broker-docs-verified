@@ -402,6 +402,49 @@ run's replay that has no current `run.end` to end on. For a run that already
 ended, the replay ends with the `run.end` of its latest execution.
 After `run.end` (or a snapshot), fetch `GET /api/runs/{id}` and the artifact.
 
+## Policy Check discrepancies (slice 3)
+
+A `policy-check` run makes no compose call: its artifact is one "Discrepancies" section of
+`discrepancy` blocks built in code from the verified facts (D14), so Regenerate rebuilds it
+for free and byte-identically. An AMS document's facts come from the AMS key table, not the
+model (D5). A slot takes only what its `accepts` names: an AMS export only in `ams`, a PDF
+only in the PDF slots (`400 invalid_run` otherwise).
+
+The broker's decision on each item lives in `discrepancy_state`, outside the artifact.
+Every new artifact version (run, retry, regenerate, undo) reconciles it against a
+fingerprint of the item's compared slot values (citations excluded): a resolved item whose
+values changed reopens with `changed_since_resolved: true`; restoring the resolved values
+brings the decision back. Statuses are `open | resolved` only; there is no bulk endpoint (D1, D2).
+
+### `GET /api/runs/{id}/discrepancies?severity=critical,high&hide_resolved=true`
+
+Items of the current version in report order (severity, then key). `severity` is one tier
+or a comma list of `critical | high | medium | low` (`422` for another). `counts` and
+`open_counts` cover every item; the filters do not change them.
+
+```json
+{"run_id": 4, "artifact_id": 4, "version": 2, "total": 5, "resolved": 1,
+ "counts": {"critical": 2, "high": 2, "medium": 1, "low": 0},
+ "open_counts": {"critical": 1, "high": 2, "medium": 1, "low": 0},
+ "items": [{"type": "discrepancy", "id": "disc-coverage-a-limit", "key": "coverage_a_limit",
+            "title": "Coverage A (Dwelling) decreased by 14.3%", "severity": "critical",
+            "item_state": "discrepancy", "lob": null, "prose": [{"text": "...", "passage_ids": []}],
+            "slots": {"expiring": Cell, "renewal": Cell, "ams": Cell},
+            "status": "resolved", "note": "Insured asked for it.", "changed_since_resolved": false,
+            "updated_at": "2026-11-02T10:00:00+00:00"}]}
+```
+
+A role missing from `slots` is N/A (no document). `404 not_found` for an unknown run,
+`404 no_report` before the run has an artifact. A run of another workflow lists no items.
+
+### `PATCH /api/runs/{id}/discrepancies/{item_id}`
+
+Body `{"status": "open" | "resolved", "note": "..." | null}`, either or both (`422` for an
+empty body, another status, an unknown key, or a note over 2000 characters). Control
+characters are stripped from the note; `note: null` clears it. A status change clears
+`changed_since_resolved`. Returns the item in the GET shape; `404 discrepancy_not_found`
+when the current version has no such item.
+
 ## Artifacts
 
 ### `GET /api/runs/{run_id}/artifact?version=N` and `GET /api/artifacts/{id}?version=N`
