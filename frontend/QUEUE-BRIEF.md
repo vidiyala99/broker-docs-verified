@@ -166,3 +166,22 @@ items carry `proposal_retryable` (the linked proposal run's `retryable`, `null` 
 | Live sweep on In progress | n/a | Loading feedback | Perpetual motion only where state is live | n/a | Status by silhouette | Constant motion = linear | One orchestrated moment | Purpose: state indication | Avoid slow full-surface loops; small, thin |
 | Reduced motion | n/a | Respect prefers-reduced-motion | Mandatory | n/a | Floor | Keep opacity, drop movement | Floor | Ships with the animation | Gentler, non-vestibular equivalent |
 | Font proposal, not applied | n/a | n/a | Inter override path (brief pins it) | Font swap is the biggest lift, so ask | Do not change the incumbent world unasked | n/a | Choose type deliberately | n/a | Optical sizing; tighten large text |
+
+## Self-review rounds (3 of 3, Playwright MCP; screenshots in `qa-screenshots/queue/`)
+
+1. `r1-*` (1440): built as briefed; opened a row menu, Mark done, opened Done recently, Move back to queue, Build
+   proposal over a saved draft and its Undo, Review into run 7. Fixed: the status column did not line up across rows
+   (actions column now fixed width); "Move to Personal lines" wrapped in the menu (nowrap); the queue sat tight under the
+   Compare title; the run toolbar wrapped to two rows at 1440 once Client joined Line (the visible "Client" word now
+   shows only from 1600px, the button carries a person glyph and its name starts with "Client").
+2. `r2-*` (1440, 1024, 390) after the owner's feedback (Retry proposal, glyphs, type, motion): Retry proposal on run 4
+   live (row to In progress with the sweep line, polling moved it back to Ready and announced it). Fixed: "Building
+   proposal" said twice on the In progress row; status copy wrapped ("Ready for a proposal", wider status column);
+   an entered row kept a stacking context from its enter animation and the row below covered its menu (enter now uses
+   `backwards` fill; caught by e2e); the live row clipped its own menu (`overflow: hidden` moved onto the sweep's track).
+3. Motion sampled in the page (getBoundingClientRect over time): a Mark done exit folded only to the row's padding
+   height; fixed by folding the child's padding too (now 70px to 0 in 190ms); Done recently opens 0 to 72px over 200ms on
+   a pointer click. No open findings from the rounds.
+
+Known, not fixed: the run toolbar's report actions still clip at 390 (pre-existing, noted since PERSONAL-LINES-BRIEF);
+the section count reads "Needs review2" to a text query without a space (the accessible name has one).
