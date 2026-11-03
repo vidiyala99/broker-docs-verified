@@ -1,0 +1,123 @@
+{
+  "generator_version": 1,
+  "seed": 20261103,
+  "pymupdf_version": "1.28.0",
+  "scalar_fields": {
+    "policy_number": "Policy Number",
+    "policy_term": "Policy Term",
+    "named_insured": "Named Insured",
+    "insured_address": "Insured Address",
+    "coverage_a_limit": "Coverage A (Dwelling)",
+    "coverage_b_limit": "Coverage B (Other Structures)",
+    "coverage_c_limit": "Coverage C (Personal Property)",
+    "coverage_d_limit": "Coverage D (Loss of Use)",
+    "coverage_e_limit": "Coverage E (Personal Liability)",
+    "coverage_f_limit": "Coverage F (Medical Payments)",
+    "deductible_all_peril": "All Other Perils Deductible",
+    "deductible_wind_hail": "Wind/Hail Deductible",
+    "deductible_hurricane": "Hurricane Deductible",
+    "total_premium": "Total Premium",
+    "discount_multi_policy": "Multi-Policy Discount",
+    "discount_protective_device": "Protective Device Discount",
+    "discount_claims_free": "Claims-Free Discount",
+    "discount_loyalty": "Loyalty Discount"
+  },
+  "cases": [
+    {
+      "case_id": "pc_homeowners",
+      "truth": "pc_homeowners.case.json",
+      "roles": {
+        "expiring": "pc_homeowners_expiring",
+        "renewal": "pc_homeowners_renewal",
+        "quote": "pc_homeowners_quote",
+        "ams": "pc_homeowners_ams"
+      },
+      "seeded": 9,
+      "description": "Homeowners (HO-3) renewal check with all four roles: expiring clean, renewal two-column (values before labels), quote scanned, AMS JSON export."
+    },
+    {
+      "case_id": "pc_condo_injection",
+      "truth": "pc_condo_injection.case.json",
+      "roles": {
+        "expiring": "pc_condo_injection_expiring",
+        "renewal": "pc_condo_injection_renewal"
+      },
+      "seeded": 4,
+      "description": "Unit-owners (HO-6) renewal check with only the required roles: expiring two-column, renewal clean with a small-print injection paragraph. No quote and no AMS export (their slots are N/A)."
+    }
+  ],
+  "documents": [
+    {
+      "fixture_id": "pc_homeowners_expiring",
+      "case_id": "pc_homeowners",
+      "role": "expiring",
+      "file": "pc_homeowners_expiring.pdf",
+      "truth": "pc_homeowners_expiring.truth.json",
+      "variant": "policy_clean",
+      "gate_bucket": "policy_check",
+      "sha256": "a90b67726b3da777e2cbda31fc4bacc3bc287c8accf740f539026079dbf5ca86",
+      "deterministic_bytes": true,
+      "description": "Expiring document of pc_homeowners (clean layout). Not stated: deductible_hurricane, discount_loyalty."
+    },
+    {
+      "fixture_id": "pc_homeowners_renewal",
+      "case_id": "pc_homeowners",
+      "role": "renewal",
+      "file": "pc_homeowners_renewal.pdf",
+      "truth": "pc_homeowners_renewal.truth.json",
+      "variant": "policy_multicol",
+      "gate_bucket": "policy_check",
+      "sha256": "f7960f0148b4196f8f836be38c5204b098b4bdff889aaf4e93e71302df926a95",
+      "deterministic_bytes": true,
+      "description": "Renewal document of pc_homeowners (multicol layout). Not stated: deductible_hurricane, discount_claims_free, discount_loyalty."
+    },
+    {
+      "fixture_id": "pc_homeowners_quote",
+      "case_id": "pc_homeowners",
+      "role": "quote",
+      "file": "pc_homeowners_quote.pdf",
+      "truth": "pc_homeowners_quote.truth.json",
+      "variant": "policy_scanned",
+      "gate_bucket": "policy_check",
+      "sha256": "0a6653b034c1e1b3ec56294b42b43591c508045fbe02045e4b614266ea15970f",
+      "deterministic_bytes": true,
+      "description": "Quote document of pc_homeowners (scanned layout). Not stated: insured_address, deductible_hurricane, discount_multi_policy, discount_protective_device, discount_claims_free, discount_loyalty."
+    },
+    {
+      "fixture_id": "pc_homeowners_ams",
+      "case_id": "pc_homeowners",
+      "role": "ams",
+      "file": "pc_homeowners_ams.json",
+      "truth": "pc_homeowners_ams.truth.json",
+      "variant": "policy_ams_json",
+      "gate_bucket": "policy_check",
+      "sha256": "711be18aa3e61a4008708a850b5151542f8801d986847b6c51b3702b068c6234",
+      "deterministic_bytes": true,
+      "description": "AMS JSON export of pc_homeowners: 12 fields, rendered to a one-page PDF at upload. Unmapped: Carrier, Agent Notes."
+    },
+    {
+      "fixture_id": "pc_condo_injection_expiring",
+      "case_id": "pc_condo_injection",
+      "role": "expiring",
+      "file": "pc_condo_injection_expiring.pdf",
+      "truth": "pc_condo_injection_expiring.truth.json",
+      "variant": "policy_multicol",
+      "gate_bucket": "policy_check",
+      "sha256": "8baf4ed9258c7565984c443f7d2d6a5bd785faa97c0d03a45730a703e5a2162e",
+      "deterministic_bytes": true,
+      "description": "Expiring document of pc_condo_injection (multicol layout). Not stated: coverage_b_limit, deductible_wind_hail, deductible_hurricane, discount_multi_policy, discount_claims_free."
+    },
+    {
+      "fixture_id": "pc_condo_injection_renewal",
+      "case_id": "pc_condo_injection",
+      "role": "renewal",
+      "file": "pc_condo_injection_renewal.pdf",
+      "truth": "pc_condo_injection_renewal.truth.json",
+      "variant": "policy_clean",
+      "gate_bucket": "policy_check",
+      "sha256": "fb6fe196ae9b8d2d7aa8a43257d4f4b4a32506d80b1768191a8113f21344ee98",
+      "deterministic_bytes": true,
+      "description": "Renewal document of pc_condo_injection (clean layout). Not stated: coverage_b_limit, deductible_wind_hail, deductible_hurricane, discount_multi_policy, discount_protective_device, discount_claims_free."
+    }
+  ]
+}

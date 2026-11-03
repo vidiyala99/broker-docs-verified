@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261103,
+  "case_id": "pc_homeowners",
+  "workflow": "policy-check",
+  "gate_bucket": "policy_check",
+  "description": "Homeowners (HO-3) renewal check with all four roles: expiring clean, renewal two-column (values before labels), quote scanned, AMS JSON export.",
+  "roles": {
+    "expiring": "pc_homeowners_expiring",
+    "renewal": "pc_homeowners_renewal",
+    "quote": "pc_homeowners_quote",
+    "ams": "pc_homeowners_ams"
+  },
+  "discrepancies": [
+    {
+      "key": "coverage_a_limit",
+      "item_state": "discrepancy",
+      "change": "decrease",
+      "severity": "high",
+      "kind": "ten_percent_edge",
+      "note": "$400,000 to $360,000 is exactly 10%: High, not Critical (Critical is more than 10%).",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "$400,000",
+          "pages": [
+            1
+          ]
+        },
+        "quote": {
+          "state": "value",
+          "value": "$360,000",
+          "pages": [
+            1
+          ]
+        },
+        "renewal": {
+          "state": "value",
+          "value": "$360,000",
+          "pages": [
+            2
+          ]
+        },
+        "ams": {
+          "state": "value",
+          "value": "$360,000",
+          "pages": [
+            1
+          ]
+        }
+      }
+    },
+    {
+      "key": "coverage_c_limit",
+      "item_state": "discrepancy",
+      "change": "decrease",
+      "severity": "critical",
+      "kind": "limit_drop_over_10pct",
+      "note": "$200,000 to $170,000 is 15%: Critical.",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "$200,000",
+          "pages": [
+            1
+          ]
+        },
+        "quote": {
+          "state": "value",
+          "value": "$170,000",
+          "pages": [
+            1
+          ]
+        },
+        "renewal": {
+          "state": "value",
+          "value": "$170,000",
+          "pages": [
+            2
+          ]
+        },
+        "ams": {
+          "state": "value",
+          "value": "$170,000",
+          "pages": [
+            1
+          ]
+        }
+      }
+    },
+    {
+      "key": "coverage_d_limit",
+      "item_state": "discrepancy",
+      "change": "mismatch",
+      "severity": "high",
+      "kind": "quote_mismatch",
+      "note": "Expiring and renewal agree ($80,000); the scanned quote states $72,000: flat High.",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "$80,000",
+          "pages": [
+            1
+          ]
+        },
+        "quote": {
+          "state": "value",
+          "value": "$72,000",
+          "pages": [
+            1
+          ]
+        },
+        "renewal": {
+          "state": "value",
+          "value": "$80,000",
+          "pages": [
+            2
+          ]
+        },
+        "ams": {
+          "state": "not_stated",
+          "value": null
+        }
+      }
+    },
+    {
+      "key": "deductible_all_peril",
+      "item_state": "discrepancy",
+      "change": "increase",
+      "severity": "critical",
+      "kind": "deductible_increase",
+      "note": "$1,000 to $2,500: a deductible increase is Critical. AMS agrees with the renewal.",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "$1,000",
+          "pages": [
+            2
+          ]
+        },
+        "quote": {
+          "state": "value",
+          "value": "$2,500",
+          "pages": [
+            2
+          ]
+        },
+        "renewal": {
+          "state": "value",
+          "value": "$2,500",
+          "pages": [
+            2
+          ]
+        },
+        "ams": {
+          "state": "value",
+          "value": "$2,500",
+          "pages": [
+            1
+          ]
+        }
+      }
+    },
+    {
+      "key": "discount_claims_free",
+      "item_state": "discrepancy",
+      "change": "removed",
+      "severity": "high",
+      "kind": "discount_dropped",
+      "note": "7% on expiring, not on the renewal: discount dropped, High.",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "7%",
+          "pages": [
+            2
+          ]
+        },
+        "quote": {
+          "state": "not_stated",
+          "value": null
+        },
+        "renewal": {
+          "state": "not_stated",
+          "value": null
+        },
+        "ams": {
+          "state": "not_stated",
+          "value": null
+        }
+      }
+    },
+    {
+      "key": "form:HO0003",
+      "item_state": "discrepancy",
+      "change": "edition_changed",
+      "severity": "medium",
+      "kind": "edition_change",
+      "note": "HO 00 03 05 11 to HO 00 03 10 20: one edition change aligned on the form number, Medium.",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "HO 00 03 05 11",
+          "pages": [
+            3
+          ]
+        },
+        "quote": {
+          "state": "not_stated",
+          "value": null
+        },
+        "renewal": {
+          "state": "value",
+          "value": "HO 00 03 10 20",
+          "pages": [
+            3
+          ]
+        },
+        "ams": {
+          "state": "not_stated",
+          "value": null
+        }
+      }
+    },
+    {
+      "key": "form:HO0481",
+      "item_state": "discrepancy",
+      "change": "added",
+      "severity": "medium",
+      "kind": "form_added",
+      "note": "HO 04 81 appears only on the renewal: added, Medium.",
+      "slots": {
+        "expiring": {
+          "state": "not_stated",
+          "value": null
+        },
+        "quote": {
+          "state": "not_stated",
+          "value": null
+        },
+        "renewal": {
+          "state": "value",
+          "value": "HO 04 81 05 11",
+          "pages": [
+            3
+          ]
+        },
+        "ams": {
+          "state": "not_stated",
+          "value": null
+        }
+      }
+    },
+    {
+      "key": "form:HO0490",
+      "item_state": "discrepancy",
+      "change": "removed",
+      "severity": "high",
+      "kind": "removed_coverage",
+      "note": "Replacement cost endorsement HO 04 90 on expiring only: coverage removed, High.",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "HO 04 90 05 11",
+          "pages": [
+            3
+          ]
+        },
+        "quote": {
+          "state": "not_stated",
+          "value": null
+        },
+        "renewal": {
+          "state": "not_stated",
+          "value": null
+        },
+        "ams": {
+          "state": "not_stated",
+          "value": null
+        }
+      }
+    },
+    {
+      "key": "total_premium",
+      "item_state": "discrepancy",
+      "change": "increase",
+      "severity": "high",
+      "kind": "conflicting_value",
+      "note": "Premium increase alone is Medium; the AMS premium ($2,388.00) disagrees with the renewal, so the item is High.",
+      "slots": {
+        "expiring": {
+          "state": "value",
+          "value": "$2,184.00",
+          "pages": [
+            2
+          ]
+        },
+        "quote": {
+          "state": "value",
+          "value": "$2,412.00",
+          "pages": [
+            2
+          ]
+        },
+        "renewal": {
+          "state": "value",
+          "value": "$2,412.00",
+          "pages": [
+            2
+          ]
+        },
+        "ams": {
+          "state": "value",
+          "value": "$2,388.00",
+          "pages": [
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "no_item_keys": [
+    {
+      "key": "coverage_b_limit",
+      "reason": "equal in every role; the renewal's mislabeled $30,000 endorsement line is a trap"
+    },
+    {
+      "key": "coverage_e_limit",
+      "reason": "equal in expiring, quote and renewal; two AMS fields conflict, which is Needs review in the AMS slot and never a mismatch (D15)"
+    },
+    {
+      "key": "discount_multi_policy",
+      "reason": "equal in expiring and renewal; absent in AMS never counts (D10)"
+    },
+    {
+      "key": "discount_protective_device",
+      "reason": "equal in expiring and renewal; absent in quote and AMS"
+    },
+    {
+      "key": "insured_address",
+      "reason": "equal after normalization (Ct = Court)"
+    },
+    {
+      "key": "policy_term",
+      "reason": "never compared with expiring; quote and AMS state the renewal term"
+    },
+    {
+      "key": "policy_number",
+      "reason": "equal in every role"
+    },
+    {
+      "key": "deductible_wind_hail",
+      "reason": "equal in expiring, quote and renewal; absent in AMS"
+    },
+    {
+      "key": "form:HO0416",
+      "reason": "same form and edition on both policies"
+    }
+  ]
+}

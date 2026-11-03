@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261103,
+  "fixture_id": "pc_homeowners_ams",
+  "case_id": "pc_homeowners",
+  "role": "ams",
+  "file": "pc_homeowners_ams.json",
+  "variant": "policy_ams_json",
+  "gate_bucket": "policy_check",
+  "description": "AMS JSON export of pc_homeowners: 12 fields, rendered to a one-page PDF at upload. Unmapped: Carrier, Agent Notes.",
+  "carrier": "Hollowmere Mutual Insurance Company",
+  "page_count": 1,
+  "size_bytes": 492,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "facts": {
+    "policy_number": {
+      "value": "HM-HO-5530-1188",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Number: HM-HO-5530-1188",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_term": {
+      "value": "01/01/2027 - 01/01/2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Term: 01/01/2027 - 01/01/2028",
+      "source": "text",
+      "accepted_values": []
+    },
+    "named_insured": {
+      "value": "Avery and Jordan Pellham",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Avery and Jordan Pellham",
+      "source": "text",
+      "accepted_values": []
+    },
+    "insured_address": {
+      "value": "418 Thornbury Court, Lexington, KY 40502",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Address: 418 Thornbury Court, Lexington, KY 40502",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_a_limit": {
+      "value": "$360,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Dwelling Limit: $360,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_b_limit": null,
+    "coverage_c_limit": {
+      "value": "$170,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Cov C: $170,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "coverage_d_limit": null,
+    "coverage_e_limit": null,
+    "coverage_f_limit": null,
+    "deductible_all_peril": {
+      "value": "$2,500",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AOP Deductible: $2,500",
+      "source": "text",
+      "accepted_values": []
+    },
+    "deductible_wind_hail": null,
+    "deductible_hurricane": null,
+    "total_premium": {
+      "value": "$2,388.00",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Total Premium: $2,388.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "discount_multi_policy": null,
+    "discount_protective_device": null,
+    "discount_claims_free": null,
+    "discount_loyalty": null
+  },
+  "conflicts": {
+    "coverage_e_limit": [
+      {
+        "value": "$300,000",
+        "page": 1,
+        "quote": "Coverage E: $300,000"
+      },
+      {
+        "value": "$500,000",
+        "page": 1,
+        "quote": "Personal Liability: $500,000"
+      }
+    ]
+  },
+  "decoys": [],
+  "injection": null,
+  "notes": ""
+}

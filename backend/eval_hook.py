@@ -36,6 +36,19 @@ NotImplementedError, before any model call. Run parameters follow spec section
 2: the hook adds ``template_id`` and an ``outline`` copied from the template's
 blocks when a ``proposal_template`` table exists; without one the run uses the
 workflow's static section plan and a warning says so.
+
+Policy Check (slice 3, task T7): ``run_eval_batch(paths, workflow="policy-check",
+slots={path: role})`` runs the seeded ``policy-check`` workflow with each path in its
+role slot (expiring, renewal, quote, ams; D8). An AMS path is the JSON or CSV export
+itself: the hook parses and renders it to a PDF exactly as the upload route does (D4),
+stores the document as kind "ams" with the original kept for ams.facts_from_original
+(D5), and an AMS file the parser rejects is reported failed with its AmsError code. The
+output adds a ``policy_check`` block: every DiscrepancyBlock of the artifact as an item
+(id, key, title, severity, item_state, explanation) with one slot per role present in
+the block (a role left out is N/A, no document). A slot carries the role's document
+path, the raw evidence state (verified, scan_read, absent, failed, conflicting,
+not_found), the value only for a cited state, its citations resolved to (document
+path, page) and its conflict list.
 """
 
 from __future__ import annotations
@@ -43,17 +56,19 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
 
-from backend import db, models
+from backend import ams, db, models
 from backend.pipeline.parse import DEFAULT_LIMITS
 from backend.pipeline.runner import DocumentRef, RunManager
 from backend.providers import OpenAIProvider, Provider
 from backend.schemas import (
+    CITED_STATES,
+    DiscrepancyBlock,
     EvidenceState,
     HeadingBlock,
     IssueBlock,
@@ -72,6 +87,9 @@ _STATES = {EvidenceState.VERIFIED: "verified", EvidenceState.SCAN_READ: "scan_re
            EvidenceState.CONFLICTING: "not_found"}
 
 PROPOSAL_SLUG = "proposal-builder"
+POLICY_SLUG = db.POLICY_CHECK_SLUG
+POLICY_ROLES = ("expiring", "quote", "renewal", "ams")
+_AMS_SUFFIXES = (".json", ".csv")
 PROPOSAL_TEMPLATE_TABLE = "proposal_template"
 # Wizard step 2 fields the caller may pass (spec section 2); template_id and
 # outline are added here unless the caller gives them.
@@ -88,14 +106,21 @@ class WorkflowUnavailable(NotImplementedError):
 def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
                    budget_limit: int | None = None, workflow: str | None = None,
                    parameters: dict[str, Any] | None = None,
-                   template: str | int | None = None) -> dict[str, Any]:
+                   template: str | int | None = None,
+                   slots: Mapping[str, str] | None = None) -> dict[str, Any]:
     paths = [str(p) for p in paths]
     if len(paths) > DEFAULT_LIMITS.max_documents_per_run:
         raise ValueError(f"{len(paths)} documents; one run takes at most "
                          f"{DEFAULT_LIMITS.max_documents_per_run} (D3)")
     slug = workflow or db.COMPARE_QUOTES_SLUG
-    if slug not in (db.COMPARE_QUOTES_SLUG, PROPOSAL_SLUG):
-        raise ValueError(f"unknown eval workflow {slug!r}; known: {db.COMPARE_QUOTES_SLUG}, {PROPOSAL_SLUG}")
+    known = (db.COMPARE_QUOTES_SLUG, PROPOSAL_SLUG, POLICY_SLUG)
+    if slug not in known:
+        raise ValueError(f"unknown eval workflow {slug!r}; known: {', '.join(known)}")
+    role_of: dict[str, str] | None = None
+    if slug == POLICY_SLUG:
+        role_of = _policy_roles(paths, slots)
+    elif slots is not None:
+        raise ValueError("slots are only used by the policy-check workflow")
     if slug != db.COMPARE_QUOTES_SLUG:
         _require_workflow(slug)  # before a provider (and an API key) is needed
     owned = provider is None
@@ -103,7 +128,7 @@ def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
 
     async def _main() -> dict[str, Any]:
         try:
-            return await _run(paths, prov, budget_limit, slug, parameters, template)
+            return await _run(paths, prov, budget_limit, slug, parameters, template, role_of)
         finally:
             # Close the HTTP client we created inside this loop, else teardown logs
             # 'Event loop is closed' errors.
@@ -112,6 +137,25 @@ def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
                 await close()
 
     return asyncio.run(_main())
+
+
+def _policy_roles(paths: Sequence[str], slots: Mapping[str, str] | None) -> dict[str, str]:
+    """path -> role for a policy-check run; every path has one known role, no role twice."""
+    if not slots:
+        raise ValueError("a policy-check eval run needs slots: {path: role}")
+    given = {str(k): v for k, v in slots.items()}
+    out: dict[str, str] = {}
+    for p in paths:
+        role = given.get(p)
+        if role not in POLICY_ROLES:
+            raise ValueError(f"path {p!r} has no policy-check role (one of {', '.join(POLICY_ROLES)})")
+        if role in out.values():
+            raise ValueError(f"role {role!r} is given to more than one document")
+        out[p] = role
+    extra = set(given) - set(paths)
+    if extra:
+        raise ValueError(f"slots name paths that are not in the run: {sorted(extra)}")
+    return out
 
 
 def _failed(reason: str) -> dict[str, Any]:
@@ -176,14 +220,17 @@ def proposal_parameters(session: Any, parameters: dict[str, Any] | None,
 
 async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                slug: str = db.COMPARE_QUOTES_SLUG, parameters: dict[str, Any] | None = None,
-               template: str | int | None = None) -> dict[str, Any]:
+               template: str | int | None = None,
+               role_of: Mapping[str, str] | None = None) -> dict[str, Any]:
     proposal = slug == PROPOSAL_SLUG
+    policy = slug == POLICY_SLUG
     engine = db.make_engine("sqlite://")
     try:
         db.init_db(engine)
         factory = db.make_session_factory(engine)
         documents: dict[str, dict[str, Any]] = {}
         blobs: dict[int, bytes] = {}
+        originals: dict[int, bytes] = {}
         order: list[tuple[str, int]] = []
         run_params: dict[str, Any] = {}
         warnings: list[str] = []
@@ -199,27 +246,55 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 except OSError:
                     documents[path] = _failed("missing_file")
                     continue
+                kind, pdf, page_count = "quote", data, None
+                if policy and (role_of[path] == "ams" or Path(path).suffix.lower() in _AMS_SUFFIXES):
+                    # Same path as the AMS upload route (D4): parse, screen, render to a PDF.
+                    try:
+                        rendered = ams.render_pdf(ams.parse_ams(data))
+                    except ams.AmsError as exc:
+                        documents[path] = _failed(str(exc.code))
+                        continue
+                    kind, pdf, page_count = "ams", rendered.pdf, rendered.page_count
                 doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=Path(path).name,
                                       stored_name=uuid.uuid4().hex, size_bytes=len(data),
-                                      sha256=hashlib.sha256(data).hexdigest())
+                                      sha256=hashlib.sha256(data).hexdigest(), kind=kind,
+                                      page_count=page_count)
                 s.add(doc)
                 s.flush()
-                blobs[doc.id] = data
+                blobs[doc.id] = pdf
+                if kind == "ams":
+                    originals[doc.id] = data
                 order.append((path, doc.id))
         if not order:
             out: dict[str, Any] = {"input_tokens": 0, "documents": documents}
             if proposal:
                 out["proposal"] = {"workflow": slug, "run_status": None, "cells": [], "prose": [],
                                    "warnings": warnings + ["no readable document: no run"]}
+            if policy:
+                out["policy_check"] = _empty_policy_block(slug, role_of, ["no readable document: no run"])
             return out
 
         def load(ref: DocumentRef) -> bytes:
             return blobs[ref.id]
 
-        manager = RunManager(factory, provider, load_bytes=load, budget_limit=budget_limit)
+        def load_original(ref: DocumentRef) -> bytes:
+            return originals[ref.id]
+
+        manager = RunManager(factory, provider, load_bytes=load, load_original=load_original,
+                             budget_limit=budget_limit)
         try:
             if proposal:
                 run_id, _ = manager.submit(workflow_id, [doc_id for _, doc_id in order], run_params)
+            elif policy:
+                try:
+                    run_id, _ = manager.submit(workflow_id, [doc_id for _, doc_id in order],
+                                               slots={doc_id: role_of[path] for path, doc_id in order})
+                except ValueError as exc:  # SlotError: a required role is missing (its file failed)
+                    out = {"input_tokens": 0, "documents": documents}
+                    for path, _ in order:
+                        documents.setdefault(path, _failed("not_run"))
+                    out["policy_check"] = _empty_policy_block(slug, role_of, [f"run not created: {exc}"])
+                    return out
             else:
                 run_id, _ = manager.submit(workflow_id, [doc_id for _, doc_id in order])
             await manager.wait(run_id)
@@ -249,9 +324,66 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
             out = {"input_tokens": tokens, "documents": documents}
             if proposal:
                 out["proposal"] = _proposal_block(s, run, slug, order, warnings)
+            if policy:
+                out["policy_check"] = _policy_block(s, run, slug, order, role_of)
         return out
     finally:
         engine.dispose()
+
+
+def _empty_policy_block(slug: str, role_of: Mapping[str, str] | None, warnings: list[str]) -> dict[str, Any]:
+    return {"workflow": slug, "run_status": None,
+            "roles": {r: p for p, r in (role_of or {}).items()}, "items": [], "notices": [],
+            "warnings": list(warnings)}
+
+
+def _policy_block(s: Any, run: models.Run, slug: str, order: list[tuple[str, int]],
+                  role_of: Mapping[str, str]) -> dict[str, Any]:
+    """Every DiscrepancyBlock of the run's current artifact version as an item, its slots
+    with citations resolved to (document path, page) through the passages."""
+    path_by_doc = {doc_id: path for path, doc_id in order}
+    path_by_role = {r: p for p, r in role_of.items()}
+    block = _empty_policy_block(slug, role_of, [])
+    block["run_status"] = str(run.status)
+    art = run.artifact
+    if art is None or not art.versions:
+        block["warnings"].append("the run produced no artifact")
+        return block
+    content = art.latest_content()
+    block["notices"] = [{"kind": n.kind, "message": n.message} for n in content.notices]
+    found = [b for _, b in content.iter_blocks() if isinstance(b, DiscrepancyBlock)]
+    wanted: set[int] = set(content.passage_ids())
+    for b in found:
+        for cell in b.slots.values():
+            wanted.update(c.passage_id for c in cell.conflicts if c.passage_id is not None)
+    passages = {p.id: p for p in s.scalars(select(models.Passage).where(models.Passage.id.in_(wanted)))}
+
+    def cites(ids: Sequence[int]) -> list[dict[str, Any]]:
+        out = []
+        for pid in ids:
+            p = passages.get(pid)
+            out.append({"document": path_by_doc.get(p.document_id) if p else None,
+                        "page": p.page_no if p else None, "passage_id": pid})
+        return out
+
+    for b in found:
+        slots: dict[str, dict[str, Any]] = {}
+        for role, cell in b.slots.items():
+            state = EvidenceState(cell.state) if cell.state is not None else None
+            shown = state in CITED_STATES
+            slots[str(role)] = {
+                "document": path_by_role.get(str(role)),
+                "state": str(state) if state is not None else None,
+                "value": cell.value if shown else None,
+                "citations": cites(cell.passage_ids),
+                "conflicts": [{"value": c.value, "page": c.page_no} for c in cell.conflicts],
+            }
+        block["items"].append({
+            "id": b.id, "key": b.key, "title": b.title, "severity": str(b.severity),
+            "item_state": str(b.item_state), "explanation": " ".join(seg.text for seg in b.prose),
+            "slots": slots,
+        })
+    return block
 
 
 def _proposal_block(s: Any, run: models.Run, slug: str, order: list[tuple[str, int]],

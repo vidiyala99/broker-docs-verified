@@ -192,3 +192,50 @@ def run_proposal_suite(adapter: Callable[..., dict], proposal_dir: Path, proposa
         scores.append(g.score_proposal(p, doc_truths, out, paths))
     metrics = g.aggregate_proposals(scores)
     return metrics, g.evaluate_proposal_gates(metrics)
+
+
+# ---------------------------------------------------------------------------
+# Policy Check runs (slice 3, T7)
+# ---------------------------------------------------------------------------
+#
+# One case is one Policy Check run. The adapter is called with
+#
+#     run_eval_batch(paths, workflow="policy-check", slots={path: role})
+#
+# where role is expiring | renewal | quote | ams (an AMS path is the JSON or CSV export
+# itself; the hook renders it to a PDF as the upload route does, D4). It returns the dict
+# above plus "policy_check" (shape in eval_gates, Policy Check section).
+
+POLICY_CASES_ENV = "BROKERDOCS_EVAL_POLICY_CASES"
+
+
+def selected_policy_cases(known: list[str], env: dict | None = None) -> list[str]:
+    """Case ids from ``BROKERDOCS_EVAL_POLICY_CASES`` (comma-separated), else all.
+    Unknown names raise ValueError."""
+    raw = (os.environ if env is None else env).get(POLICY_CASES_ENV, "")
+    names = [n.strip() for n in raw.split(",") if n.strip()]
+    if not names:
+        return list(known)
+    unknown = [n for n in names if n not in known]
+    if unknown:
+        raise ValueError(f"{POLICY_CASES_ENV}: unknown case(s) {unknown}; known: {known}")
+    return list(dict.fromkeys(names))
+
+
+def run_policy_suite(adapter: Callable[..., dict], policy_dir: Path, cases: dict, doc_truths: dict,
+                     ids: list[str] | None = None):
+    """Call ``adapter`` once per policy case, score its discrepancy items, apply the D16 gate.
+
+    Returns ``(metrics, gate_report)``. NotImplementedError from the adapter propagates."""
+    import eval_gates as g
+
+    ids = ids if ids is not None else selected_policy_cases(sorted(cases))
+    scores = []
+    for cid in ids:
+        case = cases[cid]
+        paths = {fid: str(Path(policy_dir) / doc_truths[fid]["file"]) for fid in case["roles"].values()}
+        slots = {paths[fid]: role for role, fid in case["roles"].items()}
+        out = adapter(list(slots), workflow=case["workflow"], slots=slots)
+        scores.append(g.score_policy_case(case, doc_truths, out, paths))
+    metrics = g.aggregate_policy(scores)
+    return metrics, g.evaluate_policy_gates(metrics)

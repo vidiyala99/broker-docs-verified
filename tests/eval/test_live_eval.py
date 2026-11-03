@@ -10,6 +10,9 @@ the report is labeled a subset run. Unset runs the full suite.
 
 The Proposal Builder gate is its own test; run only it with
 ``pytest -m live tests/eval/test_live_eval.py -k proposal``.
+
+The Policy Check gate (slice 3, T7) is its own test too:
+``pytest -m live tests/eval/test_live_eval.py -k policy_check``.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ from pathlib import Path
 import pytest
 
 import eval_gates as g
-from eval_adapter import AdapterUnavailable, load_adapter, run_proposal_suite, run_suite
+from eval_adapter import AdapterUnavailable, load_adapter, run_policy_suite, run_proposal_suite, run_suite
 
 pytestmark = pytest.mark.live
 
@@ -63,3 +66,21 @@ def test_live_proposal_gates(adapter, proposal_dir: Path, proposals: dict, propo
     with capsys.disabled():
         print("\n" + report + f"\nreport: {target}")
     assert gates.passed, "proposal gate failed:\n" + report
+
+
+def test_live_policy_check_gates(adapter, policy_dir: Path, policy_cases: dict, policy_doc_truths: dict,
+                                 tmp_path: Path, capsys):
+    """Policy Check gate (slice 3, T7, D16): one run per case through the ``policy-check``
+    workflow. Run only it with ``-k policy_check``. ``BROKERDOCS_EVAL_POLICY_CASES`` selects
+    a subset; the JSON report goes to ``$BROKERDOCS_EVAL_POLICY_REPORT`` when set."""
+    try:
+        metrics, gates = run_policy_suite(adapter, policy_dir, policy_cases, policy_doc_truths)
+    except NotImplementedError as exc:
+        pytest.skip(f"policy check eval not runnable yet: {exc}")
+    report = g.format_policy_report(metrics, gates)
+    target = Path(os.environ.get("BROKERDOCS_EVAL_POLICY_REPORT") or tmp_path / "policy_report.json")
+    target.write_text(json.dumps(g.policy_report_dict(metrics, gates), indent=2, default=str),
+                      encoding="utf-8")
+    with capsys.disabled():
+        print("\n" + report + f"\nreport: {target}")
+    assert gates.passed, "policy check gate failed:\n" + report
