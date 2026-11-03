@@ -203,3 +203,14 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - PRODUCT.md (root) committed as a DRAFT: three [assumed] lines (portfolio demo for the BrokerDocs application; small/mid independent agency user; desktop-first) await owner confirmation.
 - Servers: none running (Vite 5173 was stopped for `npm ci`). Restart: backend with a fresh seed (old DBs fail the schema check), then `npm run dev` in frontend.
 - Next candidates (owner picks): rail glyph legibility pass; template library; extraction cache 2c; Standard-template eval; slice 4 (COI) per `docs/slice-map.md`. Fresh session.
+
+## 2026-11-03 10:50: rail glyphs (A) + queue navigation merged (main acc0744)
+- PRODUCT.md owner-confirmed (7e3cfb6), no [assumed] lines left.
+- Rail: direction A "Silhouettes" (`frontend/src/voice/railMarks.tsx`, 8 redrawn marks, 5 shipped kept). Brief `frontend/RAIL-BRIEF.md`, shots `frontend/qa-screenshots/rail/`. DESIGN.md Voice: no two rail items share an outline (check blurred at 20px). Open (owner did not take): Proposal mark elsewhere to the bound cover; left panel strip icons in the voice. Assistant/Insights is the one close pair (0.920 blur score), accepted.
+- Queue nav: client name links to `#/runs/<id>` (quiet "Open" link removed); menu "Open comparison"; meta line has start date, carrier names when a client repeats; seed run 3 = "Halvorsen Dental Partners"; report header/breadcrumb/tab title name the client ("<client> · Compare Quotes", small "Run N, version V"), "Change" when a name exists. Backend: single-run responses carry `client`/`client_source`; queue items carry `created_at`, `carriers` (API.md). Brief `frontend/QUEUE-NAV-BRIEF.md`.
+- Verified on main: backend 1441 pass/2 skip, tsc clean, full e2e 58/58 (`--workers=1`, against 8000/5173), axe 0.
+- Lane choices owner may veto: Cedar Hollow twice in seed; locale time format; carriers replace "Compare Quotes ·" on repeated rows; phone hides workflow word and time (at 390 the two Cedar Hollow rows differ only by the 2nd carrier: suggested fix = date first on phone); faint underline at rest; "run" wording left in "See every run in Activity", "All runs", "Recent runs".
+- Correction: the report toolbar's second row at 1440 is pre-existing on main, not a regression.
+- Servers: backend 8000 (fresh seed `scratchpad/dev-data-1103c` of session 482d9799), Vite 5173 from main.
+- Cleanup: worktrees `agent-a4dda978897d04506` (rail) and `agent-a25dd99f37bfb7d26` (queue) merged; own node_modules (npm ci), not links.
+- Next candidates: "run" wording pass; phone row order; template library; extraction cache 2c; Standard-template eval; slice 4 (COI). Fresh session.
