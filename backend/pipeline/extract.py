@@ -44,6 +44,7 @@ injected instruction changes what is extracted.
 from __future__ import annotations
 
 import copy
+import re
 import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -157,14 +158,19 @@ MAX_FORMS_PER_CALL = 200  # untrusted model output: forms past this are ignored
 ENDORSEMENTS_NOTE = """\
 Also return endorsements: every additional insured, waiver of subrogation (waiver of transfer of rights \
 of recovery) and primary and non-contributory endorsement these pages print. For each return \
-form_number (as printed, for example "CG 20 10"), edition (its edition date as printed, or null), page and \
+form_number (the form number as printed, without its edition date: "CG 20 10" when the page prints \
+"CG 20 10 04 13"), edition (its edition date as printed, for example "04 13", or null), page and \
 quote (a short verbatim passage containing the form number), and four parts, each as value, page and \
 quote copied character for character from one page: type (the endorsement's printed title, which says \
 what it does, for example "ADDITIONAL INSURED - DESIGNATED PERSON OR ORGANIZATION"), policy_number (the policy number the endorsement says it modifies, or null), named_party (the person or \
 organization the endorsement's schedule names, or null when it names none) and condition (verbatim \
-wording that limits when it applies, for example "where required by a written contract", or null). Use \
-null value, page and quote for a part the pages do not state. Return each endorsement at most once; return \
-an empty endorsements list when the pages print none.
+wording that makes the endorsement apply only when something outside the policy is in place, such as a \
+written contract or agreement that requires it, for example "where required by a written contract"; null \
+when no such requirement is printed. What the endorsement grants and the scope of that grant are not a \
+condition: for example "but only with respect to liability caused by your acts or omissions", "This \
+insurance is primary to ..." or the class of persons a blanket form describes, such as everyone the \
+insured does work for). Use null value, page and quote for a part the pages do not state. Return \
+each endorsement at most once; return an empty endorsements list when the pages print none.
 
 """
 MAX_ENDORSEMENTS_PER_CALL = 50  # untrusted model output: endorsements past this are ignored
@@ -349,25 +355,52 @@ def _part_fact(key: str, raw: Any) -> ExtractedFact | None:
     return ExtractedFact(field=key, value=" ".join(str(raw["value"]).split()), page=page, quote=quote)
 
 
+def _compact(text: str) -> str:
+    return re.sub(r"[^0-9A-Z]", "", text.upper())
+
+
+def split_edition(number: str, edition: str | None) -> tuple[str, str]:
+    """(form number without its edition, value as printed) of one endorsement. Models often return the
+    printed "OM 20 26 04 24" as the number and "04 24" again as the edition: the key then must not carry
+    the edition (OM2026, not OM20260424) and the value must not repeat it ("OM 20 26 04 24 04 24" is in
+    no quote, so it would never verify). Separators are ignored when comparing ("04/24" == "04 24")."""
+    if not edition:
+        return number, number
+    tail = _compact(edition)
+    # an edition is a date ("04 24", "04/2024"): at least four characters, printed after the number as
+    # its own token(s), so "WC 00 03 13" with a stray edition "13" keeps its number
+    if len(tail) >= 4 and _compact(number).endswith(tail) and len(_compact(number)) > len(tail):
+        seen, cut = 0, len(number)
+        while seen < len(tail):  # walk back over the edition's letters and digits
+            cut -= 1
+            if number[cut].isalnum():
+                seen += 1
+        base = number[:cut].rstrip(" -/.(")
+        if _compact(base) and not number[cut - 1].isalnum():
+            return base, number  # the number already prints its edition: keep it verbatim
+    return number, f"{number} {edition}"
+
+
 def endorsement_facts(raw_items: Any) -> list[ExtractedFact]:
     """Facts per endorsement (slice 4): cert:endorsement:<number>:form_number with value "<number>
-    <edition>" as printed (the form fact rule), then one fact per part the endorsement states (type =
+    <edition>" as printed (the form fact rule; a number that already prints its edition keeps it once and
+    keys without it, split_edition), then one fact per part the endorsement states (type =
     its printed title, policy_number, named_party, condition). The first entry of a number wins;
     entries without a number and entries past MAX_ENDORSEMENTS_PER_CALL are ignored. Sorted by key."""
     chosen: dict[str, list[ExtractedFact]] = {}
     for raw in (raw_items if isinstance(raw_items, list) else [])[:MAX_ENDORSEMENTS_PER_CALL]:
         if not isinstance(raw, dict) or _blank(raw.get("form_number")):
             continue
-        number = " ".join(str(raw["form_number"]).split())
+        edition = None if _blank(raw.get("edition")) else " ".join(str(raw["edition"]).split())
+        number, value = split_edition(" ".join(str(raw["form_number"]).split()), edition)
         key = endorsement_key(number, "form_number")
         if key is None or key in chosen:
             continue
         base = key[: -len(":form_number")]
-        edition = None if _blank(raw.get("edition")) else " ".join(str(raw["edition"]).split())
         page = raw.get("page")
         page = page if isinstance(page, int) and not isinstance(page, bool) else None
         quote = None if _blank(raw.get("quote")) else str(raw["quote"])
-        out = [ExtractedFact(field=key, value=f"{number} {edition}" if edition else number, page=page, quote=quote)]
+        out = [ExtractedFact(field=key, value=value, page=page, quote=quote)]
         for attribute in ENDORSEMENT_PARTS:
             part = _part_fact(f"{base}:{attribute}", raw.get(attribute))
             if part is not None:

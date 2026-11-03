@@ -202,6 +202,49 @@ def test_endorsement_without_a_number_joins_its_own_document():
     assert len(joined.endorsements["A"]) == 1 and joined.notices == []
 
 
+def _endorsement_doc(letter, e, *, number, line="Commercial General Liability Coverage Part", **more):
+    """An endorsement-only document as the live model reads it: the coverage part it modifies as the
+    line and "forms part of Policy No. X" as the policy number, no declarations facts."""
+    facts = {"cert:line": ev(line), "cert:policy_number": ev(number), "cert:carrier": ev("Thistlewood"),
+             **{k: ev(v) for k, v in more.items()}}
+    return cc.PolicyDoc(letter, 2, f"{letter}.pdf", facts, (e,))
+
+
+def test_endorsement_only_document_is_not_a_policy_row():
+    decl = policy("A", number="GL-4410-2281")
+    e = endorsement(policy_number="GL 4410 2281", party="Smith & Sons")
+    joined = cc.join([decl, _endorsement_doc("B", e, number="GL 4410 2281")])
+    assert [p.letter for p in joined.policies] == ["A"]  # no second row, no collision
+    assert joined.endorsements == {"A": [e]} and joined.notices == []
+    assert str(cc.wording_claim(decl, cc.ADDITIONAL_INSURED, joined.endorsements["A"], REQ).verdict) == "supported"
+
+
+def test_endorsement_only_document_naming_another_policy_is_unmatched():
+    auto = policy("A", number="CA 7719-0024", line="Business Auto")
+    e = endorsement(number="OM2049", policy_number="CA 7719-0042")
+    joined = cc.join([auto, _endorsement_doc("B", e, number="CA 7719-0042", line="Business Auto Coverage Form")])
+    assert [p.letter for p in joined.policies] == ["A"] and joined.endorsements == {"A": []}
+    assert [n.kind for n in joined.notices] == ["endorsement_unmatched"] and "OM2049" in joined.notices[0].message
+
+
+@pytest.mark.parametrize("key,value", [("cert:named_insured", "Cedar Hollow LLC"), ("cert:effective_date", "01/01/2026"),
+                                       ("cert:gl_each_occurrence", "$1,000,000")])
+def test_a_document_with_endorsements_and_a_declarations_fact_is_a_policy(key, value):
+    e = endorsement(policy_number=None, letter="A")
+    doc = _endorsement_doc("A", e, number="GL-1", **{key: value})
+    joined = cc.join([doc])
+    assert [p.letter for p in joined.policies] == ["A"] and joined.endorsements == {"A": [e]}
+
+
+def test_unverified_declarations_fact_still_makes_a_policy_row():
+    """A declarations page whose dates did not verify stays a row (its claims fail), never vanishes."""
+    e = endorsement(policy_number=None, letter="A")
+    doc = cc.PolicyDoc("A", 1, "a.pdf", {"cert:line": ev("Commercial General Liability"),
+                                         "cert:expiration_date": cc.Evidence(state=EvidenceState.NOT_FOUND)}, (e,))
+    assert cc.join([doc]).policies == [doc]
+    assert cc.join([cc.PolicyDoc("B", 2, "b.pdf", {"cert:line": ev("Business Auto")})]).policies[0].letter == "B"
+
+
 def test_package_and_unused_documents_are_noticed():
     pkg = policy(line="Commercial Package Policy")
     bare = cc.PolicyDoc("B", 2, "b.pdf", {})
@@ -261,6 +304,36 @@ def test_extraction_schema_and_normalized_endorsements():
                        "quote": "ADDITIONAL INSURED"}], "endorsements": []}
     facts, _, _ = extract.normalize_output(flat, CERTIFICATE_FIELDS)
     assert "cert:endorsement:OM2026:type" in {f.field for f in facts}
+
+
+@pytest.mark.parametrize("number,edition,expected", [
+    ("OM 20 26 04 24", "04 24", ("OM 20 26", "OM 20 26 04 24")),  # the live model's doubled edition
+    ("OM 20 26 (04/24)", "04/24", ("OM 20 26", "OM 20 26 (04/24)")),
+    ("OM 20 26 04/24", "04 24", ("OM 20 26", "OM 20 26 04/24")),  # separators ignored
+    ("CG 20 10", "04 13", ("CG 20 10", "CG 20 10 04 13")),  # the asked-for shape
+    ("CG 20 10", None, ("CG 20 10", "CG 20 10")),
+    ("WC 00 03 13", "13", ("WC 00 03 13", "WC 00 03 13 13")),  # too short to be an edition date
+    ("CG2010", "2010", ("CG2010", "CG2010 2010")),  # not its own token: part of the number
+])
+def test_split_edition(number, edition, expected):
+    assert extract.split_edition(number, edition) == expected
+
+
+def test_doubled_edition_keys_as_the_form_and_verifies():
+    data = {"facts": [], "endorsements": [{
+        "form_number": "OM 20 02 04 24", "edition": "04 24", "page": 1, "quote": "Form OM 20 02 04 24",
+        **{p: {"value": None, "page": None, "quote": None} for p in ("type", "policy_number", "named_party",
+                                                                      "condition")}}]}
+    facts, _, _ = extract.normalize_output(data, CERTIFICATE_FIELDS)
+    form = next(f for f in facts if is_endorsement_key(f.field))
+    assert (form.field, form.value) == ("cert:endorsement:OM2002:form_number", "OM 20 02 04 24")
+    assert form.value in form.quote
+
+
+def test_endorsements_note_says_what_a_condition_is():
+    note = extract.ENDORSEMENTS_NOTE
+    assert "without its edition date" in note and "written contract" in note
+    assert "are not a condition" in note
 
 
 def test_merge_expands_endorsement_keys_in_the_field_order():
