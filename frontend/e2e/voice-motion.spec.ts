@@ -125,6 +125,7 @@ const VIEWS: [string, string, string][] = [
   ["tasks", "/#/tasks", ".tasks__count"],
   ["activity", "/#/activity", ".run-link, .state-block"],
   ["policy-wizard", "/#/policy-check/new", ".wizard__title"],
+  ["proposal-wizard", "/#/proposals/new", ".wizard__title"],
 ];
 
 for (const [w, h] of [

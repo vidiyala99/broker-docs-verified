@@ -316,3 +316,21 @@ Built by a motion sub-lane (Opus) against the audit table above, then verified l
   cross-fade of `#main` only (150ms), pointer navigations only.
 - Sort fades the Tasks table too (the audit said "no motion" for sort; kept because it is the same pointer list
   change; owner may veto).
+
+### Phase B rounds (3 of 3, Playwright MCP at 1440 / 1024 / 390)
+1. Voice live on queue, personal, run, Tasks, Activity, both wizards. Fixed: voice.css loaded before component CSS, so
+   queue marks kept the old tinted tabs (now loaded after App); the 390 Compare queue overflowed by 27px through the
+   row action line (now spans the row); "Add client" was set in the serif (system words stay Inter).
+2. Final shots and new spec. Fixed: run-header client clipped at 390 (cap `min(320px, 100%)`); the seal re-landed each
+   time Done recently reopened (now once per row per session).
+3. Motion lane verified live. Review dialog pointer close: opacity 0.13 by about 58ms, scale 0.98, native close at
+   about 200ms (rAF granularity), focus back on "Review one at a time". Route change: one `startViewTransition`, only
+   `::view-transition-old/new(main-pane)` animate (150ms), the rail has no transition name. `#main`'s
+   `view-transition-name` does not cover row menus (all items topmost; one item sat below the fold, which is the menu's
+   existing open-downward placement). List fade on a pointer filter: WAAPI opacity 0.35 to 1, 150ms. Fixed: the 1024
+   overlay's `translateX(-100%)` drew the panel across the rail (now a clip-path reveal from its own edge + 12px
+   nudge; the box never goes left of the rail).
+   Focus (lead's e2e found it): the task dialog's 140ms exit kept the modal open while the card tried to focus its new
+   "Task: Open" link, so focus was lost. Now the card and the Tasks page wait for the dialog's native close; RowMenu
+   returns focus to its trigger when an item's action did not move it; hiding the overlay returns focus to the strip
+   toggle. New e2e asserts focus return after pointer closes (review dialog, task dialog, overlay).
