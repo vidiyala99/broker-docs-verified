@@ -193,6 +193,35 @@ export interface DiscrepancyItem extends DiscrepancyBlock {
   changed_since_resolved: boolean;
   updated_at: string | null;
   sources?: Partial<Record<PolicyRole, SlotSource[]>>;
+  /** Slice 3b: the task linked to this item (first open, else newest), or null (API.md, O4). */
+  task?: { id: number; status: TaskStatus } | null;
+}
+
+export type TaskStatus = "open" | "done";
+
+/** GET /api/tasks item (slice 3b, API.md "Tasks"). The read-only fields are computed by the server. */
+export interface Task {
+  id: number;
+  title: string;
+  due_date: string | null;
+  status: TaskStatus;
+  run_id: number | null;
+  discrepancy_item_id: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  run_label: string | null;
+  run_missing: boolean;
+  discrepancy: { item_id: string; title: string; status: "open" | "resolved"; in_report: boolean } | null;
+}
+
+/** POST takes title, due_date, run_id, discrepancy_item_id; PATCH also status. null clears. */
+export interface TaskInput {
+  title?: string;
+  due_date?: string | null;
+  status?: TaskStatus;
+  run_id?: number | null;
+  discrepancy_item_id?: string | null;
 }
 
 export interface DiscrepancyList {

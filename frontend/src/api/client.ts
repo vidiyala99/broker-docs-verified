@@ -11,6 +11,8 @@ import type {
   ProposalParameters,
   Rejection,
   Run,
+  Task,
+  TaskInput,
   Template,
   TemplateSummary,
   Workspace,
@@ -136,6 +138,11 @@ export const api = {
       method: "PATCH",
       body: json(body),
     }),
+  tasks: () => request<{ tasks: Task[] }>("/api/tasks").then((r) => r.tasks),
+  createTask: (body: TaskInput) => request<Task>("/api/tasks", { method: "POST", body: json(body) }),
+  patchTask: (id: number, body: TaskInput) => request<Task>(`/api/tasks/${id}`, { method: "PATCH", body: json(body) }),
+  /** Sent only when the undo toast closes or the page unmounts (D6). */
+  deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: "DELETE" }),
   fileUrl: (documentId: number) => `${API_BASE}/api/documents/${documentId}/file`,
   eventsUrl: (runId: number, lastEventId?: number) =>
     `${API_BASE}/api/runs/${runId}/events${lastEventId != null ? `?last_event_id=${lastEventId}` : ""}`,

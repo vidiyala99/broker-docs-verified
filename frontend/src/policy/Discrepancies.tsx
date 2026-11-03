@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
-import { Check, CheckCircle, ClockCounterClockwise, Eye, NotePencil } from "@phosphor-icons/react";
+import { Check, CheckCircle, ClockCounterClockwise, Eye, ListChecks, NotePencil } from "@phosphor-icons/react";
 import { api, ApiError } from "../api/client";
 import {
   POLICY_ROLES,
@@ -14,6 +14,9 @@ import {
 import type { OpenSource } from "../report/Chip";
 import { SlotView } from "./Slot";
 import { ReviewDialog } from "./ReviewDialog";
+import { TaskDialog } from "../tasks/TaskDialog";
+import { discrepancyFromHash, followUpTitle, taskHref } from "../tasks/taskUtil";
+import { useToast } from "../ui/Toast";
 import "./policy.css";
 
 const SEV_LABEL: Record<Severity, string> = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
@@ -80,6 +83,11 @@ export function Discrepancies({
   const [review, setReview] = useState<{ ids: string[]; index: number; animate: boolean } | null>(null);
   const [announce, setAnnounce] = useState("");
   const opener = useRef<HTMLElement | null>(null);
+  // Slice 3b T7: "Create task" opens the task dialog prefilled (spec 2.3); `?discrepancy=<id>` targets a card (O7).
+  const [taskFor, setTaskFor] = useState<{ item: DiscrepancyItem; animate: boolean; opener: HTMLElement | null } | null>(null);
+  const [target, setTarget] = useState<string | null>(() => discrepancyFromHash(window.location.hash));
+  const focusTask = useRef<string | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     setError(null);
@@ -101,6 +109,12 @@ export function Discrepancies({
   }, []);
   const resolve = useResolve(run.id, onSaved);
 
+  useEffect(() => {
+    const on = () => setTarget(discrepancyFromHash(window.location.hash));
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+
   const items = data?.items ?? [];
   const resolvedCount = items.filter((i) => i.status === "resolved").length;
   const visible = useMemo(
@@ -112,6 +126,33 @@ export function Discrepancies({
       ),
     [items, severities, hideResolved, kept],
   );
+
+  // Deep link (O7): once the list is loaded, clear filters that hide the card, then scroll it into view, outline and
+  // focus it. Runs again when the hash names another card.
+  const scrolled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data || !target || scrolled.current === target) return;
+    if (!data.items.some((i) => i.id === target)) return;
+    if (!visible.some((i) => i.id === target)) {
+      setSeverities([]);
+      setHideResolved(false);
+      setKept([]);
+      return;
+    }
+    const card = document.querySelector<HTMLElement>(`.disc[data-item="${CSS.escape(target)}"]`);
+    if (!card) return;
+    scrolled.current = target;
+    // Centred when it fits; a card taller than most of the screen (phone) starts at the top so its heading shows.
+    card.scrollIntoView({ block: card.offsetHeight > window.innerHeight * 0.6 ? "start" : "center" });
+    card.focus({ preventScroll: true });
+  }, [data, target, visible]);
+
+  useEffect(() => {
+    const id = focusTask.current;
+    if (!id) return;
+    focusTask.current = null;
+    document.querySelector<HTMLElement>(`.disc[data-item="${CSS.escape(id)}"] .disc__task`)?.focus();
+  });
 
   // A card chip opens its source side by side; the list then reflows to half width, so bring the
   // card back into view once the split has settled (--dur-base).
@@ -266,6 +307,8 @@ export function Discrepancies({
                 editable={editable}
                 resolve={resolve}
                 onReview={(e) => openReview(item.id, e)}
+                target={item.id === target}
+                onCreateTask={(e) => setTaskFor({ item, animate: e.detail > 0, opener: e.currentTarget as HTMLElement })}
               />
             </li>
           ))}
@@ -288,6 +331,26 @@ export function Discrepancies({
           resolve={resolve}
         />
       )}
+      {taskFor && (
+        <TaskDialog
+          mode={{ kind: "new", prefill: { title: followUpTitle(taskFor.item.title), runId: run.id, itemId: taskFor.item.id } }}
+          animate={taskFor.animate}
+          onSaved={(task) => {
+            // The card shows "Task: Open" at once; the next list load agrees (API `task`, O4).
+            const linked = task.run_id === run.id ? task.discrepancy_item_id : null;
+            if (linked) {
+              setData((d) => (d ? { ...d, items: d.items.map((x) => (x.id === linked && !x.task ? { ...x, task: { id: task.id, status: task.status } } : x)) } : d));
+              focusTask.current = linked;
+            }
+            toast({ message: "Task created." });
+          }}
+          onClose={() => {
+            const back = taskFor.opener;
+            setTaskFor(null);
+            if (back && document.contains(back)) window.setTimeout(() => back.focus(), 0);
+          }}
+        />
+      )}
       <p className="sr-only" role="status" aria-live="polite">
         {announce}
       </p>
@@ -303,6 +366,8 @@ export function DiscrepancyCard({
   editable,
   resolve,
   onReview,
+  target = false,
+  onCreateTask,
 }: {
   item: DiscrepancyItem;
   run: Run;
@@ -311,10 +376,18 @@ export function DiscrepancyCard({
   editable: boolean;
   resolve: ReturnType<typeof useResolve>;
   onReview: (e: MouseEvent) => void;
+  /** `#/runs/<id>?discrepancy=<item_id>` names this card (O7). */
+  target?: boolean;
+  onCreateTask?: (e: MouseEvent) => void;
 }) {
   const titleId = useId();
   return (
-    <article className={`disc${item.status === "resolved" ? " is-resolved" : ""}`} aria-labelledby={titleId} data-item={item.id}>
+    <article
+      className={`disc${item.status === "resolved" ? " is-resolved" : ""}${target ? " is-target" : ""}`}
+      aria-labelledby={titleId}
+      data-item={item.id}
+      tabIndex={target ? -1 : undefined}
+    >
       <ItemHead item={item} titleId={titleId} />
       <p className="disc__prose">{item.prose.map((s) => s.text).join("")}</p>
       <div className="disc__slots">
@@ -323,6 +396,19 @@ export function DiscrepancyCard({
         ))}
       </div>
       <ResolveControls item={item} editable={editable} resolve={resolve}>
+        {/* Slice 3b T7 (spec 2.3): a task for this item, or the action that makes one. */}
+        {item.task ? (
+          <a className="disc__task" href={taskHref(item.task.id)}>
+            <ListChecks size={16} aria-hidden /> Task: {item.task.status === "done" ? "Done" : "Open"}
+          </a>
+        ) : (
+          editable &&
+          onCreateTask && (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={onCreateTask}>
+              <ListChecks size={16} aria-hidden /> Create task
+            </button>
+          )
+        )}
         <button type="button" className="btn btn--ghost btn--sm" onClick={onReview}>
           <Eye size={16} aria-hidden /> Review
         </button>
