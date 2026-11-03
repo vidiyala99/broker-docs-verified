@@ -155,7 +155,9 @@ export function Discrepancies({
 
   useEffect(() => {
     const id = focusTask.current;
-    if (!id) return;
+    // Wait for the task dialog to close: it plays a short exit (pointer closes), and while a modal <dialog> is open
+    // focus cannot move to the card behind it. `taskFor` clears in the dialog's native close event.
+    if (!id || taskFor) return;
     focusTask.current = null;
     document.querySelector<HTMLElement>(`.disc[data-item="${CSS.escape(id)}"] .disc__task`)?.focus();
   });

@@ -125,6 +125,12 @@ export function RowMenu({ label, items }: { label: string; items: MenuItem[] }) 
               onClick={(e) => {
                 close(e.detail > 0);
                 item.run();
+                // The leaving list is inert, so the clicked item loses focus. If the action did not move focus itself
+                // (a dialog, a navigation, a row that left), return it to the trigger instead of the page body.
+                window.setTimeout(() => {
+                  const a = document.activeElement;
+                  if ((a === document.body || a === null || menu.current?.contains(a)) && trigger.current?.isConnected) trigger.current.focus();
+                }, 0);
               }}
             >
               {item.icon}

@@ -315,19 +315,30 @@ a {
   border-color: var(--color-border-input);
 }
 
-/* Narrow left panel overlay (shell/layout.tsx): a pointer open slides it in from the strip's edge (250ms
-   --ease-out, a drawer), a pointer close slides it back out the same way, faster (200ms). Keyboard opens and Esc are
-   instant (no .is-animated class). Transitions, so a quick close mid-open retargets. */
+/* Narrow left panel overlay (shell/layout.tsx): a pointer open reveals it from its left edge, a drawer (clip-path +
+   a 12px nudge, 250ms --ease-out); a pointer close folds it back the same way, faster (200ms). Clip, not
+   translateX(-100%): a full slide drew the panel across the rail (voice + motion lane, round 3). Keyboard opens and
+   Esc are instant (no .is-animated class). Transitions, so a quick close mid-open retargets. */
+.left-panel--overlay {
+  clip-path: inset(0 0 0 0 round var(--radius-control));
+}
+
 .left-panel--overlay.is-animated {
-  transition: transform var(--dur-drawer) var(--ease-out);
+  transition:
+    clip-path var(--dur-drawer) var(--ease-out),
+    transform var(--dur-drawer) var(--ease-out);
   @starting-style {
-    transform: translateX(-100%);
+    clip-path: inset(0 100% 0 0 round var(--radius-control));
+    transform: translateX(-12px);
   }
 }
 
 .left-panel--overlay.is-leaving {
-  transform: translateX(-100%);
-  transition: transform var(--dur-base) var(--ease-out);
+  clip-path: inset(0 100% 0 0 round var(--radius-control));
+  transform: translateX(-12px);
+  transition:
+    clip-path var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
   pointer-events: none;
 }
 
@@ -2605,6 +2616,7 @@ canvas {
   }
   .left-panel--overlay.is-leaving {
     transform: none;
+    clip-path: inset(0 0 0 0 round var(--radius-control));
     opacity: 0;
     transition: opacity var(--dur-fade) ease;
   }

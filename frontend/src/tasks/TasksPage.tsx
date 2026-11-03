@@ -131,7 +131,8 @@ export function TasksPage({ targetId }: { targetId: number | null }) {
 
   useEffect(() => {
     const id = focusAfter.current;
-    if (id == null) return;
+    // After a save, wait until the dialog has closed (its exit plays on pointer closes; a modal <dialog> keeps focus).
+    if (id == null || dialog) return;
     const el = document.querySelector<HTMLElement>(`[data-task="${id}"] .task-title`);
     if (!el) return;
     focusAfter.current = null;

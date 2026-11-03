@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChatCircleText, SidebarSimple, UploadSimple } from "@phosphor-icons/react";
 import { keyboardAction } from "../ui/input";
 import { tokenMs } from "../ui/motion";
@@ -44,12 +44,16 @@ export function LeftPanel({
   // exit; keyboard opens and Esc are instant. `animated` is decided at the open, `leaving` holds the panel for its exit.
   const [animated, setAnimated] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const showButton = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const show = () => {
     setAnimated(!keyboardAction());
     setLeaving(false);
     setOpen(true);
   };
   const hide = (viaPointer: boolean) => {
+    // The leaving panel is inert: if focus was inside it, return it to the button that opens the panel.
+    if (panel.current?.contains(document.activeElement)) showButton.current?.focus();
     setOpen(false);
     setLeaving(viaPointer && !keyboardAction());
   };
@@ -91,7 +95,7 @@ export function LeftPanel({
   return (
     <>
       <div className="left-strip">
-        <button type="button" className="icon-btn" aria-label={`Show ${label.toLowerCase()}`} aria-expanded={open} onClick={show}>
+        <button ref={showButton} type="button" className="icon-btn" aria-label={`Show ${label.toLowerCase()}`} aria-expanded={open} onClick={show}>
           <SidebarSimple size={20} aria-hidden />
         </button>
         <button type="button" className="icon-btn" aria-label="Show uploads" onClick={() => reveal("uploads")}>
@@ -110,6 +114,7 @@ export function LeftPanel({
       )}
       {(open || leaving) && (
         <aside
+          ref={panel}
           className={`left-panel left-panel--overlay${open ? (animated ? " is-animated" : "") : " is-leaving"}`}
           aria-label={label}
           aria-hidden={open ? undefined : true}

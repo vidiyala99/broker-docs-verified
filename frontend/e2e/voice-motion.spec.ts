@@ -89,6 +89,35 @@ test("paper layer: serif on titles, section headings and client names; Inter for
   await expect.poll(() => page.evaluate(() => document.fonts.check('600 19px "Source Serif 4"'))).toBe(true);
 });
 
+test("focus returns to the opener after pointer closes that play an exit (review dialog, task dialog, overlay)", async ({ page }) => {
+  // Review dialog, closed with its X (pointer: 150ms exit before the native close).
+  await page.goto("/#/runs/7");
+  const opener = page.getByRole("button", { name: "Review one at a time" });
+  await opener.click();
+  await page.getByRole("button", { name: "Close review" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(opener).toBeFocused();
+
+  // Task dialog opened from a row title, cancelled by pointer.
+  await page.goto("/#/tasks");
+  const title = page.locator(".task-title").first();
+  await title.click();
+  const dialog = page.getByRole("dialog", { name: "Edit task" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(title).toBeFocused();
+
+  // Narrow left panel overlay: Hide panel by pointer slides it out; focus goes back to the strip's toggle.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto("/#/runs/7");
+  const show = page.locator(".left-strip").getByRole("button").first();
+  await show.click();
+  await page.getByRole("button", { name: "Hide panel" }).click();
+  await expect(page.locator(".left-panel--overlay")).toHaveCount(0);
+  await expect(show).toBeFocused();
+});
+
 const VIEWS: [string, string, string][] = [
   ["queue", "/#/", ".queue-group"],
   ["personal", "/#/personal-lines", ".queue-group"],
