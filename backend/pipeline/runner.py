@@ -569,13 +569,17 @@ class RunManager:
 
     def submit(self, workflow_id: int, document_ids: Sequence[int],
                parameters: dict[str, Any] | None = None, *,
-               slots: Mapping[int, str] | None = None) -> tuple[int, bool]:
+               slots: Mapping[int, str] | None = None, line: str | None = None) -> tuple[int, bool]:
         """Create and start a run, or return the active identical one. Returns (run_id, created).
 
         `slots` maps each document id to one of the workflow's input slot keys (D8);
         without it every document goes to the workflow's only slot ("quotes"). The
         active run is identical when workflow, documents in order, their slots and
         parameters all match.
+
+        `line` (slice 3b, "commercial" or "personal", validated by the caller) is a tag outside
+        that identity: a new run gets it (default commercial), and a reused active run takes
+        it when it is given (D4).
 
         Raises SlotError for a slot assignment that does not fit the workflow, ValueError
         for an invalid document list (messages are user-safe) and LookupError for an
@@ -611,11 +615,14 @@ class RunManager:
                 if [(rd.document_id, rd.slot) for rd in run.documents] == wanted \
                         and (run.parameters or {}) == params:
                     existing = run.id
+                    if line is not None:
+                        run.line = line  # D4: reuse the run, apply the requested line
                     break
             else:
                 existing = None
             if existing is None:
                 run = models.Run(workspace_id=workflow.workspace_id, workflow_id=workflow_id, parameters=params,
+                                 line=line or "commercial",
                                  status=RunStatus.QUEUED, retryable=False, tokens_in=0, tokens_out=0, cost_usd=0.0)
                 for pos, (doc_id, slot) in enumerate(wanted):
                     run.documents.append(models.RunDocument(document_id=doc_id, position=pos, slot=slot,

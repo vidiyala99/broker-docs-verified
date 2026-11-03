@@ -57,6 +57,7 @@ def run_out(run: models.Run, *, active: bool) -> dict[str, Any]:
         "id": run.id,
         "workflow_id": run.workflow_id,
         "workflow_name": run.workflow.name if run.workflow else None,
+        "line": run.line or "commercial",  # slice 3b; REST only, the SSE snapshot is unchanged (O9)
         "status": str(run.status),
         "active": active,
         "terminal": str(run.status) in TERMINAL_RUN_STATUSES and not active,

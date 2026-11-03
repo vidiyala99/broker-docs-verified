@@ -2,7 +2,7 @@
 
 Tables: workspace, workflow, proposal_template, document, page, run,
 run_document, model_call, message, fact, passage, artifact, artifact_version,
-discrepancy_state (slice 3), feedback.
+discrepancy_state (slice 3), task (slice 3b), feedback.
 
 Key rules:
 - `fact` is persisted (M7); each fact carries an EvidenceState (M1).
@@ -17,13 +17,14 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -146,12 +147,18 @@ class Page(Base):
     document: Mapped[Document] = relationship(back_populates="pages")
 
 
+RUN_LINES = ("commercial", "personal")  # slice 3b: household cover is "personal" (R1, R2)
+
+
 class Run(Base):
     __tablename__ = "run"
+    __table_args__ = (CheckConstraint("line IN ('commercial', 'personal')", name="ck_run_line"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"), index=True)
     workflow_id: Mapped[int] = mapped_column(ForeignKey("workflow.id"))
+    # Slice 3b: a tag only (no engine change). Outside the duplicate-run identity (D4).
+    line: Mapped[str] = mapped_column(String(20), default="commercial", server_default="commercial")
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     status: Mapped[RunStatus] = mapped_column(String(20), default=RunStatus.QUEUED)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -375,6 +382,39 @@ class DiscrepancyState(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     run: Mapped[Run] = relationship(back_populates="discrepancy_states")
+
+
+TASK_STATUSES = ("open", "done")
+MAX_TASK_TITLE_CHARS = 200
+MAX_DISCREPANCY_TITLE_CHARS = 300
+
+
+class Task(Base):
+    """A broker's to-do (slice 3b, spec 1.2): title, optional due date, open | done, and an
+    optional link to a run or to one discrepancy of a run.
+
+    `run_id` is a plain integer with no foreign key (D2): it is checked on write, and a run row
+    that goes away later leaves the link in place so the list can say `run_missing`.
+    `discrepancy_item_id` needs `run_id` and must name an item of that run's current report when
+    it is written (D3). `discrepancy_title` is the block title saved at link time and refreshed
+    while the item is in the report (D8), so a dropped item still has a label. A task never
+    changes a discrepancy state, nor the other way round (R5).
+    """
+
+    __tablename__ = "task"
+    __table_args__ = (CheckConstraint("status IN ('open', 'done')", name="ck_task_status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"), index=True)
+    title: Mapped[str] = mapped_column(String(MAX_TASK_TITLE_CHARS))
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="open")
+    run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # no FK (D2), indexed (P1)
+    discrepancy_item_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    discrepancy_title: Mapped[str | None] = mapped_column(String(MAX_DISCREPANCY_TITLE_CHARS), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Feedback(Base):
@@ -681,6 +721,19 @@ def update_discrepancy_state(session: Session, run_id: int, item_id: str, *, sta
     row.updated_at = utcnow()
     session.flush()
     return row
+
+
+def item_tasks(session: Session, run_id: int) -> dict[str, Task]:
+    """The task each discrepancy item of the run shows (O4): the first open task linked to the
+    item by created_at DESC, id DESC, else the latest one. Items without a task are absent."""
+    picked: dict[str, Task] = {}
+    rows = session.scalars(select(Task).where(Task.run_id == run_id, Task.discrepancy_item_id.is_not(None))
+                           .order_by(Task.created_at.desc(), Task.id.desc()))
+    for task in rows:
+        current = picked.get(task.discrepancy_item_id)
+        if current is None or (current.status != "open" and task.status == "open"):
+            picked[task.discrepancy_item_id] = task
+    return picked
 
 
 def restore_version(session: Session, artifact: Artifact, version: int) -> ArtifactVersion:

@@ -1,5 +1,6 @@
-"""Run routes: create (idempotent), list, get, retry, cancel, the SSE progress stream, and the
-Policy Check discrepancy list and its per-item status (slice 3 T6)."""
+"""Run routes: create (idempotent), list (optionally by line), get, re-tag (PATCH line, slice 3b),
+retry, cancel, the SSE progress stream, and the Policy Check discrepancy list and its per-item
+status (slice 3 T6), each item with its linked task (slice 3b, O4)."""
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ import contextlib
 import re
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from sqlalchemy import select
@@ -33,6 +34,15 @@ class RunCreate(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     # document_id -> input slot key (slice 3, D8); omitted = the workflow's only slot
     slots: dict[int, SlotKey] | None = Field(default=None, max_length=64)
+    # Slice 3b: "commercial" | "personal". Typed Any on purpose: a bad value is a domain
+    # 400 invalid_run checked in the route (O10), not the global 422.
+    line: Any = None
+
+
+def _check_line(value: Any) -> str:
+    if not isinstance(value, str) or value not in models.RUN_LINES:
+        raise ApiError(400, "invalid_run", "line must be commercial or personal.")
+    return value
 
 
 def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
@@ -46,6 +56,7 @@ def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
 @router.post("/runs")
 async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSONResponse:
     parameters = body.parameters
+    line = None if body.line is None else _check_line(body.line)
     with ctx.factory() as s:
         wf = find_workflow(s, body.workflow)
         if wf is None:
@@ -61,7 +72,8 @@ async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSO
                 raise ApiError(422, "invalid_request", "The proposal settings are not valid.",
                                fields=fields) from None
     try:
-        run_id, created = ctx.manager.submit(workflow_id, body.document_ids, parameters, slots=body.slots)
+        run_id, created = ctx.manager.submit(workflow_id, body.document_ids, parameters, slots=body.slots,
+                                             line=line)
     except SlotError as exc:
         raise ApiError(400, "invalid_run", str(exc)) from None
     except ValueError as exc:
@@ -73,14 +85,34 @@ async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSO
 
 
 @router.get("/runs")
-async def list_runs(limit: int = Query(20, ge=1, le=100), ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+async def list_runs(limit: int = Query(20, ge=1, le=100),
+                    line: Literal["commercial", "personal"] | None = Query(None),
+                    ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """Newest first. `line` (slice 3b) filters; without it every run is listed, as before."""
+    query = select(models.Run)
+    if line is not None:
+        query = query.where(models.Run.line == line)
     with ctx.factory() as s:
-        runs = s.scalars(select(models.Run).order_by(models.Run.id.desc()).limit(limit))
+        runs = s.scalars(query.order_by(models.Run.id.desc()).limit(limit))
         return {"runs": [run_out(r, active=ctx.manager.is_active(r.id)) for r in runs]}
 
 
 @router.get("/runs/{run_id}")
 async def get_run(run_id: int, ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    return _run_json(ctx, run_id)
+
+
+@router.patch("/runs/{run_id}")
+async def patch_run(run_id: int, body: Any = Body(...), ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """Re-tag a run (slice 3b): the body is `{"line": "commercial" | "personal"}` and nothing else."""
+    with db.session_scope(ctx.factory) as s:
+        run = s.get(models.Run, run_id)
+        if run is None:
+            raise not_found("run", run_id)
+        if not isinstance(body, dict) or set(body) != {"line"}:
+            raise ApiError(400, "invalid_run", 'Only the line can be changed: send {"line": "commercial"} '
+                                               'or {"line": "personal"}.')
+        run.line = _check_line(body["line"])
     return _run_json(ctx, run_id)
 
 
@@ -115,7 +147,8 @@ MAX_NOTE_CHARS = 2000
 
 
 def _item_out(block: DiscrepancyBlock, row: models.DiscrepancyState | None,
-              sources: dict[str, dict[str, list]] | None = None) -> dict[str, Any]:
+              sources: dict[str, dict[str, list]] | None = None,
+              task: models.Task | None = None) -> dict[str, Any]:
     out = block.model_dump(mode="json")
     out.update({
         "sources": (sources or {}).get(block.id, {}),
@@ -123,6 +156,8 @@ def _item_out(block: DiscrepancyBlock, row: models.DiscrepancyState | None,
         "note": row.note if row else None,
         "changed_since_resolved": bool(row.changed_since_resolved) if row else False,
         "updated_at": _ts(row.updated_at) if row else None,
+        # slice 3b (O4): the item's task, read-only; a task never changes this item's state (R5)
+        "task": {"id": task.id, "status": task.status} if task else None,
     })
     return out
 
@@ -162,7 +197,8 @@ async def list_discrepancies(run_id: int, severity: str | None = Query(None, max
         run, blocks = _current_blocks(s, run_id)
         rows = _discrepancy_rows(s, run_id)
         sources = discrepancy_sources(s, run, blocks)
-        all_items = [_item_out(b, rows.get(b.id), sources) for b in blocks]
+        tasks = models.item_tasks(s, run_id)
+        all_items = [_item_out(b, rows.get(b.id), sources, tasks.get(b.id)) for b in blocks]
         counts = {k: 0 for k in _SEVERITIES}
         open_counts = {k: 0 for k in _SEVERITIES}
         for it in all_items:
@@ -215,7 +251,7 @@ async def patch_discrepancy(run_id: int, item_id: str, body: DiscrepancyPatch,
         if "note" in body.model_fields_set:
             kwargs["note"] = body.note
         row = models.update_discrepancy_state(s, run_id, item_id, **kwargs)
-        return _item_out(block, row, discrepancy_sources(s, run, [block]))
+        return _item_out(block, row, discrepancy_sources(s, run, [block]), models.item_tasks(s, run_id).get(item_id))
 
 
 @router.get("/runs/{run_id}/events")

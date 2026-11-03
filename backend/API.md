@@ -1,4 +1,7 @@
-# BrokerDocs local API (slice 1)
+# BrokerDocs local API (slices 1 to 3b)
+
+Covers Compare Quotes (slice 1), Proposal Builder (slice 2), Policy Check (slice 3) and the
+rail completion of slice 3b (run `line` for Personal lines, Tasks).
 
 Contract between `backend/` and `frontend/`. The live OpenAPI schema is at
 `GET /api/openapi.json` (interactive at `/api/docs`); this file is the
@@ -15,6 +18,12 @@ It listens on `http://127.0.0.1:8000` only (port: `BROKERDOCS_PORT`). Data
 lives in `broker-docs-verified/data/` (`BROKERDOCS_DATA_DIR` overrides). The model
 key is read from the `OPENAI_API_KEY` environment variable on the server and
 never reaches the browser.
+
+There are no migrations. A database created before the slice 3b schema change
+(2026-11-02: `run.line` and the `task` table) stops the server at startup with
+a message naming the file to delete and the reseed command
+(`backend/.venv/Scripts/python -m backend.dev_seed seed`, with
+`BROKERDOCS_DATA_DIR` set to a scratch folder).
 
 ## Conventions
 
@@ -40,12 +49,13 @@ Every error has one shape:
 
 `message` is safe to show as is. Some errors add fields next to `code` and
 `message` (listed per route): `limit`, `run_id`, `run_status`, `version`,
-`retryable`, and for `422 invalid_request` a `fields` list of
+`retryable`, `field` (the body field a `400 invalid_task` is about), and for
+`422 invalid_request` a `fields` list of
 `{"loc": ["body", "value"], "message": "..."}`.
 
 | Status | Codes |
 |---|---|
-| 400 | `Invalid host header` (plain text from the host guard), `invalid_run` (slot assignment, see `POST /api/runs`) |
+| 400 | `Invalid host header` (plain text from the host guard), `invalid_run` (slot assignment or `line`, see `POST /api/runs` and `PATCH /api/runs/{id}`), `invalid_task` (see Tasks) |
 | 403 | `origin_not_allowed` |
 | 404 | `not_found`, `no_report`, `cell_not_found`, `version_not_found`, `file_missing` |
 | 409 | `document_in_use`, `not_retryable`, `run_active`, `version_conflict`, `regenerate_in_progress`, `already_applied`, `chat_busy`, `no_report`, `budget_exhausted` |
@@ -365,17 +375,27 @@ workflow and documents are found:
   `application/pdf`. An AMS export therefore cannot enter a Compare Quotes run.
 - A slot a run leaves empty is simply absent (`min` 0 slots only).
 
+**`line` (slice 3b, optional).** `"commercial"` or `"personal"` (household
+cover: homeowners, auto, renters, umbrella). Omitted or `null` means
+`commercial` for a new run. It is a tag only: it does not change how the run
+reads or compares documents. Any other value (another string, a number, a
+list) is `400 invalid_run` with the message "line must be commercial or
+personal." and creates nothing.
+
 Responses:
 
 - `201 {"run": Run, "created": true}` for a new run (it starts at once).
 - `200 {"run": Run, "created": false}` when an identical run is still active
   (double-click Run returns the same run). Identical means the same workflow,
   the same documents in the same order with the same slots, and the same
-  `parameters`.
+  `parameters`. `line` is **not** part of that identity: a resubmit with a
+  different `line` returns the active run, and that run takes the `line` that
+  was sent (D4). A resubmit without `line` leaves the run's line as it is.
 - `400 invalid_run`: the slot assignment does not fit the workflow (missing,
   unknown or extra slot entry, a slot below its min or above its max, a PDF in
   the AMS slot, an AMS export in a PDF slot, or `slots` omitted for a
-  multi-slot workflow). `message` is safe to show.
+  multi-slot workflow), or `line` is not `commercial` or `personal`. `message`
+  is safe to show.
 - `422 invalid_run`: no documents, a duplicate, or more than 8 (`limit: 8`).
   These are the older cases and stay 422; slot errors are 400.
 - `422 invalid_request`: a malformed body (for example `slots` with more than
@@ -393,7 +413,7 @@ the run; its cells read Not read in the report (see "Policy Check discrepancies"
 
 ```json
 {
-  "id": 12, "workflow_id": 1, "workflow_name": "Compare Quotes",
+  "id": 12, "workflow_id": 1, "workflow_name": "Compare Quotes", "line": "commercial",
   "status": "running", "active": true, "terminal": false,
   "error": null, "retryable": false, "parameters": {},
   "tokens_in": 5120, "tokens_out": 830, "cost_usd": 0.0029,
@@ -409,6 +429,13 @@ some documents failed or the budget ran out), `failed` (no report: every
 document failed, or a crash), `cancelled`. `terminal` is true
 once the status is final and no task is running. `artifact` is null until a
 report exists.
+
+`line` (slice 3b) is `commercial` or `personal`; every run made before slice 3b
+reads `commercial`. It is in every REST `Run` (create, list, get, patch, retry,
+cancel). The SSE `run.snapshot` payload does not carry it (unchanged, O9).
+
+The UI's label for a run is `"<workflow_name> · Run <id>"` (for example
+`"Policy Check · Run 7"`); `GET /api/tasks` returns it as `run_label`.
 
 `retryable` is true exactly when `POST /api/runs/{id}/retry` would be
 accepted: the status is `failed`, `partial` or `cancelled` and no task is
@@ -438,13 +465,33 @@ reason and `error_code` is one of: `not_pdf`, `empty`, `corrupt`, `encrypted`,
 `option_count > 1` means only the first option was compared (D8); the column
 header shows the warning from the artifact table.
 
-### `GET /api/runs?limit=20`
+### `GET /api/runs?limit=20&line=personal`
 
-`{"runs": [Run]}`, newest first (Recent runs list, DG1). `limit` 1 to 100.
+`{"runs": [Run]}`, newest first (Recent runs list, DG1). `limit` 1 to 100
+(default 20; there is no paging, so a list sees at most the newest 100 runs,
+D5). `line` (slice 3b, optional) is `personal` or `commercial` and keeps only
+runs with that line; without it every run is listed, exactly as before. Another
+`line` value or a `limit` outside 1 to 100 is `422 invalid_request`. Personal
+lines uses `?line=personal&limit=100`; the Workflows recent-runs list uses
+`?line=commercial` (D9).
 
 ### `GET /api/runs/{id}`
 
 `Run`.
+
+### `PATCH /api/runs/{id}` (slice 3b)
+
+```json
+{"line": "personal"}
+```
+
+Re-tags a run (the run header's Commercial / Personal control). Only `line` can
+change, and the body must be exactly that one key. Works on an active run too.
+Returns `200 Run`.
+
+- `404 not_found`: unknown run.
+- `400 invalid_run`: `line` missing, `null` or not `commercial` / `personal`,
+  any other key in the body, or a body that is not an object.
 
 ### `POST /api/runs/{id}/retry`
 
@@ -581,8 +628,15 @@ or a comma list of `critical | high | medium | low` (`422` for another). `counts
             "item_state": "discrepancy", "lob": null, "prose": [{"text": "...", "passage_ids": []}],
             "slots": {"expiring": Cell, "renewal": Cell, "ams": Cell},
             "status": "resolved", "note": "Insured asked for it.", "changed_since_resolved": false,
-            "updated_at": "2026-11-02T10:00:00+00:00"}]}
+            "updated_at": "2026-11-02T10:00:00+00:00", "task": {"id": 3, "status": "open"}}]}
 ```
+
+`task` (slice 3b, read-only) is the task linked to this item, or `null`: the
+first **open** task linked to the item, newest first (`created_at`, then `id`),
+else the newest linked task (then `status` is `done`). A task linked only to the
+run (no item) is not an item's task. Use it for the card's "Task: Open" /
+"Task: Done" link (`#/tasks?task=<id>`). A task never changes the item's
+`status`, and resolving the item never changes the task (R5).
 
 Each item also carries `sources` (slice 3 T9, read-only, not part of the artifact): per role, the
 cited facts behind that slot's chips, `[{"passage_id": 53, "page_no": 1, "rects": [[x0, y0, x1, y1]],
@@ -599,8 +653,100 @@ A role missing from `slots` is N/A (no document). `404 not_found` for an unknown
 Body `{"status": "open" | "resolved", "note": "..." | null}`, either or both (`422` for an
 empty body, another status, an unknown key, or a note over 2000 characters). Control
 characters are stripped from the note; `note: null` clears it. A status change clears
-`changed_since_resolved`. Returns the item in the GET shape; `404 discrepancy_not_found`
+`changed_since_resolved`. Returns the item in the GET shape (with `task`); `404 discrepancy_not_found`
 when the current version has no such item.
+
+## Tasks (slice 3b)
+
+A broker's to-dos: a title, an optional due date, `open` or `done`, and an
+optional link to a run or to one Policy Check discrepancy of a run. No notes,
+assignees, priorities or reminders (R3). Search, sort and the Open / Done / All
+filter are client-side over `GET /api/tasks` (R4). Tasks belong to the local
+workspace; there is no workspace filter (as for runs).
+
+Tasks and discrepancy states are independent (R5): marking a task done never
+resolves its discrepancy, and resolving a discrepancy never completes its task.
+The task shows the discrepancy's live state.
+
+`Task`:
+
+```json
+{"id": 3, "title": "Follow up: Coverage A (Dwelling) decreased by 14.3%",
+ "due_date": "2026-11-05", "status": "open",
+ "run_id": 7, "discrepancy_item_id": "disc-coverage-a-limit",
+ "created_at": "2026-11-02T21:04:05.123456+00:00", "updated_at": "2026-11-02T21:04:05.123456+00:00",
+ "completed_at": null,
+ "run_label": "Policy Check · Run 7", "run_missing": false,
+ "discrepancy": {"item_id": "disc-coverage-a-limit", "title": "Coverage A (Dwelling) decreased by 14.3%",
+                 "status": "open", "in_report": true}}
+```
+
+| Field | Meaning |
+|---|---|
+| `title` | 1 to 200 characters, control characters removed, trimmed |
+| `due_date` | `YYYY-MM-DD` or `null`. Overdue (past due and `open`) is decided by the UI |
+| `status` | `open` or `done` |
+| `completed_at` | set when the status becomes `done`, `null` again when reopened; `done` to `done` keeps it |
+| `run_id` | the linked run id or `null`. A plain id: if the run row is later removed the id stays |
+| `discrepancy_item_id` | the linked item id (`DiscrepancyBlock.id`) or `null`; only with `run_id` |
+| `run_label` | read-only. `"<workflow_name> · Run <id>"`; `null` with no run or a missing run |
+| `run_missing` | read-only. `true` when `run_id` is set and that run no longer exists: show "Linked run removed" (no link). Then `run_label` and `discrepancy` are `null` |
+| `discrepancy` | read-only, `null` without an item link (or with a missing run). `title` is the item's live title while it is in the report, else the title saved when the link was made; `status` is the item's live `open` / `resolved` state; `in_report` is `false` when the item is not in the run's current report version (a regenerate dropped it, or the run has no report): show "No longer in the report" and open the run without scrolling (D3, D8). Restoring a version that has the item makes it `true` again |
+
+### `GET /api/tasks`
+
+`{"tasks": [Task]}`, newest first (`created_at`, then `id`). All tasks; nothing
+is filtered on the server.
+
+### `POST /api/tasks`
+
+```json
+{"title": "Follow up: Coverage A (Dwelling) decreased by 14.3%", "due_date": "2026-11-05",
+ "run_id": 7, "discrepancy_item_id": "disc-coverage-a-limit"}
+```
+
+Only `title` is required; `due_date`, `run_id` and `discrepancy_item_id` are
+optional (`null` = none). A new task is `open`. `201 Task`.
+
+### `PATCH /api/tasks/{id}`
+
+Any of `title`, `due_date`, `status`, `run_id`, `discrepancy_item_id`; `null`
+clears `due_date`, `run_id` and `discrepancy_item_id`. `200 Task`. The result is
+checked as a whole (the stored task with the patch applied):
+
+- Changing `run_id` to another run, or clearing it, **without** sending
+  `discrepancy_item_id` drops the item link (O1). Sending the same `run_id`
+  keeps it.
+- To link a discrepancy, send `discrepancy_item_id` (with `run_id` unless the
+  task already has that run). The item must be in the run's current report.
+- A patch that does not send `discrepancy_item_id` never re-checks an existing
+  item link, so editing the title of a task whose item left the report works.
+
+`404 not_found` for an unknown task.
+
+### `DELETE /api/tasks/{id}`
+
+`204`. `404 not_found` for an unknown task. There is no server-side undo: the UI
+hides the row at once and sends the DELETE when its undo toast closes (D6).
+
+### Task errors
+
+Every validation problem is `400 invalid_task` with `field` and a message safe
+to show (checked by the route, so these are never `422`):
+
+```json
+{"error": {"code": "invalid_task", "message": "The title can be at most 200 characters.", "field": "title"}}
+```
+
+| `field` | When |
+|---|---|
+| `title` | missing on create, not text, empty after cleaning, or over 200 characters |
+| `due_date` | not a `YYYY-MM-DD` string (or `null`), or not a real date |
+| `status` | not `open` or `done` (PATCH only) |
+| `run_id` | not an integer (or `null`), or no such run |
+| `discrepancy_item_id` | not a string id; sent without a run; the run has no report yet; the item is not in the run's current report |
+| the field's own name | a key that is not a task field (for example `status` on create, or `note`) |
+| absent | the body is not an object, or a PATCH body is empty |
 
 ## Artifacts
 

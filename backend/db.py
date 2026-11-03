@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, event, select
+from sqlalchemy import Engine, create_engine, event, inspect, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -73,8 +73,51 @@ def session_scope(factory: sessionmaker[Session]) -> Iterator[Session]:
         session.close()
 
 
+RESEED_COMMAND = "backend/.venv/Scripts/python -m backend.dev_seed seed"
+
+
+class SchemaOutdated(RuntimeError):
+    """The database predates a schema change; there are no migrations, so it must be recreated."""
+
+
+def check_schema(engine: Engine) -> None:
+    """Fail fast on a database made before slice 3b (D10): `create_all` adds missing tables but
+    never a missing column, so an old `run` table without `line` would start and then fail on the
+    first runs query. A new (empty) database passes."""
+    names = set(inspect(engine).get_table_names())
+    if "run" not in names:
+        return
+    missing = []
+    if "line" not in {c["name"] for c in inspect(engine).get_columns("run")}:
+        missing.append("the run.line column")
+    if "task" not in names:
+        missing.append("the task table")
+    if not missing:
+        return
+    where = engine.url.database or "the in-memory database"
+    raise SchemaOutdated(
+        f"The database {where} was created before the 2026-11-02 schema change (slice 3b) and lacks "
+        f"{' and '.join(missing)}. There are no migrations: stop the server, delete {where} (and its -wal and "
+        f"-shm files if present), then start again for an empty database, or reseed dev data with: "
+        f"{RESEED_COMMAND} (with BROKERDOCS_DATA_DIR set to a scratch folder).")
+
+
+def exit_if_outdated(url: str | None = None) -> None:
+    """For the server entry points: print the SchemaOutdated message and exit before uvicorn starts
+    (a failure inside the lifespan would bury it in a traceback)."""
+    engine = make_engine(url)
+    try:
+        check_schema(engine)
+    except SchemaOutdated as exc:
+        raise SystemExit(str(exc)) from None
+    finally:
+        engine.dispose()
+
+
 def init_db(engine: Engine) -> None:
-    """Create tables and seed the default workspace and workflows (idempotent)."""
+    """Check the schema is current (D10), create tables and seed the default workspace and
+    workflows (idempotent)."""
+    check_schema(engine)
     models.Base.metadata.create_all(engine)
     with session_scope(make_session_factory(engine)) as session:
         seed(session)
