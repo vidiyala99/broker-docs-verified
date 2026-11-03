@@ -45,7 +45,7 @@ Every error has one shape:
 
 | Status | Codes |
 |---|---|
-| 400 | `Invalid host header` (plain text from the host guard) |
+| 400 | `Invalid host header` (plain text from the host guard), `invalid_run` (slot assignment, see `POST /api/runs`) |
 | 403 | `origin_not_allowed` |
 | 404 | `not_found`, `no_report`, `cell_not_found`, `version_not_found`, `file_missing` |
 | 409 | `document_in_use`, `not_retryable`, `run_active`, `version_conflict`, `regenerate_in_progress`, `already_applied`, `chat_busy`, `no_report`, `budget_exhausted` |
@@ -248,7 +248,59 @@ A damaged or password-protected PDF is **accepted** with `parse_error` and a
 ```
 
 `filename` is display text only (base name, control and path characters
-removed). Files are stored under generated UUID names.
+removed). Files are stored under generated UUID names. `kind` is `quote` for a
+PDF uploaded here and `ams` for an AMS export (next route).
+
+### `POST /api/documents/ams` (multipart, slice 3)
+
+Form field `files`, repeated once per file; same `200` envelope as
+`POST /api/documents` (`documents` and `rejected`, so good files stay and bad
+ones get an inline rejection). Use it for the AMS export of a Policy Check run;
+`POST /api/documents` stays PDF-only.
+
+- **Formats.** Only `.json` and `.csv`, and the content must agree with the
+  extension (JSON opens with `{` or `[`). JSON is one flat object of field names
+  and values (nested values are not accepted, `invalid_ams`). CSV is either a
+  header row plus exactly one record row, or a two-column `field,value` table
+  (header `field`/`name`/`key`/`field_name`/`code`/`field_code` and
+  `value`/`field_value`). Text must be UTF-8. A repeated field name is rejected.
+- **Caps.** 512 KB per file (also bounded by the PDF byte cap), 400 fields,
+  100 characters per field name, 1000 characters per field value, and at most 8
+  files per request (the same per-run document limit as PDFs). The rendered
+  PDF also has to pass the normal PDF page cap. Field names and values are
+  screened like document text (control characters removed, unsupported
+  characters shown as `?`, counted in `ams.notices`).
+- **Rejection codes** (`rejected[]`, with `limit` where a limit applies):
+  `too_large` (`limit` in bytes), `empty`, `not_ams` (wrong extension, a PDF, or
+  content that does not match the extension), `invalid_ams` (unreadable JSON or
+  CSV, wrong shape, no fields, duplicate field), `too_many_fields` (`limit` 400),
+  `field_too_long` (`limit` is the name or value cap), `too_many_documents`
+  (`limit` 8), `too_many_pages` (`limit` in pages).
+- **What is stored.** The export is rendered to a PDF (one line per field,
+  `field_name: value`) that is served, parsed and verified like any PDF
+  (`GET /api/documents/{id}/file` returns that PDF, so a citation chip opens
+  the rendered page); the original file is kept beside it. The document has
+  `kind: "ams"` and can be used only in a slot that accepts JSON or CSV.
+
+Each accepted item is a `Document` plus an `ams` summary:
+
+```json
+{"documents": [{"id": 9, "filename": "ams-export.json", "size_bytes": 812, "page_count": 1,
+                "sha256": "...", "kind": "ams", "parse_error": null, "warning": null,
+                "created_at": "...",
+                "ams": {"format": "json", "field_count": 14,
+                        "unmapped": ["Effective Date", "Carrier"],
+                        "notices": []}}],
+ "rejected": []}
+```
+
+`ams.format` is `json` or `csv`; `field_count` is the fields read (including
+empty ones); `unmapped` is the names of fields that have a value but match no
+Policy Check field, so they are not compared (the effective date and expiration
+date on their own, carrier and similar); `notices` is the list of record-level
+notices (replaced characters). In a Policy Check report, run `notices` of kind
+`info` carry the record notices, "AMS fields not compared (...)" and any
+"AMS fields ... give different values for <key>" conflict.
 
 ### `GET /api/documents`
 
@@ -282,11 +334,59 @@ URL to pdf.js for the source viewer. `404 file_missing` if the file is gone
 "Proposal runs" below: the parameters are validated and stored with the
 template snapshot.
 
+**`slots` (slice 3, optional).** A map of document id to input slot key, one
+entry per document in the run, for example
+`{"document_ids": [3, 4, 9], "workflow": "policy-check", "slots": {"3": "expiring", "4": "renewal", "9": "ams"}}`
+(JSON keys are strings; the server reads them as integers). Each key is 1 to 50
+characters and `slots` holds at most 64 entries. The valid keys are the
+workflow's `input_slots` (`GET /api/workflows/{id_or_slug}`):
+
+| Workflow | Slot key | Accepts | Min | Max |
+|---|---|---|---|---|
+| `compare-quotes`, `proposal-builder` | `quotes` | `application/pdf` | 1 | 8 |
+| `policy-check` | `expiring` | `application/pdf` | 1 | 1 |
+| `policy-check` | `renewal` | `application/pdf` | 1 | 1 |
+| `policy-check` | `quote` | `application/pdf` | 0 | 1 |
+| `policy-check` | `ams` | `application/json,text/csv` | 0 | 1 |
+
+Rules, checked in this order after the duplicate and count checks and after the
+workflow and documents are found:
+
+- Without `slots`, a one-slot workflow puts every document in its slot
+  (`quotes`), exactly as before slice 3. A workflow with several slots
+  (`policy-check`) needs `slots`.
+- With `slots`: every document in `document_ids` has exactly one entry, no entry
+  names a document outside the run, every key is one of the workflow's slots,
+  and each slot's document count is within its min and max.
+- `accepts` is enforced. A document whose `kind` is `ams` (uploaded through
+  `POST /api/documents/ams`) can only go in a slot that accepts `text/csv` or
+  `application/json`; any other document only in a slot that accepts
+  `application/pdf`. An AMS export therefore cannot enter a Compare Quotes run.
+- A slot a run leaves empty is simply absent (`min` 0 slots only).
+
+Responses:
+
 - `201 {"run": Run, "created": true}` for a new run (it starts at once).
 - `200 {"run": Run, "created": false}` when an identical run is still active
-  (double-click Run returns the same run).
+  (double-click Run returns the same run). Identical means the same workflow,
+  the same documents in the same order with the same slots, and the same
+  `parameters`.
+- `400 invalid_run`: the slot assignment does not fit the workflow (missing,
+  unknown or extra slot entry, a slot below its min or above its max, a PDF in
+  the AMS slot, an AMS export in a PDF slot, or `slots` omitted for a
+  multi-slot workflow). `message` is safe to show.
 - `422 invalid_run`: no documents, a duplicate, or more than 8 (`limit: 8`).
+  These are the older cases and stay 422; slot errors are 400.
+- `422 invalid_request`: a malformed body (for example `slots` with more than
+  64 entries, or a key over 50 characters).
 - `404 not_found`: unknown workflow or document.
+
+A `policy-check` run additionally fails (`status: failed`, `retryable: true`)
+when a required slot (min 1: `expiring`, `renewal`) has no readable document
+after the documents settle. `error` then reads "The expiring policy could not be
+read, so this check cannot run. Retry to try again." followed by the document
+reasons. An optional slot (`quote`, `ams`) whose document failed does not fail
+the run; its cells read Not read in the report (see "Policy Check discrepancies").
 
 `Run`:
 
@@ -317,10 +417,16 @@ it to show the Retry button.
 `RunDocument` (identical to the SSE `document.status` payload):
 
 ```json
-{"run_document_id": 31, "document_id": 3, "position": 0, "letter": "A",
+{"run_document_id": 31, "document_id": 3, "position": 0, "letter": "A", "slot": "quotes",
  "filename": "harborline.pdf", "status": "reading", "progress": "Reading pages 4/10",
  "error": null, "error_code": null, "option_count": 1, "option_label": null}
 ```
+
+`slot` (slice 3) is the input slot key the document was assigned to in
+`POST /api/runs`: `quotes` for Compare Quotes and Proposal Builder runs, and
+for any run created before slice 3; `expiring`, `renewal`, `quote` or `ams`
+for Policy Check. It is in the REST `Run.documents` list and in the SSE
+`document.status` and `run.snapshot` payloads alike.
 
 `status`: `queued`, `reading`, `extracting`, `verifying`, `done`, `failed`.
 `progress` is the per-row text (DG4). On `failed`, `error` is the user-facing
@@ -415,6 +521,49 @@ Every new artifact version (run, retry, regenerate, undo) reconciles it against 
 fingerprint of the item's compared slot values (citations excluded): a resolved item whose
 values changed reopens with `changed_since_resolved: true`; restoring the resolved values
 brings the decision back. Statuses are `open | resolved` only; there is no bulk endpoint (D1, D2).
+
+### `DiscrepancyBlock`
+
+Each item is a `discrepancy` block of the artifact (`GET /api/runs/{id}/artifact`
+returns the same blocks without the decision fields):
+
+| Field | Meaning |
+|---|---|
+| `type` | `"discrepancy"` |
+| `id` | `disc-` plus the lower-cased `key` with other characters as `-`; stable across regeneration |
+| `key` | canonical fact key (`coverage_a_limit`, `total_premium`, ...) or `form:<normalized form number>` |
+| `title` | deterministic title built in code |
+| `severity` | `critical`, `high`, `medium` or `low` |
+| `item_state` | `discrepancy` (the renewal differs from a compared role) or `needs_review` (an expiring or renewal value is conflicting, unverified or not read; severity is `low`) |
+| `lob` | `null` today |
+| `prose` | one segment, the deterministic explanation (`{"text", "passage_ids"}`) |
+| `slots` | map of role (`expiring`, `quote`, `renewal`, `ams`) to a `Cell` |
+
+The comparison is renewal-centered. Expiring vs renewal is graded by fact
+type (limit down more than 10% is `critical`, any other limit change or a removed
+limit `high`, deductible increase `critical`, premium up `medium`, deductible
+down `medium`, form edition change `medium`, text or address change `medium`,
+policy number change `low`, discount dropped `high`, discount amount change
+`low`, a key outside the closed list `low`). A quote or AMS value that differs
+from the renewal is `high`. `policy_term` is not compared expiring vs renewal
+(the term always moves); it is compared with the quote and the AMS value only.
+The AMS effective date, expiration date and carrier are not compared (listed in
+`ams.unmapped` and in a run notice). Equal values after normalization produce no
+item. A report with no items holds one paragraph (`id: "discrepancies-none"`)
+instead of blocks, and the list endpoint returns `items: []`.
+
+Slot states are carried in each role's `Cell`:
+
+| Slot | Meaning | Shown as |
+|---|---|---|
+| role missing from `slots` | no document was assigned to that role | N/A |
+| `state: "absent"`, no value | the document was read but does not state this fact | N/A |
+| `state: "failed"` | the role's document failed or the budget ran out, or its fact extraction failed | Not read (never N/A) |
+| `state: "verified"` or `"scan_read"`, with `value` and `passage_ids` | cited value | the value and its chips |
+| `state: "conflicting"`, no `value`, `conflicts` and `passage_ids` listed | the document states different values, each cited | Needs review |
+| `state: "not_found"`, no `value` | the value could not be verified in the document | Needs review ("Couldn't verify") |
+
+AMS citations are chips on the rendered AMS PDF (see `POST /api/documents/ams`).
 
 ### `GET /api/runs/{id}/discrepancies?severity=critical,high&hide_resolved=true`
 

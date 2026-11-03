@@ -615,3 +615,42 @@ REALITY: pr-count pass no ship-policy.json, default one PR per wave, review reco
 **VERDICT:** no review is CLEAR. Eng Review is ISSUES OPEN (mapped work, 32 issues all dispositioned, 0 unresolved decisions); eng review required before it can read CLEAR.
 
 NO UNRESOLVED DECISIONS
+
+---
+
+## Amendments after build (2026-11-02)
+
+The backend was built and merged on 2026-11-02 (HANDOFF.md, "slice 3 Policy Check backend built and merged"). The sections above are left as written; this section lists where the build differs from sections 2, 3, 4, 5, 7 and 8. `backend/API.md` documents the shipped contract.
+
+**Section 2, roles and inputs**
+- `parameters.roles` is replaced by `slots` on `POST /api/runs` (ledger D8): a map `document_id -> slot key`, where the keys `expiring`, `renewal`, `quote`, `ams` are the workflow's `input_slots` with `min`/`max` and `accepts`. Slot errors answer `400 invalid_run`; the older `422 invalid_run` cases (no documents, a duplicate, more than 8) stay 422.
+- `accepts` is enforced: an AMS export fits only the `ams` slot, a PDF only the PDF slots, so an AMS export cannot enter Compare Quotes.
+- A required slot (`expiring`, `renewal`) with no readable document fails the run (retryable). A failed optional slot (`quote`, `ams`) shows "Not read" and is never N/A (D11).
+- The AMS file has its own endpoint, `POST /api/documents/ams`, not the PDF upload. It takes `.json` (flat object) and `.csv` (one record row, or a `field,value` table), 512 KB, 400 fields, 100-character names, 1000-character values. It is rendered to a PDF at upload (one `field_name: value` line per field) and verified like any PDF, so a citation is a normal passage on the rendered page, not a separate pseudo-page type. The original is kept beside it. The response adds an `ams` summary (`format`, `field_count`, `unmapped`, `notices`).
+
+**Section 3, facts and diff**
+- Forms are extracted in the same pass as the scalar fields (one combined schema, ledger D13) and align by `form:<normalized number>` keys, so an edition change is one change.
+- The comparison is renewal-centered (D10): expiring vs renewal is graded by fact type; quote and AMS are compared with the renewal only, and only a slot that has a value counts. A quote or AMS mismatch is a flat `high`.
+- `policy_term` is not compared expiring vs renewal (the term always moves); it is compared with quote and AMS only.
+- The AMS effective date, expiration date and carrier are not compared: they map to no policy field and are named in the `ams.unmapped` list and in a run notice.
+- A conflicting or unverified expiring or renewal value becomes a `needs_review` item (severity `low`), never "removed" and never equal (D15).
+- Severity values were set during the build and are starting values to tune: limit down more than 10% `critical` (exactly 10% is `high`), other limit change or removal `high`, limit added `medium`; deductible increase or added `critical`, decrease `medium`; premium up `medium`, down `low`; discount dropped `high`, discount amount change `low`; form edition change `medium`; text or address change `medium`; policy number change `low`; keys outside the closed list `low`.
+- Title and explanation are deterministic text built in code (D14). There is no model prose and no compose call for Policy Check, so Regenerate is free and byte-identical; "No-AI-prose mode" does not apply.
+- Reading fix found by the live eval: a two-column renewal schedule was read values-then-labels. `parse.reading_text` now rejoins label and value columns row by row (used by `extract.page_text`, so chat sees it too).
+
+**Section 4, storage**
+- `discrepancy_state` statuses are `open | resolved` only; `accepted` was cut (D2). The table also keeps a fingerprint of the compared slot values (citations excluded) and the resolved fingerprint. A resolved item whose values change reopens with `changed_since_resolved`; restoring the resolved values (for example by undo) restores the resolved status.
+- The stored discrepancy item is a `DiscrepancyBlock` in the artifact `Block` union (D7): `{type, id, key, title, severity, item_state, lob, prose, slots}`. Citations live in the slot cells and prose segments, not in a separate `citations` field.
+
+**Section 5, API**
+- `POST /api/runs/{id}/discrepancies/bulk` is cut (D1), and so is the `accepted` status.
+- `GET /api/runs/{id}/discrepancies` also returns `open_counts` and totals; `PATCH` takes `status` and/or `note` (a note up to 2000 characters, `null` clears it).
+- Added: `POST /api/documents/ams`, `slots` on `POST /api/runs`, and a `slot` field on every run document in REST and SSE.
+
+**Section 7, eval and tests**
+- Fixtures live in `tests/fixtures/policy/`; the live gate also blocks on recall below 0.80 and on wrong-field values (D16). After the reading fix two live Policy Check runs passed: recall 13/13, precision 13/13, 0 hard fails, about 15k tokens per run. The 23-document Compare Quotes live eval on `e8eac21` also passed with 0 hard fails (267/286, 0.934).
+
+**Section 8, risks and open questions**
+- Slice 3 supports single-location policies (D17): canonical keys carry no location or schedule, so a multi-location policy cannot align. Recorded in TODOS.md.
+- The non-PDF citation question is settled by rendering the AMS export to a PDF; no new citation type was added.
+- Open residuals are listed in TODOS.md: reading_text limits, duplicate form editions in one call, the long_300 token ceiling and a one-off scanned retention miss.

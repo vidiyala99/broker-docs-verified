@@ -34,3 +34,12 @@
 - **Pros:** correct comparisons on real commercial and multi-property policies. **Cons:** extraction must emit a scope per fact, and alignment gets a second dimension.
 - **Context:** `docs/specs/2026-11-02-policy-check-design.md` section 8 and the Engineering review section. Related: the cross-reference TODO above (long policies).
 - **Depends on:** slice 3 Policy Check diff engine (`pipeline/diff.py`).
+
+## Policy Check residuals (slice 3 backend, 2026-11-02)
+- **What:** known gaps left after the slice 3 backend merge (HANDOFF.md, 2026-11-02 19:50 entry).
+- **reading_text limits:** `parse.reading_text` rejoins label and value columns row by row, but it does not rejoin word-only value columns (a value that is words, not a number or date), wrapped labels, or tables with three or more columns. A schedule laid out that way can still be read values-then-labels.
+- **Duplicate form editions:** when one extraction call states the same form number twice with different editions, the diff keeps the first.
+- **long_300 ceiling:** the long_300 fixture plans 467k tokens of the 500k per-document ceiling once the forms schema is added; a longer policy would hit the ceiling.
+- **Scanned retention miss:** `carrier_c_scanned.retention` came back `not_found` once in the 19:53 live eval (Compare Quotes, scanned bucket, otherwise 0.983). A one-off so far; watch it in the next live run before acting.
+- **Context:** `docs/specs/2026-11-02-policy-check-design.md`, "Amendments after build". Multi-location policies are the separate "Coverage identity" entry above.
+- **Depends on:** slice 3 Policy Check backend.
