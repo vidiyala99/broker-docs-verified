@@ -131,3 +131,36 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Defaults taken in the spec (owner may veto): delete uses undo toast, no confirm; discrepancy card shows first open linked task, else latest.
 - Next: `/plan-eng-review` on the spec (fresh session), then backend lane (Opus), then UI lanes through the design stack (Integrations, Personal lines, Tasks).
 - Dev stack may still be running (backend 8000, Vite 5173).
+
+## 2026-11-02 22:50: slice 3b T1 to T6 merged; work queue spec written; Tasks lane still running
+- Main `cb647cf`. Merged: backend lane T1 to T4 (`33b20cb`: Run.line, PATCH /api/runs, `?line=`, Tasks API, fail-fast on old DB, seed),
+  Integrations mock T5 (`a26def6`), Personal lines T6 (`16a05d7`). Eng review of slice 3b: D1 to D11 in
+  `docs/specs/2026-11-02-rail-completion-design.md` (ledger overrides spec text). Backend 1315 pass/2 skip (checked on the branch);
+  tsc clean on main after each merge. Lane e2e (agent-reported, on their branches): Integrations 16/16, Personal lines 24/24, axe 0.
+  Full e2e has NOT been run on main after the merges: do that first.
+- Old-test edits so far (D7 exceptions, commented): disabled-rail count in journey.spec.ts and policy-check.spec.ts (10 -> 8),
+  journey's "Personal lines coming later" check now checks the live link.
+- **Tasks lane T7 still running** as a background agent in worktree `.claude/worktrees/agent-a0592be45707cfcc1`, branch `slice3b-tasks`
+  (it hit a transient API SSL error once and was resumed). If the session ends before it reports: inspect that worktree
+  (`git -C <worktree> log/status`), finish or rerun T7 from the brief in the slice 3b spec (sections 2.2, 2.3, D2/D3/D6/D8/O3/O4/O7),
+  ports 8030/5195. Told not to touch `frontend/src/launch/RecentRuns.tsx`.
+- **Owner rejected the run-list design** (22:44): Personal lines / Workflows showing raw runs is an engine view with no next action.
+  New spec `docs/specs/2026-11-02-work-queue-design.md` (cb647cf), decisions W1 to W6: work queue grouped Needs review / Ready /
+  Needs attention / Done recently (+ In progress strip), rows named by client (broker-typed Client field, fallback extracted
+  named_insured), Activity page `#/activity` for raw runs, items leave the queue when work is done, no extraction change.
+  Status: written, NOT yet owner-approved. Next: owner review, then `/plan-eng-review`, then backend lane, queue UI lane, motion lane.
+  The table redesign of RecentRuns proposed at 22:43 is withdrawn.
+- **Motion pass (W5)**: owner flagged that segmented controls (All/Open etc.), tabs and list filters have no transitions app-wide.
+  Separate lane after Tasks merges: `improve-animations` audit first, shared segmented control with sliding indicator, reduced-motion.
+- Owner calls taken by lane agents (owner may veto): Integrations omits the evidence shot's search/filter/badges (R7); ImageRight stays in
+  agency group; rail on a run page highlights the workflow, not Personal lines; re-tag shows a success toast without Undo; Policy Check line
+  choice at top of step 1, Compare's in Upload above the button. Backend: bad `?line=` is 422 like `severity`; POST /api/tasks rejects
+  unknown keys; PATCH without `discrepancy_item_id` does not re-validate an existing link.
+- Pre-existing issues seen, not fixed: run toolbar actions clipped ~60px at 390; run breadcrumb flashes "Workflows / Compare Quotes" while loading;
+  PRODUCT.md missing (every design lane flags it).
+- Dev stack: backend 8000 restarted on main code with a fresh seed at
+  `C:\Users\aakas\AppData\Local\Temp\claude\C--Users-aakas-Documents-JobHunt-BrokerDocs\23f47f7d-be6b-4b5f-b308-230d1734b5b5\scratchpad\dev-data-3b`
+  (runs 1 to 8, 7/8 personal, two tasks); Vite 5173 from main. Old DBs now refuse to start (D10): reseed with `python -m backend.dev_seed seed`.
+- Cleanup pending: merged lane worktrees under `.claude/worktrees/` (agent-a76ce5b93a99de08c, agent-a4e0b986261be2a61, agent-ab9097927fb1621d0)
+  and branches slice3b-backend/-integrations/-personal-lines can be removed; untracked compare_eval*.log/json in repo root.
+- Fresh session recommended.
