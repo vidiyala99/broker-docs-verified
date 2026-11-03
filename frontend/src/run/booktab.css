@@ -1,0 +1,87 @@
+/* Line move, direction B (LINE-MOVE-BRIEF.md): the run header's book tab and its Move button. */
+
+.booktab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+/* The book the file is filed in: a tag (4px chip radius, no border so it never reads as a button), canvas grey, a
+   darker left edge like a divider tab in a binder. Decoration only; the words say the book. */
+.booktab__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border-left: 3px solid var(--color-text-muted);
+  border-radius: var(--radius-chip);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.booktab__tab .vmark {
+  flex: none;
+}
+
+/* The one action: a quiet text button in the link colour that names where the file goes. 32px drawn, 44px hit. */
+.booktab__move {
+  position: relative;
+  height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.booktab__move::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.booktab__move > span {
+  position: relative;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-input);
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .booktab__move:hover > span {
+    text-decoration-color: currentColor;
+  }
+}
+
+.booktab__move:active {
+  transform: scale(var(--press-scale));
+}
+
+.booktab__move:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Phone: the run pane is ~250px; the button takes its own row under the tab rather than overflow. */
+@media (max-width: 599px) {
+  .booktab {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  .booktab__tab {
+    padding: 0 var(--space-2);
+  }
+}

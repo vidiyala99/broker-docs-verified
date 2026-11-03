@@ -24,6 +24,7 @@ export type GlyphName =
   | "policy-check"
   | "proposal"
   | "personal"
+  | "commercial"
   | "certificate"
   | "tasks"
   | "integrations"
@@ -72,6 +73,13 @@ function draw(name: GlyphName, tabs: boolean) {
       );
     case "personal": // a household: the house
       return <path {...S} d="M3.75 11 12 4l8.25 7M6 9.25v11h12v-11M10 20.25v-5.5h4v5.5" />;
+    case "commercial": // a business: an office block on its ground line (line-move B; the book tab, not the rail)
+      return (
+        <>
+          <rect x="5.25" y="3.75" width="13.5" height="16.5" rx="1.5" {...S} fill={PAPER} />
+          <path {...S} d="M8.75 7.75h1.5M13.75 7.75h1.5M8.75 11.25h1.5M13.75 11.25h1.5M10.5 20.25v-4.5h3v4.5M3.75 20.25h16.5" />
+        </>
+      );
     case "certificate": // a certificate: a sheet with its seal
       return (
         <>

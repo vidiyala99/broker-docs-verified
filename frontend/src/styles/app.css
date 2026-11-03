@@ -239,6 +239,32 @@ a {
   font-weight: var(--weight-medium);
 }
 
+/* Line move B: the book crumb (first crumb of a run) fades in when a pointer move changed it (App.tsx `refile`). Reduced
+   motion: the fade only. */
+.crumbs li.is-refiled {
+  animation: crumb-refile var(--dur-base) var(--ease-out);
+}
+
+@keyframes crumb-refile {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes crumb-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crumbs li.is-refiled {
+    animation-name: crumb-fade;
+  }
+}
+
+
 .topbar__spacer {
   flex: 1;
 }
@@ -704,6 +730,10 @@ kbd {
   bottom: var(--space-6);
   z-index: var(--z-toast);
   transform: translateX(-50%);
+  /* Line move B: with `left: 50%` alone the toast could only use half the viewport, so a toast naming a client wrapped
+     to seven lines at 390. Size to the message, capped at the viewport less a margin. */
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--space-4));
 }
 
 .toast {

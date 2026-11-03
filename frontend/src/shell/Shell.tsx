@@ -89,6 +89,8 @@ export function Rail({ section }: { section: Section }) {
 export interface Crumb {
   label: string;
   href?: string;
+  /** Line move B: this (book) crumb just changed by a pointer move, so it fades in (app.css `.is-refiled`). */
+  refile?: boolean;
 }
 
 export function TopBar({ crumbs }: { crumbs: Crumb[] }) {
@@ -101,7 +103,7 @@ export function TopBar({ crumbs }: { crumbs: Crumb[] }) {
       <nav aria-label="Breadcrumb" className="crumbs">
         <ol>
           {crumbs.map((c, i) => (
-            <li key={`${c.label}-${i}`}>
+            <li key={`${c.label}-${i}`} className={c.refile ? "is-refiled" : undefined}>
               {i === crumbs.length - 1 ? (
                 <span aria-current="page">{c.label}</span>
               ) : c.href ? (

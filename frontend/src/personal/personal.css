@@ -131,6 +131,10 @@
   flex: none;
 }
 
+.line-choice__check.is-off {
+  visibility: hidden;
+}
+
 /* Text and glyph paint above the ::before hit area, so a pointer on the words lands on them (inside the label). */
 .line-choice__opt > span,
 .line-choice__check {
@@ -143,7 +147,7 @@
   }
 }
 
-/* Run header: 32px, sits in the toolbar after the title. */
+/* Compact 32px segment with an inline label (now only the Tasks filter; the run header uses the book tab, line move B). */
 .line-choice--compact {
   display: flex;
   align-items: center;
@@ -166,7 +170,7 @@
   inset: -6px -2px;
 }
 
-/* Phone: the run pane is ~250px. The inline label stays the accessible name but is not drawn; options size to text. */
+/* Phone: the pane is narrow. The inline label stays the accessible name but is not drawn; options size to text. */
 @media (max-width: 599px) {
   .line-choice__inline-label {
     position: absolute;

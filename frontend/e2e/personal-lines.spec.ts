@@ -155,7 +155,8 @@ test("Starting a comparison and a check from Personal lines makes personal runs"
   expect((await (await page.request.get(`${API}/api/runs/${compareId}`)).json()).line).toBe("personal");
   // Queue navigation: the last crumb names the client once the documents give one (before that, "Run N").
   await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes.*(Run \d+|Cedar Hollow Hospitality LLC)$/);
-  await expect(page.getByRole("group", { name: "Line", exact: true }).getByRole("radio", { name: "Personal" })).toBeChecked();
+  // Owner-approved change (line move B, 2026-11-03): the run header shows the book tab, not Line radios.
+  await expect(page.getByRole("group", { name: "Book" })).toContainText("Personal lines");
   await expect(page.locator(".report")).toBeVisible({ timeout: 60_000 });
 
   // Policy Check: the same, through the wizard (roles guessed from the file names).
@@ -186,8 +187,12 @@ test("Starting a comparison and a check from Personal lines makes personal runs"
 
 test("Re-tag from the run header moves the run between the lists; a failed PATCH rolls back", async ({ page }) => {
   await page.goto("/#/runs/7");
-  const control = page.getByRole("group", { name: "Line", exact: true });
-  await expect(control.getByRole("radio", { name: "Personal" })).toBeChecked();
+  // Owner-approved change (line move B, 2026-11-03): the run header's Line radios became the book tab plus one
+  // "Move to ..." button; the toast names the client and the book and offers Undo; commercial crumbs lead with
+  // "Commercial". Assertions below follow that; the PATCH body, list moves and rollback are unchanged.
+  const book = page.getByRole("group", { name: "Book" });
+  const tab = book.locator(".booktab__tab");
+  await expect(tab).toHaveText("Personal lines");
   // Queue navigation (deliberate update): a named run's last crumb is its client, not "Run 7".
   await expect(crumbs(page)).toHaveText(/^Personal lines.*Policy check.*Avery and Jordan Pellham$/);
   // The rail names the tool: Policy check stays current for a personal Policy Check run.
@@ -198,12 +203,12 @@ test("Re-tag from the run header moves the run between the lists; a failed PATCH
   // Personal -> Commercial: PATCH body exactly {"line": "commercial"}, crumbs and toast follow.
   const [patch] = await Promise.all([
     page.waitForRequest((r) => r.method() === "PATCH" && /\/api\/runs\/7$/.test(r.url())),
-    control.getByText("Commercial").click(),
+    book.getByRole("button", { name: "Move to Commercial" }).click(),
   ]);
   expect(patch.postDataJSON()).toEqual({ line: "commercial" });
-  await expect(control.getByRole("radio", { name: "Commercial" })).toBeChecked();
-  await expect(page.locator(".toast-region")).toContainText("Moved to Commercial.");
-  await expect(crumbs(page)).toHaveText(/^Policy check.*Avery and Jordan Pellham$/);
+  await expect(tab).toHaveText("Commercial");
+  await expect(page.locator(".toast-region")).toContainText("Avery and Jordan Pellham moved to Commercial.");
+  await expect(crumbs(page)).toHaveText(/^Commercial.*Policy check.*Avery and Jordan Pellham$/);
   await shot(page, "1440-retag-commercial");
 
   await page.goto("/");
@@ -214,10 +219,13 @@ test("Re-tag from the run header moves the run between the lists; a failed PATCH
 
   // And back, by keyboard.
   await page.goto("/#/runs/7");
-  await control.getByRole("radio", { name: "Commercial" }).focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(control.getByRole("radio", { name: "Personal" })).toBeChecked();
-  await expect(page.locator(".toast-region")).toContainText("Moved to Personal lines.");
+  const toPersonal = book.getByRole("button", { name: "Move to Personal lines" });
+  await toPersonal.focus();
+  await page.keyboard.press("Enter");
+  await expect(tab).toHaveText("Personal lines");
+  await expect(page.locator(".toast-region")).toContainText("Avery and Jordan Pellham moved to Personal lines.");
+  // Keyboard stays on the control: the same button now offers the way back.
+  await expect(book.getByRole("button", { name: "Move to Commercial" })).toBeFocused();
   await page.goto("/#/personal-lines");
   await expect(runLink(page, 7)).toBeVisible();
   await page.goto("/");
@@ -230,12 +238,50 @@ test("Re-tag from the run header moves the run between the lists; a failed PATCH
       ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "internal_error", message: "Couldn't save the line. Retry." } }) })
       : route.fallback(),
   );
-  await control.getByText("Commercial").click();
+  await book.getByRole("button", { name: "Move to Commercial" }).click();
   await expect(page.locator(".toast-region")).toContainText("Couldn't save the line. Retry.");
-  await expect(control.getByRole("radio", { name: "Personal" })).toBeChecked();
+  await expect(tab).toHaveText("Personal lines");
   await expect(crumbs(page)).toHaveText(/^Personal lines/);
   await page.unroute("**/api/runs/7");
   expect((await (await page.request.get(`${API}/api/runs/7`)).json()).line).toBe("personal");
+});
+
+// Line move B (owner-approved 2026-11-03, LINE-MOVE-BRIEF.md): the move says where the file went, and Undo puts it back.
+test("Move to Commercial then Undo restores the book, the crumb and the server line", async ({ page }) => {
+  await page.goto("/#/runs/8");
+  const book = page.getByRole("group", { name: "Book" });
+  const tab = book.locator(".booktab__tab");
+  await expect(tab).toHaveText("Personal lines");
+  await expect(crumbs(page)).toHaveText(/^Personal lines.*Policy check/);
+  // The button's hit area is 44px tall although it draws 32px (DESIGN.md touch targets).
+  const hit = await book.getByRole("button", { name: "Move to Commercial" }).evaluate((b) => {
+    const r = b.getBoundingClientRect();
+    const at = (y: number) => b.contains(document.elementFromPoint(r.left + r.width / 2, y));
+    return { above: at(r.top - 6), below: at(r.bottom + 5) };
+  });
+  expect(hit).toEqual({ above: true, below: true });
+
+  await book.getByRole("button", { name: "Move to Commercial" }).click();
+  await expect(tab).toHaveText("Commercial");
+  await expect(crumbs(page)).toHaveText(/^Commercial.*Policy check/);
+  await expect.poll(async () => (await (await page.request.get(`${API}/api/runs/8`)).json()).line).toBe("commercial");
+
+  await page.locator(".toast-region").getByRole("button", { name: "Undo" }).click();
+  await expect(tab).toHaveText("Personal lines");
+  await expect(crumbs(page)).toHaveText(/^Personal lines.*Policy check/);
+  await expect(page.locator(".toast-region")).toContainText("moved back to Personal lines.");
+  await expect(page.locator(".toast-region").getByRole("button", { name: "Undo" })).toHaveCount(0);
+  await expect.poll(async () => (await (await page.request.get(`${API}/api/runs/8`)).json()).line).toBe("personal");
+
+  // Keyboard: Ctrl+Z runs Undo while the toast shows; focus stays on the Move button.
+  const move = book.getByRole("button", { name: "Move to Commercial" });
+  await move.focus();
+  await page.keyboard.press("Enter");
+  await expect(tab).toHaveText("Commercial");
+  await page.keyboard.press("Control+z");
+  await expect(tab).toHaveText("Personal lines");
+  await expect(book.getByRole("button", { name: "Move to Commercial" })).toBeFocused();
+  await expect.poll(async () => (await (await page.request.get(`${API}/api/runs/8`)).json()).line).toBe("personal");
 });
 
 test("Empty state when no run is personal", async ({ page }) => {
@@ -277,9 +323,10 @@ for (const vp of [
 
     await page.goto("/#/runs/7");
     await expect(page.locator(".disc").first()).toBeVisible();
-    const control = page.getByRole("group", { name: "Line", exact: true });
-    await expect(control.getByRole("radio", { name: "Personal" })).toBeChecked();
-    await control.getByRole("radio", { name: "Personal" }).focus();
+    // Owner-approved change (line move B, 2026-11-03): the header shows the book tab and its Move button.
+    const book = page.getByRole("group", { name: "Book" });
+    await expect(book.locator(".booktab__tab")).toHaveText("Personal lines");
+    await book.getByRole("button", { name: "Move to Commercial" }).focus();
     await noSideScroll(page);
     await shot(page, `${vp.w}-run-header`);
     await axe(page, `run header ${vp.w}`);
