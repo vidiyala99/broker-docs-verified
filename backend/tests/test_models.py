@@ -104,7 +104,7 @@ def test_init_db_seeds_workspace_and_compare_quotes_idempotently():
     factory = db.make_session_factory(engine)
     with factory() as s:
         workflows = s.scalars(select(models.Workflow).order_by(models.Workflow.id)).all()
-        assert [w.slug for w in workflows] == ["compare-quotes", "proposal-builder"]
+        assert [w.slug for w in workflows] == ["compare-quotes", "proposal-builder", "policy-check"]
         wf = workflows[0]
         assert wf.name == "Compare Quotes"
         keys = [f["key"] for f in wf.fact_schema]

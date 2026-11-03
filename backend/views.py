@@ -44,7 +44,7 @@ def run_document_out(rd: models.RunDocument) -> dict[str, Any]:
     # Same keys as pipeline.runner's document.status event payload.
     return {
         "run_document_id": rd.id, "document_id": rd.document_id, "position": rd.position,
-        "letter": rd.letter, "filename": rd.document.filename, "status": str(rd.status),
+        "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename, "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
         "option_count": rd.option_count, "option_label": rd.option_label,
     }
