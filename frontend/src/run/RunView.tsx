@@ -32,13 +32,14 @@ import { Outline, warningSummary, type TrustFilter } from "../report/Outline";
 import type { CellRef } from "../report/Table";
 import { hueOf } from "../report/Chip";
 import type { PdfTarget } from "../pdf/PdfViewer";
+import { keyboardAction } from "../ui/input";
+import { tokenMs, usePresence } from "../ui/motion";
 
 const PdfViewer = lazy(() => import("../pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })));
 import { Chat } from "./Chat";
 import { RunProgress } from "./RunProgress";
 import { RunClient } from "./RunClient";
-import { VOICE } from "../voice/voice";
-import { WorkflowMark } from "../voice/marks";
+import { ReadingMark, WorkflowMark } from "../voice/marks";
 
 type Tab = "report" | number; // number = document id of an open PDF
 
@@ -68,6 +69,12 @@ export function RunView({
   const [split, setSplit] = useState(false);
   const [splitAnim, setSplitAnim] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(viewport === "wide");
+  // Motion lane: the outline's pointer show / hide (data-outline-motion), the split pane's pointer exit (a ghost of the
+  // pane over the report's right half for --dur-fast), and PDF tabs entering / leaving (usePresence, pointer only).
+  const [outlineMotion, setOutlineMotion] = useState<"enter" | "leave" | null>(null);
+  const [leavingPdf, setLeavingPdf] = useState<PdfTarget | null>(null);
+  const [prevSplitPdf, setPrevSplitPdf] = useState<PdfTarget | null>(null);
+  const pdfTabs = usePresence(pdfs, (p) => p.documentId, !keyboardAction());
   const [focusCount, setFocusCount] = useState(0);
   const [filter, setFilter] = useState<TrustFilter | null>(null);
   const [regenerating, setRegenerating] = useState(false);
@@ -244,6 +251,24 @@ export function RunView({
     return () => window.removeEventListener("keydown", onKey);
   }, [split, tab, exitSplit]);
 
+  // The split pane's exit ghost and the outline's motion state clear once their --dur-fast transition is over.
+  useEffect(() => {
+    if (!leavingPdf) return;
+    const t = window.setTimeout(() => setLeavingPdf(null), tokenMs("--dur-fast", 150));
+    return () => window.clearTimeout(t);
+  }, [leavingPdf]);
+
+  useEffect(() => {
+    if (!outlineMotion) return;
+    const t = window.setTimeout(() => setOutlineMotion(null), tokenMs("--dur-fast", 150));
+    return () => window.clearTimeout(t);
+  }, [outlineMotion]);
+
+  const toggleOutline = (next: boolean) => {
+    setOutlineOpen(next);
+    setOutlineMotion(keyboardAction() ? null : next ? "enter" : "leave");
+  };
+
   const closePdf = (docId: number) => {
     setPdfs((list) => list.filter((p) => p.documentId !== docId));
     if (tab === docId) {
@@ -418,6 +443,17 @@ export function RunView({
 
   const activePdf = typeof tab === "number" ? pdfs.find((p) => p.documentId === tab) ?? null : null;
   const showReport = tab === "report" || split;
+  // The pane shown now, and the split pane that just went away. A pointer exit keeps the same <section> (and its PDF
+  // canvas) for --dur-fast as a ghost; Esc and keyboard exits drop it at once. Derived during render, so the pane is
+  // never unmounted and remounted.
+  const panePdf = activePdf && (split || tab === activePdf.documentId) ? activePdf : null;
+  const splitPdf = split ? panePdf : null;
+  if (splitPdf !== prevSplitPdf) {
+    setPrevSplitPdf(splitPdf);
+    setLeavingPdf(prevSplitPdf && !panePdf && !keyboardAction() ? prevSplitPdf : null);
+  }
+  const shownPdf = panePdf ?? leavingPdf;
+  const paneLeaving = !panePdf && leavingPdf != null;
   const summary = artifact ? warningSummary(artifact) : null;
   const running = Boolean(run?.active);
   const isProposal = run?.workflow_name === PROPOSAL_WORKFLOW;
@@ -511,12 +547,17 @@ export function RunView({
               setSplit(false);
             }}
           >
-            {running ? <span className="spinner spinner--sm" aria-hidden /> : <FileText size={16} aria-hidden />}
+            {running ? <ReadingMark size={16} /> : <FileText size={16} aria-hidden />}
             Report
             {running && <span className="sr-only"> (generating)</span>}
           </button>
-          {pdfs.map((p) => (
-            <span key={p.documentId} className={`tab tab--pdf hue-${hueOf(p.letter)}${tab === p.documentId ? " is-active" : ""}`}>
+          {pdfTabs.map(({ item: p, leaving, entering }) => (
+            <span
+              key={p.documentId}
+              className={`tab tab--pdf hue-${hueOf(p.letter)}${tab === p.documentId && !leaving ? " is-active" : ""}${leaving ? " tab--leaving" : entering ? " tab--entering" : ""}`}
+              aria-hidden={leaving || undefined}
+              inert={leaving || undefined}
+            >
               <button
                 type="button"
                 className="tab__btn"
@@ -541,7 +582,7 @@ export function RunView({
 
         <div className="toolbar">
           <h1 id="pane-title" className="toolbar__title">
-            {VOICE && run && <WorkflowMark voice={VOICE} slug={isPolicy ? "policy-check" : isProposal ? "proposal" : "compare-quotes"} summary={`${run.documents.length} carriers`} className="vmark--title" />}
+            {run && <WorkflowMark slug={isPolicy ? "policy-check" : isProposal ? "proposal" : "compare-quotes"} size={30} />}
             {isProposal ? (artifact?.title ?? "Proposal") : isPolicy ? "Policy check" : "Compare Quotes"}, run {runId}
             {artifact && (
               <span className="toolbar__version">
@@ -628,7 +669,7 @@ export function RunView({
                 aria-label={outlineOpen ? "Hide outline" : "Show outline"}
                 aria-expanded={outlineOpen}
                 disabled={!artifact}
-                onClick={() => setOutlineOpen((o) => !o)}
+                onClick={() => toggleOutline(!outlineOpen)}
               >
                 <ListBullets size={18} aria-hidden />
               </button>
@@ -638,18 +679,20 @@ export function RunView({
 
         <div className={`pane__body${split && activePdf ? " is-split" : ""}${splitAnim ? " split-anim" : ""}`}>
           {showReport && (
-            <div className="report-area">
+            <div className="report-area" data-outline-motion={outlineMotion ?? undefined}>
               {reportBody}
-              {artifact && !split && !isPolicy && (outlineOpen ? (
+              {/* While leaving (pointer hide) the outline stays for --dur-fast to slide out; the handle shows at once. */}
+              {artifact && !split && !isPolicy && (outlineOpen || outlineMotion === "leave") && (
                 <Outline artifact={artifact} hideTrust={isProposal && preview} filter={filter} onFilter={setFilter} scrollRoot={scrollRoot} focusFirstCount={focusCount} />
-              ) : (
+              )}
+              {artifact && !split && !isPolicy && !outlineOpen && (
                 <Tip text={summary ? `Outline. ${summary}` : "Outline"} side="bottom">
                   <button
                     type="button"
                     className="outline-handle"
                     aria-label={summary ? `Outline. ${summary}` : "Show outline"}
                     onClick={() => {
-                      setOutlineOpen(true);
+                      toggleOutline(true);
                       setFocusCount((n) => n + 1);
                     }}
                   >
@@ -657,21 +700,26 @@ export function RunView({
                     {summary && <Warning size={16} className="outline-handle__mark" aria-hidden />}
                   </button>
                 </Tip>
-              ))}
+              )}
             </div>
           )}
-          {activePdf && (split || tab === activePdf.documentId) && (
-            <section className="source-pane" aria-label={`Source: ${activePdf.filename}`}>
+          {shownPdf && (
+            <section
+              className={`source-pane${paneLeaving ? " source-pane--leaving" : ""}`}
+              aria-label={`Source: ${shownPdf.filename}`}
+              aria-hidden={paneLeaving || undefined}
+              inert={paneLeaving || undefined}
+            >
               <div className="source-pane__head">
-                <span className={`doc-letter hue-${hueOf(activePdf.letter)}`} aria-hidden>
-                  {activePdf.letter}
+                <span className={`doc-letter hue-${hueOf(shownPdf.letter)}`} aria-hidden>
+                  {shownPdf.letter}
                 </span>
-                <span className="source-pane__name">{activePdf.filename}</span>
+                <span className="source-pane__name">{shownPdf.filename}</span>
                 <button type="button" className="btn btn--ghost btn--sm" onClick={exitSplit}>
-                  {split ? "Exit" : "Back to report"} <kbd>Esc</kbd>
+                  {split || paneLeaving ? "Exit" : "Back to report"} <kbd>Esc</kbd>
                 </button>
               </div>
-              <Suspense fallback={<div className="pdf__frame"><div className="pdf__skeleton" aria-hidden /></div>}><PdfViewer target={activePdf} /></Suspense>
+              <Suspense fallback={<div className="pdf__frame"><div className="pdf__skeleton" aria-hidden /></div>}><PdfViewer target={shownPdf} /></Suspense>
             </section>
           )}
         </div>
@@ -778,6 +826,7 @@ function RunPlaceholder({
     return (
       <div className="report-skeleton" aria-busy="true">
         <p className="report-skeleton__text">
+          {run && <ReadingMark size={20} className="report-skeleton__mark" />}
           {run ? `Reading ${run.documents.length} ${run.documents.length === 1 ? "document" : "documents"}. Progress is in the Upload panel.` : "Loading run"}
         </p>
         <div className="skeleton-lines skeleton-lines--report" aria-hidden>
@@ -793,7 +842,7 @@ function RunPlaceholder({
   if (run.status === "composing") {
     return (
       <div className="state-block state-block--center" role="status">
-        <span className="spinner spinner--lg" aria-hidden />
+        <ReadingMark size={40} />
         <p>Writing report...</p>
       </div>
     );

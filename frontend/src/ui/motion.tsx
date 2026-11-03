@@ -2,7 +2,8 @@
 // Rules (DESIGN.md Motion, emil-design-eng, animate): transform and opacity only, plus the sanctioned grid-row collapse
 // for disclosure height; ease-out on enter/exit; at most 200ms; keyboard-triggered opens are instant; reduced motion
 // keeps opacity and drops movement.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { keyboardAction } from "./input";
 import "./motion.css";
 
 /** Exit duration in ms; matches `--dur-base` (200ms) minus a frame so the node is gone when the transition ends. */
@@ -65,8 +66,24 @@ export function usePresence<T>(items: T[], keyOf: (t: T) => string | number, ani
 /**
  * Disclosure body that animates its height (grid rows 0fr to 1fr) and opacity on pointer opens; keyboard opens and
  * closes are instant (`animate` false). Closed content is unmounted after the exit, so it is out of the tab order.
+ * `keepMounted` keeps children that hold state (upload rows, a chat draft) and hides them with `hidden` once the exit
+ * has settled instead of unmounting. Reduced motion (motion.css) keeps the opacity fade and drops the height change.
  */
-export function Collapse({ open, animate, id, children }: { open: boolean; animate: boolean; id?: string; children: ReactNode }) {
+export function Collapse({
+  open,
+  animate,
+  id,
+  keepMounted = false,
+  className,
+  children,
+}: {
+  open: boolean;
+  animate: boolean;
+  id?: string;
+  keepMounted?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
   const [mounted, setMounted] = useState(open);
   const [settled, setSettled] = useState(open);
   useEffect(() => {
@@ -87,18 +104,114 @@ export function Collapse({ open, animate, id, children }: { open: boolean; anima
     const t = window.setTimeout(() => setMounted(false), EXIT_MS);
     return () => window.clearTimeout(t);
   }, [open, animate]);
-  if (!mounted && !open) return null;
+  if (!mounted && !open && !keepMounted) return null;
   return (
     <div
       id={id}
-      className={`collapse${animate ? " collapse--animate" : ""}`}
+      className={`collapse${animate ? " collapse--animate" : ""}${className ? ` ${className}` : ""}`}
       data-open={open ? "true" : "false"}
       data-settled={settled ? "true" : undefined}
+      hidden={(!mounted && !open) || undefined}
       inert={!open || undefined}
     >
       <div className="collapse__inner">{children}</div>
     </div>
   );
+}
+
+/** The live value of a motion token from tokens.css (WAAPI cannot read `var()`), e.g. `token("--ease-out")`. */
+export function token(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+/** Milliseconds of a `--dur-*` token. */
+export function tokenMs(name: string, fallback: number): number {
+  const v = parseFloat(token(name, `${fallback}ms`));
+  return Number.isFinite(v) ? v : fallback;
+}
+
+export function reducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Filtered lists (motion audit, list filters): when `key` changes because of a pointer action (a filter chip, a
+ * checkbox click), the list re-settles with a short opacity lift (0.35 to 1, --dur-fast, --ease-out) instead of
+ * teleporting. The rows are not remounted, so no state or focus is lost. Keyboard changes (typing in search, Space on
+ * a filter) stay instant. Opacity only, so reduced motion keeps it.
+ */
+export function useFadeOnChange(ref: RefObject<HTMLElement | null>, key: unknown): void {
+  const first = useRef(true);
+  const anim = useRef<Animation | null>(null);
+  useLayoutEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const el = ref.current;
+    if (!el || keyboardAction() || typeof el.animate !== "function") return;
+    anim.current?.cancel();
+    anim.current = el.animate([{ opacity: 0.35 }, { opacity: 1 }], {
+      duration: tokenMs("--dur-fast", 150),
+      easing: token("--ease-out", "ease-out"),
+    });
+    // The key is the trigger; the ref is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+}
+
+/**
+ * Wizard steps (Stepper, Next / Back): the new step body fades in (--dur-fast, --ease-out) from 8px on the side it
+ * comes from, so forward reads as forward. Pointer changes only; keyboard step changes are instant; reduced motion
+ * keeps the fade and drops the slide. WAAPI with no fill, so nothing (no transform, no stacking context) stays behind.
+ */
+export function useStepTransition(ref: RefObject<HTMLElement | null>, step: number): void {
+  const prev = useRef(step);
+  useLayoutEffect(() => {
+    const from = prev.current;
+    prev.current = step;
+    if (from === step) return;
+    const el = ref.current;
+    if (!el || keyboardAction() || typeof el.animate !== "function") return;
+    const dx = reducedMotion() ? 0 : step > from ? 8 : -8;
+    el.animate(
+      [
+        { opacity: 0, transform: `translateX(${dx}px)` },
+        { opacity: 1, transform: "translateX(0)" },
+      ],
+      { duration: tokenMs("--dur-fast", 150), easing: token("--ease-out", "ease-out") },
+    );
+  }, [ref, step]);
+}
+
+/** Lands just before the dialog's CSS exit (--dur-fast, 150ms) ends, so the closed dialog never flashes back. */
+export const DIALOG_EXIT_MS = 140;
+
+/**
+ * Close for a native `<dialog>` opened with showModal(). A pointer-initiated close plays the exit (the dialog gets
+ * `is-closing`: opacity + scale 0.98 and a backdrop fade, CSS) and calls `close()` when it ends, so `showModal`
+ * semantics, the native focus return and the `close` event are unchanged. Keyboard closes (Esc is native; Enter on a
+ * button) are instant.
+ */
+export function useDialogClose(ref: RefObject<HTMLDialogElement | null>): { closing: boolean; close: () => void } {
+  const [closing, setClosing] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const close = useCallback(() => {
+    const d = ref.current;
+    if (!d || !d.open || timer.current !== undefined) return;
+    if (keyboardAction()) {
+      d.close();
+      return;
+    }
+    setClosing(true);
+    timer.current = window.setTimeout(() => {
+      timer.current = undefined;
+      if (d.open) d.close();
+      setClosing(false);
+    }, DIALOG_EXIT_MS);
+  }, [ref]);
+  return { closing, close };
 }
 
 /** A count that pops briefly when its value changes after the first render (state indication, not decoration). */

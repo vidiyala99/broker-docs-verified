@@ -94,6 +94,17 @@
   transition: transform var(--dur-base) var(--ease-out);
 }
 
+/* Instant for keyboard toggles (ui/input.ts) and under reduced motion. */
+:root[data-input="keyboard"] .queue-group__caret {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .queue-group__caret {
+    transition: none;
+  }
+}
+
 .queue-group__toggle[aria-expanded="true"] .queue-group__caret {
   transform: rotate(90deg);
 }
@@ -500,11 +511,14 @@
     gap: var(--space-2) var(--space-3);
     align-items: start;
   }
-  .queue-row__status,
-  .queue-row__actions {
+  .queue-row__status {
     grid-column: 2;
   }
+  /* The action line takes the full row width: in column 2 alone, "Retry proposal" plus the menu ran past the pane
+     at 390 and the menu was clipped (pre-existing, fixed in the voice + motion lane). */
   .queue-row__actions {
+    grid-column: 1 / -1;
+    min-width: 0;
     justify-content: space-between;
   }
   .queue-list--slim .queue-row__actions {

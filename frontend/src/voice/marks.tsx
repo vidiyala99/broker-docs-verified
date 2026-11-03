@@ -1,250 +1,220 @@
-// Drawn marks for the Phase A voice directions (VOICE-BRIEF.md). The owner asked for drawn marks tied to insurance
-// work instead of a restyled stock set, so these are hand-drawn on purpose, one grid and one rule per direction:
-//   A "Schedule"    line marks, 1.5px stroke, square caps, mitre joins (ACORD form furniture)
-//   B "Bound"       filled ink silhouettes with even-odd knockouts (stamp dies, binder clips)
-//   C "Paper trail" paper sheets with document-hue letter tabs (the source documents themselves)
-// Decorative: every mark is aria-hidden; the row text carries the meaning.
+// The "Paper trail" mark set (VOICE-BRIEF.md, DESIGN.md "Voice"). Drawn for this product on purpose (the owner asked
+// for drawn marks tied to insurance work, not a restyled stock set): one 24 grid, 1.5px strokes, round joins, paper
+// sheets as the base shape. Each workflow and each queue state has its own silhouette so the marks read at 20 to 28px.
+// Colour: currentColor for the drawing; document hues (DG11 `--doc-N-mark`) only on the small sheet tabs; primary only
+// for the citation box, the reading line and the ribbon. Every mark is decorative (aria-hidden): text carries meaning.
 import type { QueueGroup } from "../api/types";
-import type { Voice } from "./voice";
 
-const line = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "square", strokeLinejoin: "miter" } as const;
-const thin = { fill: "none", stroke: "currentColor", strokeWidth: 1.25, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+const S = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+const PAPER = "var(--color-surface)";
+const CITE = "var(--color-primary)";
 
-/** Source documents behind a Compare row: "4 carriers" -> 4 (capped for the drawing). */
-export function sheetCount(summary: string | undefined): number {
-  const m = summary?.match(/(\d+)\s+carriers?/);
-  return Math.max(2, Math.min(4, m ? Number(m[1]) : 2));
+/** A sheet on the 24 grid. */
+function Sheet({ x, y, w, h, dashed }: { x: number; y: number; w: number; h: number; dashed?: boolean }) {
+  return <rect x={x} y={y} width={w} height={h} rx="1.5" {...S} fill={PAPER} strokeDasharray={dashed ? "2.2 2" : undefined} />;
 }
 
-/* ------------------------------------------------------------------ workflow marks (32 grid) */
+/** A coloured document tab on a sheet's top edge (decoration: the document hue, never text). */
+function Tab({ x, y, hue }: { x: number; y: number; hue: number }) {
+  return <rect x={x} y={y} width="4.5" height="2.75" rx="0.75" fill={`var(--doc-${hue}-mark)`} stroke="currentColor" strokeWidth="0.75" />;
+}
 
-function WorkflowA({ slug }: { slug: string }) {
-  if (slug === "policy-check") {
-    // Expiring sheet behind, renewal sheet in front with a ticked box: "checked against".
-    return (
-      <g {...line}>
-        <path d="M10.75 8.75V4.75h15.5v19h-4" />
-        <rect x="5.75" y="8.75" width="16.5" height="18.5" />
-        <rect x="9.25" y="13.25" width="5" height="5" />
-        <path d="M10.4 15.9l1.3 1.3 2.1-2.5" />
-        <path d="M17.25 15.75h1.5M9.25 22.75h9.5" />
-      </g>
-    );
+export type GlyphName =
+  | "compare"
+  | "policy-check"
+  | "proposal"
+  | "personal"
+  | "certificate"
+  | "tasks"
+  | "integrations"
+  | "assistant"
+  | "search"
+  | "analytics"
+  | "insights"
+  | "vault"
+  | "documents"
+  | "reading"
+  | "review"
+  | "ready"
+  | "attention"
+  | "done"
+  | "blank";
+
+/** `tabs`: draw the document-hue tabs (rows, buttons, headers); the rail stays monochrome. */
+function draw(name: GlyphName, tabs: boolean) {
+  switch (name) {
+    case "compare": // two quotes side by side: the comparison
+      return (
+        <>
+          <Sheet x={2.75} y={5.75} w={8.25} h={15} />
+          <Sheet x={13} y={5.75} w={8.25} h={15} />
+          {tabs && <Tab x={4.5} y={3.5} hue={1} />}
+          {tabs && <Tab x={14.75} y={3.5} hue={2} />}
+          <path {...S} d="M5.5 11.5h3M15.75 11.5h3" />
+        </>
+      );
+    case "policy-check": // the renewal laid over the expiring policy (dashed), ticked
+      return (
+        <>
+          <Sheet x={8.75} y={2.75} w={12.5} h={15} dashed />
+          <Sheet x={2.75} y={6.25} w={12.5} h={15} />
+          {tabs && <Tab x={4.5} y={4} hue={3} />}
+          <path {...S} strokeWidth="1.75" d="M6 14l2.25 2.25L12.25 11.5" />
+        </>
+      );
+    case "proposal": // a bound document: the spine on the left
+      return (
+        <>
+          <Sheet x={4.75} y={2.75} w={14.5} h={18.5} />
+          <path d="M4.75 4.25a1.5 1.5 0 0 1 1.5-1.5h1.5v18.5h-1.5a1.5 1.5 0 0 1-1.5-1.5z" fill="currentColor" />
+          <path {...S} d="M10.5 8h5.5M10.5 11.5h5.5M10.5 15h3.5" />
+        </>
+      );
+    case "personal": // a household: the house
+      return <path {...S} d="M3.75 11 12 4l8.25 7M6 9.25v11h12v-11M10 20.25v-5.5h4v5.5" />;
+    case "certificate": // a certificate: a sheet with its seal
+      return (
+        <>
+          <Sheet x={3.75} y={3.75} w={16.5} h={12.5} />
+          <path {...S} d="M7 7.5h10M7 10.5h6" />
+          <circle cx="16" cy="16.5" r="2.75" {...S} fill={PAPER} />
+          <path {...S} d="M14.75 19v2.25l1.25-.75 1.25.75V19" />
+        </>
+      );
+    case "tasks": // a clipboard with ticked lines
+      return (
+        <>
+          <Sheet x={4.75} y={4.25} w={14.5} h={17} />
+          <path {...S} d="M9 4.25V3h6v1.25M8 10l1.25 1.25L11.5 9M13.5 10.25H16M8 15.5l1.25 1.25L11.5 14.5M13.5 15.75H16" />
+        </>
+      );
+    case "integrations": // two systems' sheets joined
+      return (
+        <>
+          <Sheet x={2.75} y={4.75} w={7.5} h={10} />
+          <Sheet x={13.75} y={9.25} w={7.5} h={10} />
+          <path {...S} d="M10.25 9.75h2a1.5 1.5 0 0 1 1.5 1.5v2.25" />
+        </>
+      );
+    case "assistant": // a note in the margin
+      return <path {...S} d="M4.75 4.75h14.5v11h-8.5l-4.25 3.5v-3.5H4.75zM8 8.5h8M8 12h5" />;
+    case "search": // looking through the sheets
+      return (
+        <>
+          <path {...S} d="M14.25 3.75H4.75v16.5h6" />
+          <path {...S} d="M7.5 8h4M7.5 11.5h2" />
+          <circle cx="15" cy="14" r="3.75" {...S} />
+          <path {...S} d="m17.75 16.75 2.5 2.5" />
+        </>
+      );
+    case "analytics": // a schedule's figures plotted
+      return <path {...S} d="M4.75 3.75v16.5h15.5M8 16l3.5-4.5 3 2.5 4.5-6" />;
+    case "insights": // a highlighted line on a sheet
+      return (
+        <>
+          <Sheet x={4.75} y={2.75} w={14.5} h={18.5} />
+          <rect x="7.25" y="10" width="9.5" height="3.5" rx="0.75" fill="currentColor" opacity="0.3" />
+          <path {...S} d="M8 7h8M8 11.75h8M8 16.5h5" />
+        </>
+      );
+    case "documents": // the document stack
+      return (
+        <>
+          <Sheet x={7.75} y={2.75} w={12.5} h={15.5} />
+          <Sheet x={3.75} y={5.75} w={12.5} h={15.5} />
+          <path {...S} d="M6.75 11h6.5M6.75 14.5h4" />
+        </>
+      );
+    case "vault": // the file drawer
+      return <path {...S} d="M3.75 4.75h16.5v14.5H3.75zM3.75 12h16.5M10 8.25h4M10 15.5h4" />;
+    case "reading": // a page being read: the reading line travels down (CSS `.vmark__read`)
+      return (
+        <>
+          <Sheet x={4.75} y={2.75} w={14.5} h={18.5} />
+          <path className="vmark__read" d="M7.25 7h9.5" stroke={CITE} strokeWidth="2" strokeLinecap="round" />
+        </>
+      );
+    case "review": // a line in the dashed citation box (the source viewer's passage highlight)
+      return (
+        <>
+          <Sheet x={4.75} y={2.75} w={14.5} h={18.5} />
+          <rect x="6.75" y="8.75" width="10.5" height="6" rx="1" fill="none" stroke={CITE} strokeWidth="1.75" strokeDasharray="2.2 1.6" />
+          <path {...S} d="M9 11.75h6" />
+        </>
+      );
+    case "ready": // a bookmarked page, ready to hand over
+      return (
+        <>
+          <Sheet x={4.75} y={2.75} w={14.5} h={18.5} />
+          <path d="M12.5 2.75h4v8.5l-2-1.6-2 1.6z" fill={CITE} />
+          <path {...S} d="M7.75 14h8.5M7.75 17.5h5" />
+        </>
+      );
+    case "attention": // a page with its corner missing
+      return (
+        <>
+          <path d="M4.75 4.25a1.5 1.5 0 0 1 1.5-1.5h11.5a1.5 1.5 0 0 1 1.5 1.5v9.5l-7.5 7.5h-5.5a1.5 1.5 0 0 1-1.5-1.5z" {...S} fill={PAPER} />
+          <path {...S} strokeDasharray="1.6 1.8" d="M19.25 15.5v5.75H13.5" />
+          <path {...S} d="M8 7.75h8M8 11.25h5" />
+        </>
+      );
+    case "done": // filed under seal
+      return (
+        <>
+          <Sheet x={4.75} y={2.75} w={14.5} h={18.5} />
+          <path {...S} d="M8 7.5h8M8 11h5" />
+          <circle cx="14.5" cy="16" r="3" {...S} fill={PAPER} />
+        </>
+      );
+    default: // blank: an empty sheet (empty states)
+      return (
+        <>
+          <Sheet x={4.75} y={2.75} w={14.5} h={18.5} />
+          <path {...S} strokeDasharray="1.5 2" d="M8 8h8M8 12h8M8 16h5" />
+        </>
+      );
   }
-  // A quote schedule: header band, three carrier columns, ruled rows.
-  return (
-    <g {...line}>
-      <rect x="5.75" y="4.75" width="20.5" height="22.5" />
-      <path d="M5.75 9.75h20.5M12.75 9.75v17.5M19.25 9.75v17.5M5.75 15.75h20.5M5.75 21.5h20.5" />
-    </g>
-  );
 }
 
-function WorkflowB({ slug }: { slug: string }) {
-  if (slug === "policy-check") {
-    // A renewal seal: round die with ribbon tails and a knocked-out check.
-    return (
-      <g fill="currentColor">
-        <path d="M11 21.5l-2.5 7.5 4-1.6 2.5 3.1 2-7z M21 21.5l2.5 7.5-4-1.6-2.5 3.1-2-7z" opacity="0.55" />
-        <path
-          fillRule="evenodd"
-          d="M16 3.5a10 10 0 1 1 0 20 10 10 0 0 1 0-20z M11.3 13.4l1.6-1.6 2.2 2.2 4.4-4.6 1.6 1.6-6 6.2z"
-        />
-      </g>
-    );
-  }
-  // A binder-clipped quote packet: back sheet, front sheet with knocked-out lines, the clip on top.
+export function Glyph({ name, size = 20, tabs = false, className = "" }: { name: GlyphName; size?: number; tabs?: boolean; className?: string }) {
   return (
-    <g fill="currentColor">
-      <rect x="9" y="7" width="18" height="21" rx="1" opacity="0.4" />
-      <path fillRule="evenodd" d="M5 10h18v19H5z M8.5 16h11v1.6h-11z M8.5 20h11v1.6h-11z M8.5 24h7v1.6h-7z" />
-      <path d="M10 8.5h8l-1 3.5h-6z" />
-      <path d="M11.2 8.5V4h1.6v4.5zM15.2 8.5V4h1.6v4.5z" />
-    </g>
-  );
-}
-
-const HUES = ["var(--doc-1-mark)", "var(--doc-2-mark)", "var(--doc-3-mark)", "var(--doc-4-mark)"];
-
-/** A sheet fanned around the bottom centre of a 48x36 frame, with its document-hue tab on the top-right corner. */
-function FanSheet({ angle, tab, dashed, lines }: { angle: number; tab?: string; dashed?: boolean; lines?: boolean }) {
-  return (
-    <g transform={`rotate(${angle} 24 34)`}>
-      <rect x="15" y="6" width="18" height="25" rx="1.5" fill="var(--color-surface)" stroke="currentColor" strokeWidth="1.25" strokeDasharray={dashed ? "2.6 2" : undefined} />
-      {tab && <rect x="24.5" y="3" width="7" height="4.5" rx="1" fill={tab} stroke="currentColor" strokeWidth="0.75" />}
-      {lines && <path {...thin} d="M18.5 13h11M18.5 17.5h11M18.5 22h7" />}
-    </g>
-  );
-}
-
-function WorkflowC({ slug, count }: { slug: string; count: number }) {
-  if (slug === "policy-check") {
-    // Expiring (dashed, the old) behind the renewal; one line of the renewal sits in the dashed citation box.
-    return (
-      <g>
-        <FanSheet angle={-13} dashed tab={HUES[0]} />
-        <g transform="rotate(6 24 34)">
-          <rect x="15" y="6" width="18" height="25" rx="1.5" fill="var(--color-surface)" stroke="currentColor" strokeWidth="1.25" />
-          <rect x="24.5" y="3" width="7" height="4.5" rx="1" fill={HUES[2]} stroke="currentColor" strokeWidth="0.75" />
-          <path {...thin} d="M18.5 12.5h11M18.5 25h7" />
-          <rect x="17" y="15.5" width="14" height="5.5" rx="0.75" fill="none" stroke="var(--color-primary)" strokeWidth="1.2" strokeDasharray="1.8 1.4" />
-          <path {...thin} d="M18.75 18.25h10.5" />
-        </g>
-      </g>
-    );
-  }
-  // One sheet per source document, fanned like a hand of cards; the first document sits on top.
-  const step = count > 3 ? 9 : 11;
-  const angles = Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * step);
-  return (
-    <g>
-      {angles
-        .map((a, i) => ({ a, i }))
-        .reverse()
-        .map(({ a, i }) => (
-          <FanSheet key={i} angle={a} tab={HUES[i]} lines={i === 0} />
-        ))}
-    </g>
-  );
-}
-
-export function WorkflowMark({ voice, slug, summary, className }: { voice: Voice; slug: string; summary?: string; className?: string }) {
-  const wide = voice === "c";
-  return (
-    <svg className={`vmark vmark--workflow ${className ?? ""}`} viewBox={wide ? "0 0 48 36" : "0 0 32 32"} aria-hidden focusable="false">
-      {voice === "a" ? <WorkflowA slug={slug} /> : voice === "b" ? <WorkflowB slug={slug} /> : <WorkflowC slug={slug} count={sheetCount(summary)} />}
+    <svg className={`vmark vmark--${name} ${className}`} width={size} height={size} viewBox="0 0 24 24" aria-hidden focusable="false">
+      {draw(name, tabs)}
     </svg>
   );
 }
 
-/* ------------------------------------------------------------------ group marks (24 grid) */
+const WORKFLOW_GLYPH: Record<string, GlyphName> = { "compare-quotes": "compare", "policy-check": "policy-check", proposal: "proposal" };
 
-function GroupA({ group }: { group: QueueGroup }) {
-  switch (group) {
-    case "in_progress": // a form being read: the reading line moves down the box
-      return (
-        <g {...line}>
-          <rect x="4.75" y="3.75" width="14.5" height="16.5" />
-          <path className="vmark__read" d="M7.75 8h8.5" />
-        </g>
-      );
-    case "needs_review": // a sheet under the loupe
-      return (
-        <g {...line}>
-          <path d="M14.25 3.75H3.75v16.5h7" />
-          <path d="M6.75 8h5M6.75 11.5h3" />
-          <circle cx="15" cy="14" r="3.75" />
-          <path d="M17.9 16.9l2.6 2.6" />
-        </g>
-      );
-    case "ready": // sign here: the signature line with its cross
-      return (
-        <g {...line}>
-          <rect x="3.75" y="3.75" width="16.5" height="16.5" />
-          <path d="M7 16.25h10M7.6 11.6l2.3 2.3M9.9 11.6l-2.3 2.3" />
-        </g>
-      );
-    case "needs_attention": // a torn sheet with a mark
-      return (
-        <g {...line}>
-          <path d="M4.75 3.75h14.5v9.5l-2.25 1.75 1.75 2-2 1.5.5 1.75H4.75z" />
-          <path d="M11 7.5v4.5M11 15v.5" />
-        </g>
-      );
-    default: // filed: the ticked box
-      return (
-        <g {...line}>
-          <rect x="4.75" y="4.75" width="14.5" height="14.5" />
-          <path d="M8 12.25l2.75 2.75 5.25-6" />
-        </g>
-      );
-  }
+/** A workflow's mark, with its document tabs. */
+export function WorkflowMark({ slug, size = 28, className = "" }: { slug: string; size?: number; className?: string }) {
+  return <Glyph name={WORKFLOW_GLYPH[slug] ?? "compare"} size={size} tabs className={`vmark--workflow ${className}`} />;
 }
 
-function GroupB({ group }: { group: QueueGroup }) {
-  switch (group) {
-    case "in_progress": // a dater stamp: knob, stem, date-wheel band, foot
-      return <path fill="currentColor" fillRule="evenodd" d="M12 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z M11 7h2v4h-2z M5 11h14v5H5z M7 12.75h2.5v1.5H7z M10.75 12.75h2.5v1.5h-2.5z M14.5 12.75H17v1.5h-2.5z M3.5 17h17v3.5h-17z" />;
-    case "needs_review": // the red pencil
-      return <path fill="currentColor" fillRule="evenodd" d="M16 3.25l4.75 4.75L9 19.75H4.25V15z M14.4 6.6l3 3 .9-.9-3-3z" />;
-    case "ready": // a binder clip: ready to go out
-      return <path fill="currentColor" d="M5 10.5h14l-1.75 9.5H6.75z M8 10.5V4h1.5v6.5z M14.5 10.5V4H16v6.5z M8 3.25h8v1.5H8z" />;
-    case "needs_attention": // a flag on the file
-      return <path fill="currentColor" d="M4.5 3h1.75v18H4.5z M6.25 4h12.5l-2.75 4 2.75 4H6.25z" />;
-    default: // the filed tray
-      return <path fill="currentColor" fillRule="evenodd" d="M6 3.5h12v8H6z M8 6h8v1.25H8z M3 12.75h5.25l1.5 2.5h4.5l1.5-2.5H21v7.75H3z" />;
-  }
+const GROUP_GLYPH: Record<QueueGroup, GlyphName> = {
+  in_progress: "reading",
+  needs_review: "review",
+  ready: "ready",
+  needs_attention: "attention",
+  done_recently: "done",
+};
+
+export function GroupMark({ group }: { group: QueueGroup }) {
+  return <Glyph name={GROUP_GLYPH[group]} size={22} className="vmark--group queue-group__icon" />;
 }
 
-function GroupC({ group }: { group: QueueGroup }) {
-  const sheet = <rect x="4.75" y="3.25" width="14.5" height="17.5" rx="1.25" fill="var(--color-surface)" stroke="currentColor" strokeWidth="1.25" />;
-  switch (group) {
-    case "in_progress": // reading page by page
-      return (
-        <g>
-          {sheet}
-          <path {...thin} d="M7.5 8h9M7.5 11.5h9M7.5 15h5" opacity="0.45" />
-          <path className="vmark__read" d="M6.25 7h11.5" stroke="var(--color-primary)" strokeWidth="1.5" />
-        </g>
-      );
-    case "needs_review": // a line inside the dashed citation box (the PDF viewer's passage highlight)
-      return (
-        <g>
-          {sheet}
-          <path {...thin} d="M7.5 7.5h9M7.5 16.5h6" />
-          <rect x="6.25" y="9.75" width="11.5" height="4.25" rx="0.75" fill="none" stroke="var(--color-primary)" strokeWidth="1.2" strokeDasharray="1.8 1.4" />
-          <path {...thin} d="M7.75 11.9h8.5" />
-        </g>
-      );
-    case "ready": // a bookmarked page, ready to hand to the client
-      return (
-        <g>
-          {sheet}
-          <path {...thin} d="M7.5 9h5M7.5 12.5h9M7.5 16h9" />
-          <path d="M13.5 3.25h3.5v8l-1.75-1.4-1.75 1.4z" fill="var(--color-primary)" />
-        </g>
-      );
-    case "needs_attention": // a page with its corner missing
-      return (
-        <g>
-          <path d="M4.75 3.25h14.5v10.5l-6 7H4.75z" fill="var(--color-surface)" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
-          <path d="M19.25 13.75v7h-6" fill="none" stroke="currentColor" strokeWidth="1.1" strokeDasharray="1.6 1.6" />
-          <path {...thin} d="M7.5 7.5h9M7.5 11h6" />
-        </g>
-      );
-    default: // filed with the seal
-      return (
-        <g>
-          {sheet}
-          <path {...thin} d="M7.5 7.5h9M7.5 11h6" />
-          <circle cx="14.5" cy="16" r="3" fill="none" stroke="currentColor" strokeWidth="1.25" />
-          <path {...thin} d="M13.2 16l1 1 1.7-1.9" />
-        </g>
-      );
-  }
+/** The reading mark: replaces the spinner wherever the system is reading documents. */
+export function ReadingMark({ size = 20, className = "" }: { size?: number; className?: string }) {
+  return <Glyph name="reading" size={size} className={`vmark--reading ${className}`} />;
 }
 
-export function GroupMark({ voice, group }: { voice: Voice; group: QueueGroup }) {
+/** The seal pressed on a row that reaches Done recently (lands once on pointer actions; DESIGN.md Voice). */
+export function Seal({ lands }: { lands: boolean }) {
   return (
-    <svg className="vmark vmark--group queue-group__icon" viewBox="0 0 24 24" aria-hidden focusable="false">
-      {voice === "a" ? <GroupA group={group} /> : voice === "b" ? <GroupB group={group} /> : <GroupC group={group} />}
+    <svg className={`seal${lands ? " seal--lands" : ""}`} width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
+      <circle cx="8" cy="8" r="6.75" fill="var(--color-surface)" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" strokeWidth="0.75" strokeDasharray="1 1.2" />
+      <path d="m5.6 8.1 1.6 1.6 3.2-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
-}
-
-/** B: the stamp word for a row's state (decorative; the status text beside it carries the meaning for AT). */
-export function stampWord(group: QueueGroup, queueState: string, hasReason = false): string {
-  switch (group) {
-    case "in_progress":
-      return "Received";
-    case "needs_review":
-      return "In review";
-    case "ready":
-      // A Ready row with a reason is a proposal that came back unfinished.
-      return hasReason ? "Returned" : "Ready to propose";
-    case "needs_attention":
-      return "Returned";
-    default:
-      return queueState === "dismissed" ? "Dismissed" : "Filed";
-  }
 }

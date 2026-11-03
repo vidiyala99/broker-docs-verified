@@ -12,9 +12,10 @@ export function Tip({ text, children, side = "top" }: { text: ReactNode; childre
   const [pos, setPos] = useState<{ x: number; y: number; instant: boolean } | null>(null);
   const timer = useRef<number | undefined>(undefined);
 
-  const show = (delay: number) => {
+  // `keyboard`: shown for keyboard focus, so it appears without the fade (B4: no motion for keyboard changes).
+  const show = (delay: number, keyboard = false) => {
     window.clearTimeout(timer.current);
-    const instant = Date.now() - lastHide < 400;
+    const instant = keyboard || Date.now() - lastHide < 400;
     timer.current = window.setTimeout(() => {
       const el = wrap.current?.firstElementChild ?? wrap.current;
       if (!el) return;
@@ -51,7 +52,7 @@ export function Tip({ text, children, side = "top" }: { text: ReactNode; childre
       onMouseEnter={() => show(350)}
       onMouseLeave={hide}
       onFocus={(e) => {
-        if ((e.target as HTMLElement).matches(":focus-visible")) show(0);
+        if ((e.target as HTMLElement).matches(":focus-visible")) show(0, true);
       }}
       onBlur={hide}
     >

@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ChatCircleText, SidebarSimple, UploadSimple } from "@phosphor-icons/react";
+import { keyboardAction } from "../ui/input";
+import { tokenMs } from "../ui/motion";
 
 export type Viewport = "wide" | "mid" | "narrow";
 
@@ -38,20 +40,42 @@ export function LeftPanel({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // Motion (app.css .left-panel--overlay): pointer opens slide in, pointer closes slide out and unmount after the
+  // exit; keyboard opens and Esc are instant. `animated` is decided at the open, `leaving` holds the panel for its exit.
+  const [animated, setAnimated] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const show = () => {
+    setAnimated(!keyboardAction());
+    setLeaving(false);
+    setOpen(true);
+  };
+  const hide = (viaPointer: boolean) => {
+    setOpen(false);
+    setLeaving(viaPointer && !keyboardAction());
+  };
   const reveal = (section: "uploads" | "chat") => {
     onReveal?.(section);
-    setOpen(true);
+    show();
   };
   const collapsed = viewport !== "wide";
 
   useEffect(() => {
-    if (!collapsed) setOpen(false);
+    if (!collapsed) {
+      setOpen(false);
+      setLeaving(false);
+    }
   }, [collapsed]);
+
+  useEffect(() => {
+    if (!leaving) return;
+    const t = window.setTimeout(() => setLeaving(false), tokenMs("--dur-base", 200));
+    return () => window.clearTimeout(t);
+  }, [leaving]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !(e.target as HTMLElement).closest("input, textarea")) setOpen(false);
+      if (e.key === "Escape" && !(e.target as HTMLElement).closest("input, textarea")) hide(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -67,7 +91,7 @@ export function LeftPanel({
   return (
     <>
       <div className="left-strip">
-        <button type="button" className="icon-btn" aria-label={`Show ${label.toLowerCase()}`} aria-expanded={open} onClick={() => setOpen(true)}>
+        <button type="button" className="icon-btn" aria-label={`Show ${label.toLowerCase()}`} aria-expanded={open} onClick={show}>
           <SidebarSimple size={20} aria-hidden />
         </button>
         <button type="button" className="icon-btn" aria-label="Show uploads" onClick={() => reveal("uploads")}>
@@ -77,10 +101,21 @@ export function LeftPanel({
           <ChatCircleText size={20} aria-hidden />
         </button>
       </div>
-      {open && <div className="panel-scrim" aria-hidden onClick={() => setOpen(false)} />}
-      {open && (
-        <aside className="left-panel left-panel--overlay" aria-label={label}>
-          <button type="button" className="btn btn--ghost btn--sm left-panel__close" autoFocus onClick={() => setOpen(false)}>
+      {(open || leaving) && (
+        <div
+          className={`panel-scrim${open ? (animated ? "" : " is-instant") : " is-leaving"}`}
+          aria-hidden
+          onClick={() => hide(true)}
+        />
+      )}
+      {(open || leaving) && (
+        <aside
+          className={`left-panel left-panel--overlay${open ? (animated ? " is-animated" : "") : " is-leaving"}`}
+          aria-label={label}
+          aria-hidden={open ? undefined : true}
+          inert={!open || undefined}
+        >
+          <button type="button" className="btn btn--ghost btn--sm left-panel__close" autoFocus onClick={(e) => hide(e.detail > 0)}>
             <SidebarSimple size={16} aria-hidden /> Hide panel
           </button>
           {children}

@@ -7,16 +7,8 @@ import {
   CaretRight,
   CheckCircle,
   FilePlus,
-  Handshake,
-  HourglassMedium,
-  ListMagnifyingGlass,
   Prohibit,
-  Scales,
-  SealCheck,
-  ShieldCheck,
   Warning,
-  WarningDiamond,
-  type Icon,
 } from "@phosphor-icons/react";
 import { api, ApiError } from "../api/client";
 import type { Line, Queue, QueueGroup, QueueItem, QueueState } from "../api/types";
@@ -42,22 +34,13 @@ import {
   SEVERITIES,
 } from "./queueUtil";
 import "./queue.css";
-import { VOICE } from "../voice/voice";
-import { GroupMark, stampWord, WorkflowMark } from "../voice/marks";
+import { GroupMark, ReadingMark, Seal, WorkflowMark } from "../voice/marks";
+import { keyboardAction, pointerAction } from "../ui/input";
 
 const runHref = (id: number) => `#/runs/${id}`;
 
-/** One glyph per group: what the broker does there (duotone, the queue's product voice; QUEUE-BRIEF.md). */
-const GROUP_ICON: Record<QueueGroup, Icon> = {
-  in_progress: HourglassMedium,
-  needs_review: ListMagnifyingGlass,
-  ready: Handshake,
-  needs_attention: WarningDiamond,
-  done_recently: SealCheck,
-};
-
-/** One mark per workflow, the same glyphs as the Personal lines start actions. */
-const WORKFLOW_ICON: Record<string, Icon> = { "compare-quotes": Scales, "policy-check": ShieldCheck };
+/** Rows whose seal already landed this session (it lands once). */
+const SEALED = new Set<number>();
 
 const SEV_TICKS: Record<(typeof SEVERITIES)[number], number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
@@ -95,9 +78,10 @@ export function QueueView({ data, line, empty }: { data: QueueData; line: Line; 
   const { queue, error, reload, update } = data;
   const toast = useToast();
   const [announce, setAnnounce] = useState("");
-  // Rows animate only after the queue was first shown (DESIGN.md: no entrance staggers on load).
+  // Rows animate only after the queue was first shown (DESIGN.md: no entrance staggers on load), and never for a
+  // keyboard action (motion audit B4: keyboard changes are instant).
   const shown = useRef(false);
-  const animate = shown.current;
+  const animate = shown.current && !keyboardAction();
   useEffect(() => {
     if (queue) shown.current = true;
   }, [queue]);
@@ -288,10 +272,9 @@ function Group({ group, items, actions, animate }: { group: QueueGroup; items: Q
   const [open, setOpen] = useState<{ value: boolean; animate: boolean }>({ value: !collapsible, animate: false });
   const rows = usePresence(items, (i) => i.run_id, animate);
   if (rows.length === 0) return null;
-  const GroupIcon = GROUP_ICON[group];
   const title = (
     <>
-      {VOICE ? <GroupMark voice={VOICE} group={group} /> : <GroupIcon size={20} weight="duotone" className="queue-group__icon" aria-hidden />}
+      <GroupMark group={group} />
       <span className="queue-group__label">{GROUP_LABEL[group]}</span>
       <Count value={items.length} animate={animate} className="queue-group__count" />
     </>
@@ -322,14 +305,6 @@ function Group({ group, items, actions, animate }: { group: QueueGroup; items: Q
           title
         )}
       </h2>
-      {VOICE === "a" && (
-        <div className="vA-cols" aria-hidden>
-          <span />
-          <span>Named insured</span>
-          <span>Status</span>
-          <span>Next step</span>
-        </div>
-      )}
       {collapsible ? (
         <Collapse open={open.value} animate={open.animate} id={`${id}-list`}>
           {list}
@@ -355,6 +330,12 @@ function QueueRow({
   entering: boolean;
 }) {
   const [busy, setBusy] = useState(false);
+  // The seal lands once per filed row, and only after a pointer action (the archive may open later: it lands then).
+  const [sealLands] = useState(() => {
+    const lands = group === "done_recently" && entering && pointerAction() && !SEALED.has(item.run_id);
+    if (lands) SEALED.add(item.run_id);
+    return lands;
+  });
   const name = clientOf(item);
   const forName = <span className="sr-only"> {name}</span>;
   const run = (fn: () => Promise<void>) => async () => {
@@ -437,7 +418,6 @@ function QueueRow({
   }
   menu.push({ label: moveLabel(otherLine(item.line)), icon: <ArrowsLeftRight size={16} aria-hidden />, run: () => actions.move(item) });
 
-  const WorkflowIcon = WORKFLOW_ICON[item.workflow_slug] ?? Scales;
   return (
     <li
       className={`queue-item${leaving ? " motion-exit" : entering ? " motion-enter" : ""}`}
@@ -448,17 +428,9 @@ function QueueRow({
       <div className={`queue-row queue-row--${group}${group === "in_progress" ? " motion-live" : ""}`}>
         {group === "in_progress" && <span className="motion-live__line" aria-hidden />}
         <span className="queue-row__mark" aria-hidden>
-          {VOICE && !(VOICE === "b" && group === "in_progress") ? (
-            group === "in_progress" ? (
-              <GroupMark voice={VOICE} group="in_progress" />
-            ) : (
-              <WorkflowMark voice={VOICE} slug={item.workflow_slug} summary={item.summary} />
-            )
-          ) : group === "in_progress" ? (
-            <span className="spinner spinner--sm" />
-          ) : (
-            <WorkflowIcon size={20} weight="duotone" />
-          )}
+          {group === "in_progress" ? <ReadingMark size={22} /> : <WorkflowMark slug={item.workflow_slug} />}
+          {/* Filed rows carry the seal; it lands once when a pointer action filed the row (DESIGN.md Voice). */}
+          {group === "done_recently" && <Seal lands={sealLands} />}
         </span>
         <div className="queue-row__who">
           <span className={`queue-row__client${item.client == null ? " is-unnamed" : ""}`}>{name}</span>
@@ -468,11 +440,6 @@ function QueueRow({
           </span>
         </div>
         <div className="queue-row__status">
-          {VOICE === "b" && (
-            <span className={`vB-stamp vB-stamp--${group === "ready" && item.reasons?.length ? "needs_attention" : group}`} aria-hidden>
-              {stampWord(group, item.queue_state, group === "ready" && !!item.reasons?.length)}
-            </span>
-          )}
           <Status item={item} group={group} />
         </div>
         <div className="queue-row__actions">

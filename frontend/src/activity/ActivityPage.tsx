@@ -3,6 +3,7 @@ import { Check } from "@phosphor-icons/react";
 import { api, ApiError } from "../api/client";
 import type { Line, Run } from "../api/types";
 import { RecentRuns } from "../launch/RecentRuns";
+import { useFadeOnChange } from "../ui/motion";
 import "../personal/personal.css";
 import "../queue/queue.css";
 
@@ -27,13 +28,22 @@ export function ActivityPage({ preset }: { preset: Line | null }) {
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
   const name = useId();
+  // Lists loaded so far: from the second on (a filter change), a pointer change re-settles the new list with a short
+  // opacity lift; the first load and keyboard changes are instant (ui/motion.tsx).
+  const [loads, setLoads] = useState(0);
+  const listRef = useRef<HTMLElement>(null);
+  useFadeOnChange(listRef, loads > 1 ? loads : 0);
 
   const load = useCallback(() => {
     const n = ++seq.current;
     setError(null);
     setRuns(null);
     api.runs(ACTIVITY_LIMIT, filter === "all" ? undefined : filter).then(
-      (r) => n === seq.current && setRuns(r),
+      (r) => {
+        if (n !== seq.current) return;
+        setRuns(r);
+        setLoads((l) => l + 1);
+      },
       (e: unknown) => n === seq.current && setError(e instanceof ApiError ? e.message : "Couldn't load the runs."),
     );
   }, [filter]);
@@ -71,7 +81,7 @@ export function ActivityPage({ preset }: { preset: Line | null }) {
             </fieldset>
           </header>
 
-          <section className="personal__list" aria-labelledby="activity-runs">
+          <section ref={listRef} className="personal__list" aria-labelledby="activity-runs">
             <h2 id="activity-runs" className="sr-only">
               Runs
             </h2>

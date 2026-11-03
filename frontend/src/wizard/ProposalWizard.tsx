@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight } from "@phosphor-icons/react";
 import { api, ApiError } from "../api/client";
 import type { FieldError, OutlineBlock, Template, TemplateSummary, Workspace } from "../api/types";
 import { useToast } from "../ui/Toast";
+import { useStepTransition } from "../ui/motion";
 import type { Viewport } from "../shell/layout";
 import {
   clearDraft,
@@ -22,6 +23,7 @@ import {
   type StepIndex,
 } from "./draft";
 import { Stepper } from "./Stepper";
+import { WorkflowMark } from "../voice/marks";
 import { StepTemplate } from "./StepTemplate";
 import { StepDetails } from "./StepDetails";
 import { StepOutline } from "./StepOutline";
@@ -230,6 +232,9 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
   }, [tpl, draft.docs.length, draft.step, sections]);
 
   const stepName = STEPS[draft.step];
+  // The step body slides 8px toward the direction of travel on pointer step changes (ui/motion.tsx).
+  const stepRef = useRef<HTMLElement>(null);
+  useStepTransition(stepRef, draft.step);
 
   return (
     <div className="workspace">
@@ -237,6 +242,7 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
         <header className="wizard__head">
           <div className="wizard__titles">
             <h1 id="wizard-title" className="wizard__title">
+              <WorkflowMark slug="proposal" size={34} />
               New proposal
             </h1>
             {draft.source_run_id != null && (
@@ -249,7 +255,7 @@ export function ProposalWizard({ workspace, viewport }: { workspace: Workspace; 
         </header>
 
         <div className="wizard__body">
-          <section className="wizard__step" aria-labelledby="step-heading">
+          <section ref={stepRef} className="wizard__step" aria-labelledby="step-heading">
             <h2 id="step-heading" ref={headingRef} tabIndex={-1} className="wizard__step-title">
               <span className="sr-only">
                 Step {draft.step + 1} of {STEPS.length},{" "}

@@ -4,6 +4,7 @@ import { api, ApiError } from "../api/client";
 import type { Artifact, EditResult, Message } from "../api/types";
 import { Segments } from "../report/Report";
 import type { OpenSource } from "../report/Chip";
+import { Collapse } from "../ui/motion";
 
 /**
  * Follow-up chat (state table: typing indicator, disabled with reason, "Couldn't answer" with
@@ -31,7 +32,8 @@ export function Chat({
   onToggle?: (open: boolean) => void;
 }) {
   const [ownOpen, setOwnOpen] = useState(true);
-  const [viaPointer, setViaPointer] = useState(false);
+  // The last toggle, so only the open a pointer asked for animates (Collapse below).
+  const [last, setLast] = useState<{ open: boolean; pointer: boolean } | null>(null);
   const bodyId = useId();
   const [messages, setMessages] = useState<Message[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -107,7 +109,7 @@ export function Chat({
   const showSuggestions = hasReport && suggestions.length > 0 && messages.length === 0 && !pending;
   const open = controlledOpen ?? ownOpen;
   const toggle = (e: MouseEvent<HTMLButtonElement>) => {
-    setViaPointer(e.detail > 0);
+    setLast({ open: !open, pointer: e.detail > 0 });
     setOwnOpen(!open);
     onToggle?.(!open);
   };
@@ -135,7 +137,11 @@ export function Chat({
           <CaretDown size={16} aria-hidden className="chat__caret" />
         </button>
       </h2>
-      <div id={bodyId} className={`chat__body${viaPointer ? " fade-in" : ""}`} hidden={!open}>
+      {/* Pointer opens reveal the body (height + opacity, Collapse). Closing is instant: the section's own height is
+          shared out by flex (it docks to a handle at once), so a height exit would have nothing to fold into. Kept
+          mounted (scroll position), `hidden` when closed. */}
+      <Collapse id={bodyId} className="chat__collapse" open={open} animate={open && last?.pointer === true && last.open} keepMounted>
+      <div className="chat__body">
       <div className="chat__log" ref={list} aria-live="polite" aria-relevant="additions">
         {!hasReport && <p className="chat__empty">{proposal ? "Generate a proposal to ask questions about its sources." : policy ? "Run the check to ask questions." : "Run a comparison to ask questions."}</p>}
         {hasReport && !messages.length && !pending && !error && !showSuggestions && (
@@ -252,6 +258,7 @@ export function Chat({
         </button>
       </form>
       </div>
+      </Collapse>
     </section>
   );
 }

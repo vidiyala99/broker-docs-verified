@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { api, ApiError } from "./api/client";
+import { pointerAction } from "./ui/input";
+import { reducedMotion } from "./ui/motion";
 import type { Line, Run, Workspace } from "./api/types";
 import { LaunchView } from "./launch/LaunchView";
 import { RunView } from "./run/RunView";
@@ -15,6 +18,7 @@ import { ActivityPage } from "./activity/ActivityPage";
 import { lineFromHash } from "./personal/LineChoice";
 import { TasksPage } from "./tasks/TasksPage";
 import { taskIdFromHash } from "./tasks/taskUtil";
+import { ReadingMark } from "./voice/marks";
 
 // `line` is the entry preset from the hash query (`#/?line=personal`, `#/policy-check/new?line=personal`, slice 3b T6).
 // `taskId` is the Tasks deep link (`#/tasks?task=<id>`, slice 3b T7, O7).
@@ -54,8 +58,21 @@ export function App() {
   const [, setRunsError] = useState<string | null>(null);
   const viewport = useViewport();
 
+  // Route change (motion audit): a pointer navigation to another page cross-fades the main pane only (View
+  // Transitions, `view-transition-name` on #main in app.css, 150ms opacity); the rail and panels do not animate.
+  // Keyboard navigation, reduced motion, in-page hash changes (filters, deep-link params) and browsers without the API
+  // swap instantly. The state update still runs synchronously inside the transition callback (flushSync).
   useEffect(() => {
-    const on = () => setRoute(parseRoute(window.location.hash));
+    const pageOf = (r: Route) => [r.runId, r.wizard, r.policy, r.integrations, r.personal, r.tasks, r.activity].join("|");
+    let current = pageOf(parseRoute(window.location.hash));
+    const on = () => {
+      const next = parseRoute(window.location.hash);
+      const page = pageOf(next);
+      const crossFade = page !== current && pointerAction() && !reducedMotion() && typeof document.startViewTransition === "function";
+      current = page;
+      if (crossFade) document.startViewTransition(() => flushSync(() => setRoute(next)));
+      else setRoute(next);
+    };
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
@@ -215,7 +232,7 @@ export function App() {
           ) : !workspace ? (
             <main className="pane" id="main" tabIndex={-1} aria-busy="true">
               <div className="pane__body pane__body--center">
-                <span className="spinner spinner--lg" aria-hidden />
+                <ReadingMark size={40} />
                 <span className="sr-only" role="status">Loading</span>
               </div>
             </main>

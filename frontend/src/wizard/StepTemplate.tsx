@@ -1,6 +1,7 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { LockSimple, MagnifyingGlass, Table, TextAlignLeft } from "@phosphor-icons/react";
 import type { Template, TemplateSummary } from "../api/types";
+import { useFadeOnChange } from "../ui/motion";
 import { isLocked, isTableKind, sectionNumbers } from "./draft";
 
 export function StepTemplate({
@@ -16,6 +17,10 @@ export function StepTemplate({
 }) {
   const [query, setQuery] = useState("");
   const searchId = useId();
+  // Typing filters instantly; a pointer change (Clear search, the field's clear button) re-settles the options with a
+  // short opacity lift (ui/motion.tsx).
+  const optionsRef = useRef<HTMLFieldSetElement>(null);
+  useFadeOnChange(optionsRef, query.trim().toLowerCase());
 
   const visible = useMemo(() => {
     if (!summaries) return null;
@@ -68,7 +73,7 @@ export function StepTemplate({
             </button>
           </div>
         ) : (
-          <fieldset className="tpl__options">
+          <fieldset ref={optionsRef} className="tpl__options">
             <legend className="sr-only">Template</legend>
             {visible.map((s) => {
               const on = s.slug === selected;

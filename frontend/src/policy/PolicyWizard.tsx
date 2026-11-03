@@ -8,7 +8,9 @@ import { DropZone, formatBytes } from "../launch/Upload";
 import { hueOf } from "../report/Chip";
 import type { Viewport } from "../shell/layout";
 import { useToast } from "../ui/Toast";
+import { useStepTransition } from "../ui/motion";
 import { Stepper } from "../wizard/Stepper";
+import { WorkflowMark } from "../voice/marks";
 import { UploadedPicker } from "../wizard/StepDetails";
 import {
   clearPcDraft,
@@ -141,6 +143,10 @@ export function PolicyWizard({ workspace, viewport, line: entryLine }: { workspa
     toast({ message: "Draft discarded.", action: { label: "Undo", run: () => setDraft(prev) } });
   };
 
+  // The step body slides 8px toward the direction of travel on pointer step changes (ui/motion.tsx).
+  const stepRef = useRef<HTMLElement>(null);
+  useStepTransition(stepRef, draft.step);
+
   const assigned = ROLE_INFO.filter((r) => draft.roles[r.role] != null).map((r) => r.name.toLowerCase());
   const summary =
     draft.step === 1 && assigned.length
@@ -154,13 +160,14 @@ export function PolicyWizard({ workspace, viewport, line: entryLine }: { workspa
       <main className="pane wizard" id="main" tabIndex={-1} aria-labelledby="wizard-title">
         <header className="wizard__head">
           <h1 id="wizard-title" className="wizard__title">
+            <WorkflowMark slug="policy-check" size={34} />
             New policy check
           </h1>
           <Stepper step={draft.step} reached={draft.reached} onGo={goTo} compact={viewport === "narrow"} steps={PC_STEPS} label="Policy check steps" />
         </header>
 
         <div className="wizard__body">
-          <section className="wizard__step" aria-labelledby="step-heading">
+          <section ref={stepRef} className="wizard__step" aria-labelledby="step-heading">
             <h2 id="step-heading" ref={headingRef} tabIndex={-1} className="wizard__step-title">
               <span className="sr-only">
                 Step {draft.step + 1} of {PC_STEPS.length},{" "}

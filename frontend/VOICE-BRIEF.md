@@ -11,7 +11,11 @@ Skills loaded before the first line of code: gstack, ui-ux-pro-max, taste-core, 
 emil-design-eng, frontend-design, improve-animations, animate, apple-design, deliberate. `impeccable context`
 reported `NO_PRODUCT_MD` (scoped change on existing code, so it proceeds on DESIGN.md; PRODUCT.md still missing).
 
-## How to see a direction
+> **Phase B (2026-11-03 08:11): the owner approved C, "Paper trail".** It is now the app's only voice; the `?voice=`
+> switch and directions A and B were removed (code, CSS, font packages). The Phase A sections below are kept as
+> the record of the choice. Phase B decisions, rounds and results are in "Phase B" at the end.
+
+## How to see a direction (Phase A only; removed in Phase B)
 
 Dev server only (`import.meta.env.DEV`): add `?voice=a`, `?voice=b` or `?voice=c` before the hash, for example
 `http://localhost:5230/?voice=c#/personal-lines`. The choice is kept for the tab (sessionStorage) so links keep it;
@@ -257,3 +261,58 @@ disclosure body), `Count` (tab and filter counts), `.motion-live` / the C readin
 - taste-core "AVOID Inter": body stays Inter in all three ([exact] from the live BrokerDocs app); only display roles
   change.
 - DESIGN.md "Inter only": a Phase A proposal; DESIGN.md changes only after the owner picks.
+
+## Phase B: C as the app's voice (2026-11-03)
+
+Skills reloaded for this phase and applied per decision: gstack, ui-ux-pro-max, taste-core, taste-redesign,
+impeccable, emil-design-eng, frontend-design, improve-animations, animate, apple-design, deliberate. The rules are
+recorded in `DESIGN.md` "Voice" so later lanes follow them.
+
+### Decisions and what each skill said
+
+| Decision | gstack | ui-ux-pro-max | taste-core | taste-redesign | impeccable | emil-design-eng | frontend-design | improve-animations | animate | apple-design | deliberate |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Remove switch, A, B and their fonts; C unscoped | Name the files and impact | n/a | One design system per project | Do not leave dead variants | Refinement now preserves C | n/a | n/a | n/a | n/a | Purpose: decide what not to build | A kept variant is an undecided choice |
+| Serif = paper (h1, h2, client), Inter = system | Plain words | Hierarchy by type role, body stays 14/16 | Serif only with a specific reason (legal documents, the named insured) | Font swap is the biggest lift | typeset: roles, not decoration | n/a | Two families, clearly distinct roles | n/a | n/a | Weight + size + leading as a set; tracking by size | Type roles derive from this subject |
+| One weight (600), latin subsets, swap + metric fallback | Name the cost (21.5 KB) | CLS < 0.1, reserve space | Self-hosted fonts with swap | n/a | optimize: no layout shift | n/a | n/a | n/a | n/a | n/a | Asset honesty: only what is used |
+| Simplified marks: one silhouette per workflow and state (two sheets side by side; renewal over dashed expiring, ticked; bound sheet) | n/a | SVG, one stroke, aria-hidden, readable at size | Shape lock; no decorative dots | Replace cliche metaphors | The brief wins (drawn marks) | Unseen details compound | Visual structure is information | n/a | n/a | Familiarity: neither too literal nor too abstract | Marks derive from the documents |
+| Marks inside buttons at 18px, rows 28, headers 30 to 34 | n/a | Icon sizes consistent per context | n/a | Optical alignment | n/a | n/a | n/a | n/a | n/a | Craft: nothing random | n/a |
+| Rail, Activity rows, wizard titles, empty states, report headings in the voice | n/a | Consistency across screens | One family across the tree | Compose empty states | onboard: emptiness is an invitation | n/a | Empty screen = invitation to act | n/a | n/a | Wayfinding: same mark for the same thing | The tells were the untouched places |
+| Reading mark replaces spinners where the system reads documents | n/a | Loading feedback | Shape over generic spinner | Generic spinners are a tell | Status by silhouette | Constant motion = linear | Motion shows what changed | State indication | Purpose: state indication; CSS keyframe, transform + opacity | Reduced motion: static equivalent | n/a |
+| Needs attention Retry in the secondary look | Name the action | One visible primary per region | No duplicate CTA intent | Tertiary styles reduce noise | Operate: next step obvious | n/a | Spend boldness once | n/a | n/a | Most important thing most obvious | n/a |
+| The seal lands once on Done recently (pointer only) | n/a | Motion conveys meaning | Motion must be motivated | n/a | delight: earned, rare | Rare actions can delight; never on keyboard | One orchestrated moment | Frequency: occasional | Gate passed (occasional, feedback); 220ms ease-out, never from scale(0) | Delight is the result of the rest | One signature moment |
+| 390 fixes: row actions span the row; "N severity" pairs nowrap | n/a | No horizontal scroll | Mobile collapse explicit | n/a | adapt | n/a | n/a | n/a | n/a | Layouts must not break on resize | n/a |
+
+### What changed per area
+- Type: `--font-serif` + metric-matched fallback in `tokens.css`; serif on page titles, wizard titles and step headings,
+  queue sections, report section headings, dialog and empty-state titles, client names (rows and run header). "Add
+  client" stays Inter.
+- Marks (`voice/marks.tsx`): workflow marks (rows, start buttons, run header, wizard titles, Activity rows), queue
+  state marks, the rail (13 glyphs), the reading mark (document rows, the Report tab while generating, reading and
+  writing states, app load), the seal, empty-state sheets (Personal lines, Tasks, no discrepancies).
+- Queue: marks without tinted tabs; Needs attention Retry secondary; the seal on Done recently; at 390 the action line
+  spans the row (fixes the sideways scroll and clipped row menu); severity pairs keep together.
+- Fixes from the owner and lead: start-button marks sit inside the button at 18px; simplified small marks (the fan is
+  gone); run-header mark 30px; the citation box is 1.75px.
+
+### Motion: the audit implemented (all 34 inventory items)
+Built by a motion sub-lane (Opus) against the audit table above, then verified live here. Shared pieces:
+`ui/input.ts` (pointer vs keyboard: `<html data-input>`, `keyboardAction()`, `pointerAction()`), `ui/motion.tsx`
+(`usePresence`, `Collapse` + `keepMounted`, `useFadeOnChange`, `useStepTransition`, `useDialogClose`), tokens
+`--dur-fade` (150), `--dur-drawer` (250), `--press-scale-large` (0.99).
+- Top findings: B1 reduced motion keeps fades (durations no longer zeroed; movement dropped per component); B4
+  keyboard actions are instant (queue rows, carets, tooltips, segment, lists, dialogs, menus); B5 RowMenu opacity-only
+  under reduced motion; B2 task dialog reduced fade; B3 toast enter and queue row enter are transitions from
+  `@starting-style` (they retarget); LOW items done (template press token, crumbs hover gated, toast exit curve,
+  trust filter transition).
+- Segmented: the sliding indicator on every `.line-choice` (Line of business, run-header Line, Tasks filter, Activity
+  filter). Severity filters are multi-select, so no indicator: their check fades in (120ms).
+- Tabs: folder tab cross-fade 150ms; PDF tab enter/close (`usePresence`, 200/190ms). Stepper: step body opacity +
+  8px in the direction of travel (150ms). Lists: Tasks, discrepancies, Activity, templates fade 0.35 to 1 (150ms) on
+  pointer filter/sort changes, rows not remounted. Collapsibles: Accordion and Chat open with height + opacity
+  (`keepMounted`, state kept; chat closes instantly because the flex layout docks it); "+N more" reveals rows with a
+  200ms enter; Outline show/hide 150ms. Overlays: narrow left panel slides 250/200ms; split pane exits to its own edge
+  150ms; dialogs exit 150ms with backdrop fade; RowMenu exits 120ms toward its trigger. Route: View Transitions
+  cross-fade of `#main` only (150ms), pointer navigations only.
+- Sort fades the Tasks table too (the audit said "no motion" for sort; kept because it is the same pointer list
+  change; owner may veto).

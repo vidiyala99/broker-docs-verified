@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { keyboardAction } from "./input";
+import { reducedMotion, token, tokenMs } from "./motion";
 
 /** Lists longer than this fold; the first FOLD_KEEP rows stay, plus every row that carries news. */
 export const FOLD_AT = 6;
@@ -45,6 +47,27 @@ export function MoreRow({
   noun: string;
   controls: string;
 }) {
+  // A pointer "+N more" reveals the folded rows with a short enter (opacity + 4px, --dur-base): they are not one
+  // contiguous block (rows with news never fold), so each revealed row enters on its own instead of a single height
+  // fold. Keyboard expands and "Show fewer" are instant. The rows are the callers' own <li>s; nothing remounts.
+  const before = useRef<Set<Element> | null>(null);
+  useLayoutEffect(() => {
+    const seen = before.current;
+    before.current = null;
+    const list = seen && expanded ? document.getElementById(controls) : null;
+    if (!seen || !list) return;
+    const dy = reducedMotion() ? 0 : -4;
+    for (const li of Array.from(list.children)) {
+      if (seen.has(li) || typeof li.animate !== "function") continue;
+      li.animate(
+        [
+          { opacity: 0, transform: `translateY(${dy}px)` },
+          { opacity: 1, transform: "translateY(0)" },
+        ],
+        { duration: tokenMs("--dur-base", 200), easing: token("--ease-out", "ease-out") },
+      );
+    }
+  }, [expanded, controls]);
   if (!hidden) return null;
   return (
     <li className="more-row">
@@ -54,7 +77,11 @@ export function MoreRow({
         aria-expanded={expanded}
         aria-controls={controls}
         aria-label={expanded ? `Show fewer ${noun}` : `Show ${hidden} more ${noun}`}
-        onClick={onToggle}
+        onClick={(e) => {
+          const list = document.getElementById(controls);
+          if (!expanded && e.detail > 0 && !keyboardAction() && list) before.current = new Set(Array.from(list.children));
+          onToggle();
+        }}
       >
         {expanded ? "Show fewer" : `+${hidden} more`}
       </button>

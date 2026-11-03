@@ -4,9 +4,24 @@
  * DESIGN.md. Light theme only (dark mode is out of scope for slice 1).
  */
 
+/* Georgia Bold scaled to Source Serif 4 SemiBold's advance widths and vertical metrics (fontTools, 2026-11-03:
+   size-adjust = width ratio over sample client names; overrides = Source Serif hhea metrics / size-adjust). */
+@font-face {
+  font-family: "Source Serif 4 Fallback";
+  src: local("Georgia Bold"), local("Georgia-Bold"), local("Georgia");
+  font-weight: 600;
+  size-adjust: 93.4%;
+  ascent-override: 110.9%;
+  descent-override: 35.9%;
+  line-gap-override: 0%;
+}
+
 :root {
   /* ---------- Type ---------- */
   --font-sans: "Inter Variable", "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+  /* The paper layer (DESIGN.md Voice): page titles, section headings, client names. One weight (600), latin
+     subsets only, font-display swap, with a metric-matched Georgia fallback so the swap does not shift layout. */
+  --font-serif: "Source Serif 4", "Source Serif 4 Fallback", Georgia, serif;
 
   --text-xs: 12px;   /* legal, chip numerals, captions */
   --text-sm: 14px;   /* labels, table cells, body in panels */
@@ -134,9 +149,12 @@
   --dur-fast: 150ms;      /* hover color, tooltip */
   --dur-base: 200ms;      /* tabs, accordion, side-by-side panel */
   --dur-toast: 250ms;     /* toast enter; exit uses --dur-fast */
+  --dur-drawer: 250ms;    /* narrow left panel overlay enter; exit uses --dur-base */
   --dur-max: 300ms;       /* ceiling for any UI transition */
+  --dur-fade: 150ms;      /* reduced motion: the opacity cross-fade that replaces movement */
   --dur-spin: 700ms;      /* spinner revolution, linear */
   --press-scale: 0.97;
+  --press-scale-large: 0.99; /* card-sized press targets (template picker): less travel on a bigger surface */
   --toast-hold: 6000ms;   /* DG12 "Edited. Undo" */
 
   /* ---------- Layers ---------- */
@@ -146,11 +164,12 @@
   --z-toast: 40;
 }
 
+/* Reduced motion keeps opacity fades and drops movement (motion audit B1): durations stay, each component swaps its
+   transform motion for an opacity fade (--dur-fade) in its own reduced-motion block. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --press-scale: 1;
-    --dur-base: 0ms;
-    --dur-toast: 0ms;
+    --press-scale-large: 1;
     --dur-spin: 1500ms; /* spinner keeps turning, slower; it carries state */
   }
 }

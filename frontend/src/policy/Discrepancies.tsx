@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Check, CheckCircle, ClockCounterClockwise, Eye, ListChecks, NotePencil } from "@phosphor-icons/react";
+import { Glyph } from "../voice/marks";
 import { api, ApiError } from "../api/client";
 import {
   POLICY_ROLES,
@@ -17,6 +18,7 @@ import { ReviewDialog } from "./ReviewDialog";
 import { TaskDialog } from "../tasks/TaskDialog";
 import { discrepancyFromHash, followUpTitle, taskHref } from "../tasks/taskUtil";
 import { useToast } from "../ui/Toast";
+import { useFadeOnChange } from "../ui/motion";
 import "./policy.css";
 
 const SEV_LABEL: Record<Severity, string> = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
@@ -126,6 +128,10 @@ export function Discrepancies({
       ),
     [items, severities, hideResolved, kept],
   );
+  // A pointer filter change (severity, Hide resolved) re-settles the list with a short opacity lift; keyboard
+  // toggles are instant. The cards are not remounted.
+  const listRef = useRef<HTMLOListElement>(null);
+  useFadeOnChange(listRef, `${severities.join(",")}|${hideResolved}`);
 
   // Deep link (O7): once the list is loaded, clear filters that hide the card, then scroll it into view, outline and
   // focus it. Runs again when the hash names another card.
@@ -217,7 +223,7 @@ export function Discrepancies({
   if (data.total === 0) {
     return (
       <div className="state-block disc-empty">
-        <CheckCircle size={28} className="ok-glyph" aria-hidden />
+        <Glyph name="done" size={32} className="ok-glyph" />
         <p className="state-block__title">No discrepancies found.</p>
         <p className="hint">
           {noneText && noneText.type === "paragraph" ? noneText.segments.map((s) => s.text).join("") : "Every value the renewal states agrees with the other documents."}
@@ -247,7 +253,7 @@ export function Discrepancies({
               setSeverities([]);
             }}
           >
-            {severities.length === 0 && <Check size={14} weight="bold" aria-hidden />}
+            {severities.length === 0 && <Check size={14} weight="bold" className="sev-filter__check" aria-hidden />}
             All <span className="sev-filter__count">{data.total}</span>
           </button>
           {SEVERITIES.map((s) => {
@@ -261,7 +267,7 @@ export function Discrepancies({
                 disabled={data.counts[s] === 0}
                 onClick={() => toggleSeverity(s)}
               >
-                {on && <Check size={14} weight="bold" aria-hidden />}
+                {on && <Check size={14} weight="bold" className="sev-filter__check" aria-hidden />}
                 {SEV_LABEL[s]} <span className="sev-filter__count">{data.counts[s]}</span>
               </button>
             );
@@ -296,7 +302,7 @@ export function Discrepancies({
           </button>
         </div>
       ) : (
-        <ol className="disc-list" aria-label="Discrepancies">
+        <ol ref={listRef} className="disc-list" aria-label="Discrepancies">
           {visible.map((item) => (
             <li key={item.id}>
               <DiscrepancyCard

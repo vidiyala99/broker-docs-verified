@@ -16,7 +16,8 @@ no shadows, no cards.
 - One accent: `--color-primary` `#6356F0`. Document hues are data, not accent.
 
 ## Type
-Inter only (`--font-sans`). Scale 12/14/16/20/36 with line heights
+Inter (`--font-sans`) for everything the system says, plus Source Serif 4 (`--font-serif`) for the paper layer:
+see "Voice" below. Scale 12/14/16/20/36 with line heights
 16/20/24/28/44. Weights 400 body, 500 labels and buttons, 600 headings.
 - 36px: page title only, tracking -0.02em.
 - 20px: report section headings. 16px: report prose, buttons. 14px: table
@@ -128,11 +129,15 @@ Stale section tag "May be out of date": `--color-stale-bg/fg`, glyph plus text.
 - Durations: press 120ms (scale 0.97), hover and tooltip 150ms, tabs and
   side-by-side 200ms, toast enter 250ms and exit 150ms, ceiling 300ms. The
   reference animates at 300ms [live]; we run shorter on purpose.
-- Allowed moments: press feedback, tooltip, toast, side-by-side panel,
-  progress spinner. No entrance staggers, no keyboard-triggered animation
-  (Esc, Enter, chip open via keyboard are instant).
-- `prefers-reduced-motion`: scale and movement off, opacity fades kept,
-  spinner slows to 1.5s.
+- Allowed moments (voice + motion lane, 2026-11-03): press feedback, tooltip, toast, side-by-side panel, the sliding
+  segmented indicator (200ms `--ease-in-out`), folder-tab cross-fade and PDF tab enter/close, wizard step body,
+  list fades on pointer filter/sort changes (opacity 0.35 to 1, 150ms, rows not remounted), disclosure height +
+  opacity (`Collapse`), dialog/menu/overlay exits, queue row enter/exit, the reading line, the seal, and a 150ms
+  cross-fade of `#main` on pointer route changes. Exits are faster than enters. No entrance staggers.
+- Keyboard-triggered changes are instant everywhere: `ui/input.ts` keeps `<html data-input="pointer|keyboard">`;
+  CSS drops transitions under `[data-input="keyboard"]`, components check `keyboardAction()`.
+- `prefers-reduced-motion`: scale and movement off, opacity fades kept (durations are not zeroed; each component
+  drops its transform), spinner slows to 1.5s, the reading line stands still, the seal does not land.
 
 ## Left panel (patterns, 2026-11-02)
 See `frontend/LEFT-PANEL-BRIEF.md`. No new tokens.
@@ -170,14 +175,54 @@ white), `--severity-high-fg` `#93370D` (7.52:1), `--severity-medium-fg` `#35383B
 ## Work queue (2026-11-03)
 See `frontend/QUEUE-BRIEF.md`. No new tokens.
 - Rows are named by client and carry one primary action; a hairline list, no cards. Each row starts with the workflow's
-  mark (Phosphor duotone in a 36px primary-tint tab: scales for Compare Quotes, shield-check for Policy Check).
-- Section headers: 20px semibold, -0.01em, a group glyph (duotone) and a plain tabular count; the In progress strip and
-  Done recently stay 16px.
+  drawn mark (see Voice; superseded the Phosphor duotone tabs on 2026-11-03).
+- Section headers: serif 22px, a group mark and a plain tabular count (Inter); the In progress strip and Done recently
+  stay 17px.
 - Needs review status reuses the Policy Check four-tick severity meter (worst open item) before the open counts.
 - Motion primitives in `ui/motion.tsx` / `ui/motion.css` (for reuse by the motion lane): list enter (opacity +
   translateY 6px, 200ms ease-out, `backwards` fill so no stacking context is left), list exit (opacity + grid-row fold,
   190ms), disclosure collapse (grid rows 0fr to 1fr, pointer only), count bump (scale 0.85 + opacity, 200ms), live sweep
   (2px line, 1.6s linear). First load never animates. Reduced motion: opacity only.
+
+## Voice: "Paper trail" (owner-approved 2026-11-03, direction C)
+See `frontend/VOICE-BRIEF.md`. The product's promise is that every value traces to a page in a source document, so
+the voice is the paperwork itself. Structure and layout stay as the BrokerDocs evidence has them.
+
+**Type rule: serif is the paper, sans is the system.**
+- `--font-serif` (Source Serif 4 SemiBold 600, latin + latin-ext subsets, 21.5 KB, font-display swap, metric-matched
+  Georgia Bold fallback `Source Serif 4 Fallback` so the swap does not shift layout): page titles (h1), section
+  headings (h2: queue groups, wizard steps, report sections, dialogs' titles, empty-state titles), client names
+  (queue rows, run header client). Nothing else; no italic, no other weight.
+- Inter: every action, status, label, count, number, table cell, form, chip and caption. "Add client" (no name yet)
+  is the system asking, so it stays Inter.
+- Sizes: page title 36 (-0.015em), queue section 22 (-0.01em), strip/archive 17, client in a row 19, run-header client
+  17, empty-state titles 18; phone: page title 32, section 19, row client 17.
+
+**Marks** (`frontend/src/voice/marks.tsx`, drawn on purpose, no stock set): one 24 grid, 1.5px strokes, round joins,
+a paper sheet (`--color-surface` fill, 1.5px radius) as the base shape. Decorative (`aria-hidden`); text carries
+the meaning. Each needs its own silhouette at 20 to 28px:
+- Workflows: Compare Quotes = two sheets side by side; Policy Check = the renewal laid over the dashed expiring sheet,
+  ticked; Proposal = a bound sheet (filled spine). Used on queue rows (28px), the run header and wizard titles
+  (30 to 34px), start buttons (18px, inside the button).
+- Queue states: In progress = sheet with the reading line; Needs review = sheet with the dashed citation box (the
+  viewer's passage highlight); Ready = sheet with a ribbon bookmark; Needs attention = sheet with its corner missing;
+  Done = sheet under a seal.
+- Rail: the same family (house for Personal lines, clipboard for Tasks, joined sheets for Integrations, drawer for
+  Vault, and so on). Monochrome there; active/disabled colours as before.
+- Colour inside marks: `currentColor` for the drawing; document hues (`--doc-N-mark`) only as small sheet tabs;
+  `--color-primary` only for the citation box, the reading line and the ribbon.
+
+**States as paper:** wherever the system is reading documents (document rows, the Report tab, the run's reading and
+writing states, app load), the reading mark replaces the spinner: a sheet whose line travels down it (1.6s linear,
+constant motion; reduced motion: static line). Button progress ("Starting...", exports) keeps the spinner. Empty
+states show a sheet (blank, tasks, filed) above a serif title.
+
+**One loud button per region:** a group whose rows all offer the same action (Needs attention: Retry) shows it in the
+secondary look; the primary violet stays for the one next step per region.
+
+**The seal:** a row that reaches Done recently carries a small seal on its mark. It lands once (scale 1.25 to 1 with a
+rotation settle, 220ms `--ease-out`) only when a pointer action filed it; keyboard actions, polling and first load
+show it still; reduced motion: no motion.
 
 ## Open item: collapsed-outline warning mark (recommendation, not decided)
 Recommend: when the outline is collapsed and any value is scan-read,

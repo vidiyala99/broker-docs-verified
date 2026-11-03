@@ -6,6 +6,7 @@ import { hueOf } from "../report/Chip";
 import { ItemHead, ResolveControls, type useResolve } from "./Discrepancies";
 import { ROLE_LABEL } from "./draft";
 import { slotChips, SlotView } from "./Slot";
+import { useDialogClose } from "../ui/motion";
 
 const PdfViewer = lazy(() => import("../pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })));
 
@@ -47,6 +48,8 @@ export function ReviewDialog({
   resolve: ReturnType<typeof useResolve>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // The close button plays the exit on a pointer click; Esc and keyboard closes are instant (ui/motion.tsx).
+  const { closing, close } = useDialogClose(ref);
   const headId = useId();
   const titleId = useId();
   const sourceId = useId();
@@ -107,7 +110,7 @@ export function ReviewDialog({
   return (
     <dialog
       ref={ref}
-      className={`review${animate ? " review--animate" : ""}`}
+      className={`review dialog-motion${animate ? " review--animate dialog-motion--enter" : ""}${closing ? " is-closing" : ""}`}
       aria-labelledby={headId}
       onClose={onClose}
       onCancel={(e) => {
@@ -127,7 +130,7 @@ export function ReviewDialog({
             Next <CaretRight size={16} aria-hidden />
           </button>
         </div>
-        <button type="button" className="icon-btn review__close" aria-label="Close review" onClick={() => ref.current?.close()}>
+        <button type="button" className="icon-btn review__close" aria-label="Close review" onClick={close}>
           <X size={18} aria-hidden />
         </button>
       </header>

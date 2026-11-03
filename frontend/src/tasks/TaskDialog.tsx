@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "rea
 import { api, ApiError } from "../api/client";
 import type { Run, Task, TaskInput } from "../api/types";
 import { POLICY_WORKFLOW } from "../config";
+import { useDialogClose } from "../ui/motion";
 import { MAX_TITLE, runOptionLabel } from "./taskUtil";
 import "./tasks.css";
 
@@ -123,7 +124,8 @@ export function TaskDialog({
     return list;
   }, [runs, original, prefill]);
 
-  const close = () => ref.current?.close();
+  // Pointer closes (Cancel, Create / Save clicked) play the exit; Esc and keyboard closes are instant (ui/motion.tsx).
+  const { closing, close } = useDialogClose(ref);
 
   const body = (): TaskInput | null => {
     const t = title.trim();
@@ -194,7 +196,12 @@ export function TaskDialog({
   const itemsLoading = isPolicy && runId && (items?.runId !== runId || items.list == null);
 
   return (
-    <dialog ref={ref} className={`task-dialog${animate ? " task-dialog--animate" : ""}`} aria-labelledby={`${base}-h`} onClose={onClose}>
+    <dialog
+      ref={ref}
+      className={`task-dialog dialog-motion${animate ? " task-dialog--animate dialog-motion--enter" : ""}${closing ? " is-closing" : ""}`}
+      aria-labelledby={`${base}-h`}
+      onClose={onClose}
+    >
       <form className="task-form" onSubmit={(e) => void submit(e)} noValidate>
         <h2 id={`${base}-h`} className="task-form__title">
           {heading}
