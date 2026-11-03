@@ -98,6 +98,7 @@ class ComposeColumn:
     failure_message: str | None = None
     option_count: int = 1
     option_label: str | None = None
+    slot: str = "quotes"  # the run document's input slot (slice 3 roles, D8)
 
     @property
     def warning(self) -> str | None:

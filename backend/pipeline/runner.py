@@ -53,7 +53,7 @@ import json
 import logging
 import re
 from collections import defaultdict, deque
-from collections.abc import AsyncIterator, Callable, Iterable, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -271,10 +271,98 @@ def load_stored_bytes(doc: DocumentRef) -> bytes:
     return (files_dir() / doc.stored_name).read_bytes()
 
 
+# --------------------------------------------------------------------- slots (slice 3, D8 / D11)
+
+DEFAULT_SLOT = "quotes"  # RunDocument.slot column default; every run before slice 3 used it
+
+
+class SlotError(ValueError):
+    """The run's slot assignment does not fit the workflow's input slots (D8). The
+    message is user-safe; the route answers 400 invalid_run."""
+
+
+def _slot_defs(input_slots: Sequence[Any] | None) -> list[dict[str, Any]]:
+    return [d for d in input_slots or () if isinstance(d, dict) and d.get("key")]
+
+
+def _label(d: dict[str, Any]) -> str:
+    return str(d.get("label") or d["key"])
+
+
+def resolve_slots(input_slots: Sequence[Any] | None, ids: Sequence[int],
+                  slots: Mapping[int, str] | None) -> list[str]:
+    """The slot key of each document in `ids` order, validated against the workflow.
+
+    No `slots` (every run before slice 3): a workflow with one input slot puts every
+    document in it, exactly as before; a workflow with several slots needs `slots`.
+    With `slots`: every document has exactly one known slot key, no other document is
+    named, and each slot's document count is within its min and max.
+    """
+    defs = _slot_defs(input_slots)
+    if slots is None:
+        if len(defs) > 1:
+            raise SlotError("Assign each document to a slot: " + ", ".join(_label(d) for d in defs) + ".")
+        return [defs[0]["key"] if defs else DEFAULT_SLOT] * len(ids)
+    given = {int(k): v for k, v in slots.items()}
+    extra = [d for d in given if d not in set(ids)]
+    if extra:
+        raise SlotError(f"Document {extra[0]} has a slot but is not in this run.")
+    if any(d not in given for d in ids):
+        raise SlotError("Assign a slot to every document in the run.")
+    known = {d["key"]: d for d in defs}
+    for d in ids:
+        key = given[d]
+        if key not in known:
+            raise SlotError(f"Unknown slot '{str(key)[:50]}'. This workflow's slots are: "
+                            + ", ".join(known) + ".")
+    for key, d in known.items():
+        n = sum(1 for v in given.values() if v == key)
+        low, high = int(d.get("min", 0) or 0), d.get("max")
+        if n < low:
+            raise SlotError(f"{_label(d)} needs {low} document{'s' if low != 1 else ''}; {n} assigned.")
+        if high is not None and n > int(high):
+            raise SlotError(f"{_label(d)} takes at most {high} document{'s' if high != 1 else ''}; "
+                            f"{n} assigned.")
+    return [given[d] for d in ids]
+
+
+def slot_states(run: models.Run) -> dict[str, str]:
+    """Per workflow slot: "read" (a document in it is DONE), "not_read" (its documents
+    failed, budget exhaustion included: D11 "Not read", never N/A), "absent" (no document
+    was given: N/A), or "pending" (still running). Slots in workflow order; a slot key a
+    run uses that the workflow no longer defines is appended."""
+    keys = [d["key"] for d in _slot_defs(run.workflow.input_slots)]
+    keys += [k for k in dict.fromkeys(rd.slot for rd in run.documents) if k not in keys]
+    out = {}
+    for key in keys:
+        statuses = [RunDocumentStatus(rd.status) for rd in run.documents if rd.slot == key]
+        if not statuses:
+            out[key] = "absent"
+        elif RunDocumentStatus.DONE in statuses:
+            out[key] = "read"
+        elif all(st == RunDocumentStatus.FAILED for st in statuses):
+            out[key] = "not_read"
+        else:
+            out[key] = "pending"
+    return out
+
+
+def unread_required_slots(run: models.Run) -> list[str]:
+    """Labels of required slots (min >= 1) with fewer readable documents than their min (D11)."""
+    short = []
+    for d in _slot_defs(run.workflow.input_slots):
+        low = int(d.get("min", 0) or 0)
+        done = sum(1 for rd in run.documents
+                   if rd.slot == d["key"] and RunDocumentStatus(rd.status) == RunDocumentStatus.DONE)
+        if low >= 1 and done < low:
+            short.append(_label(d))
+    return short
+
+
 def _doc_payload(rd: models.RunDocument) -> dict[str, Any]:
     return {
         "run_document_id": rd.id, "document_id": rd.document_id, "position": rd.position,
-        "letter": rd.letter, "filename": rd.document.filename, "status": str(rd.status),
+        "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename, "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
         "option_count": rd.option_count, "option_label": rd.option_label,
     }
@@ -348,7 +436,7 @@ def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactFie
                 break
         columns.append(compose.ComposeColumn(
             key=rd.letter, label=label, document_id=rd.document_id, filename=rd.document.filename,
-            failed=failed, failure_message=rd.error, option_count=rd.option_count or 1,
+            slot=rd.slot, failed=failed, failure_message=rd.error, option_count=rd.option_count or 1,
             option_label=rd.option_label))
         facts.extend(compose.ComposeFact(column_key=rd.letter, field=f.field, value=f.value,
                                          state=EvidenceState(f.state), passage_id=f.passage_id,
@@ -436,11 +524,18 @@ class RunManager:
         return sorted(r for r in self._tasks if self.is_active(r))
 
     def submit(self, workflow_id: int, document_ids: Sequence[int],
-               parameters: dict[str, Any] | None = None) -> tuple[int, bool]:
+               parameters: dict[str, Any] | None = None, *,
+               slots: Mapping[int, str] | None = None) -> tuple[int, bool]:
         """Create and start a run, or return the active identical one. Returns (run_id, created).
 
-        Raises ValueError for an invalid document list (message is user-safe)
-        and LookupError for an unknown workflow or document.
+        `slots` maps each document id to one of the workflow's input slot keys (D8);
+        without it every document goes to the workflow's only slot ("quotes"). The
+        active run is identical when workflow, documents in order, their slots and
+        parameters all match.
+
+        Raises SlotError for a slot assignment that does not fit the workflow, ValueError
+        for an invalid document list (messages are user-safe) and LookupError for an
+        unknown workflow or document.
         """
         ids = [int(i) for i in document_ids]
         params = dict(parameters or {})
@@ -460,11 +555,14 @@ class RunManager:
             missing = [i for i in ids if i not in found]
             if missing:
                 raise LookupError(f"no document {missing[0]}")
+            slot_keys = resolve_slots(workflow.input_slots, ids, slots)
+            wanted = list(zip(ids, slot_keys))
             active = s.scalars(select(models.Run).where(
                 models.Run.workflow_id == workflow_id,
                 models.Run.status.in_([str(x) for x in ACTIVE_STATUSES]))).all()
             for run in active:
-                if [rd.document_id for rd in run.documents] == ids and (run.parameters or {}) == params:
+                if [(rd.document_id, rd.slot) for rd in run.documents] == wanted \
+                        and (run.parameters or {}) == params:
                     existing = run.id
                     break
             else:
@@ -472,8 +570,8 @@ class RunManager:
             if existing is None:
                 run = models.Run(workspace_id=workflow.workspace_id, workflow_id=workflow_id, parameters=params,
                                  status=RunStatus.QUEUED, retryable=False, tokens_in=0, tokens_out=0, cost_usd=0.0)
-                for pos, doc_id in enumerate(ids):
-                    run.documents.append(models.RunDocument(document_id=doc_id, position=pos,
+                for pos, (doc_id, slot) in enumerate(wanted):
+                    run.documents.append(models.RunDocument(document_id=doc_id, position=pos, slot=slot,
                                                             status=RunDocumentStatus.QUEUED, option_count=1))
                 s.add(run)
                 s.flush()
@@ -860,10 +958,19 @@ class RunManager:
         with db.session_scope(self._factory) as s:
             run = s.get(models.Run, run_id)
             usable = [rd for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.DONE]
-            if not usable:
+            # D11: a required slot without a readable document fails the run like "none
+            # readable" does. A one-slot workflow (Compare Quotes, Proposal) can only reach
+            # this through the first branch, so its behavior and message are unchanged.
+            unread = unread_required_slots(run) if usable else []
+            if not usable or unread:
                 models.transition_run(run, RunStatus.FAILED)
                 reasons = sorted({rd.error for rd in run.documents if rd.error})
-                run.error = "No document could be read. " + " ".join(reasons)
+                if usable:
+                    names = " and ".join(name.lower() for name in unread)
+                    run.error = (f"The {names} could not be read, so this check cannot run. "
+                                 "Retry to try again. " + " ".join(reasons)).strip()
+                else:
+                    run.error = "No document could be read. " + " ".join(reasons)
                 run.retryable = True
                 run.finished_at = models.utcnow()
                 s.flush()

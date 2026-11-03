@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import select
 
 from backend import db, models, proposal
 from backend.context import AppContext
-from backend.pipeline.runner import format_sse
+from backend.pipeline.runner import SlotError, format_sse
 from backend.routes.common import ApiError, get_ctx, not_found
 from backend.routes.workspace import find_workflow
 from backend.schemas import ParameterErrors
@@ -22,10 +22,15 @@ from backend.views import run_out
 router = APIRouter(tags=["runs"])
 
 
+SlotKey = Annotated[str, StringConstraints(min_length=1, max_length=50)]
+
+
 class RunCreate(BaseModel):
     document_ids: list[int] = Field(..., max_length=64)
     workflow: str | int = db.COMPARE_QUOTES_SLUG  # slug or id
     parameters: dict[str, Any] = Field(default_factory=dict)
+    # document_id -> input slot key (slice 3, D8); omitted = the workflow's only slot
+    slots: dict[int, SlotKey] | None = Field(default=None, max_length=64)
 
 
 def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
@@ -54,7 +59,9 @@ async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSO
                 raise ApiError(422, "invalid_request", "The proposal settings are not valid.",
                                fields=fields) from None
     try:
-        run_id, created = ctx.manager.submit(workflow_id, body.document_ids, parameters)
+        run_id, created = ctx.manager.submit(workflow_id, body.document_ids, parameters, slots=body.slots)
+    except SlotError as exc:
+        raise ApiError(400, "invalid_run", str(exc)) from None
     except ValueError as exc:
         limit = ctx.settings.limits.max_documents_per_run if "limit" in str(exc) else None
         raise ApiError(422, "invalid_run", str(exc), limit=limit) from None

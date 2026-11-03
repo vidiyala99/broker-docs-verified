@@ -1,5 +1,5 @@
 """Database setup: SQLite via SQLAlchemy, plus the seeded workflows (Compare Quotes,
-Proposal Builder) and proposal templates (Standard, Premier).
+Proposal Builder, Policy Check) and proposal templates (Standard, Premier).
 
 The database lives in `broker-docs-verified/data/` (gitignored) unless
 BROKERDOCS_DATA_DIR points elsewhere. Tests use in-memory SQLite.
@@ -86,7 +86,7 @@ def seed(session: Session) -> None:
     if session.get(models.Workspace, DEFAULT_WORKSPACE_ID) is None:
         session.add(models.Workspace(id=DEFAULT_WORKSPACE_ID, name="Local workspace"))
         session.flush()
-    for spec in (COMPARE_QUOTES, PROPOSAL_BUILDER):
+    for spec in (COMPARE_QUOTES, PROPOSAL_BUILDER, POLICY_CHECK):
         _upsert(session, models.Workflow, spec, workspace_id=DEFAULT_WORKSPACE_ID)
     for spec in PROPOSAL_TEMPLATES:
         _upsert(session, models.ProposalTemplate, spec, workspace_id=DEFAULT_WORKSPACE_ID)
@@ -248,6 +248,38 @@ PROPOSAL_BUILDER: dict = {
     ),
     "section_plan": [s.model_dump() for s in _PROPOSAL_FACT_SECTIONS],
     "fact_schema": [f.model_dump() for f in [*_FIELDS, *_CYBER_FIELDS, *_EO_FIELDS]],
+}
+
+
+# --------------------------------------------------------------------- Policy Check seed (slice 3)
+#
+# Four document roles as input slots (D8 A): a run maps each document to one slot,
+# min and max are enforced at run creation. A required slot (min >= 1) whose document
+# fails fails the run; an optional one shows "Not read" (D11 A). The fact schema is
+# defined by the combined extraction schema (T3) and set here when that lands.
+
+POLICY_CHECK_SLUG = "policy-check"
+
+POLICY_CHECK: dict = {
+    "slug": POLICY_CHECK_SLUG,
+    "name": "Policy Check",
+    "category": "Policy Review",
+    "input_slots": [
+        {"key": "expiring", "label": "Expiring Policy", "accepts": "application/pdf", "min": 1, "max": 1},
+        {"key": "renewal", "label": "Renewal Policy", "accepts": "application/pdf", "min": 1, "max": 1},
+        {"key": "quote", "label": "Quote", "accepts": "application/pdf", "min": 0, "max": 1},
+        {"key": "ams", "label": "AMS Export", "accepts": "application/json,text/csv", "min": 0, "max": 1},
+    ],
+    "instructions": (
+        "Read an insurance policy document for a renewal check. Report only values stated in the "
+        "document, each with the page and an exact quote. A coverage the document does not state "
+        "has no value."
+    ),
+    "section_plan": [
+        SectionPlanItem(id="discrepancies", number="1", title="Discrepancies",
+                        guidance="Differences between the renewal and the other documents.").model_dump(),
+    ],
+    "fact_schema": [],  # T3 (lane C): the policy-check combined extraction schema
 }
 
 
