@@ -1,7 +1,7 @@
 """DOCX export of one artifact version (slice 2, T5).
 
 Layout: cover page, table of contents, notices, sections (prose, lists, issues,
-tables), then a Sources list. Citation chips become real Word footnotes: the
+tables, Policy Check discrepancies), then a Sources list. Citation chips become real Word footnotes: the
 footnote text is the existing `_source_note` (prose) or `cell_note` (table
 cells) from backend.export, so the DOCX says exactly what the XLSX comments
 and the PDF say. Cells in the `Couldn't verify`, `Conflicting values` and
@@ -54,11 +54,14 @@ from backend.export import (
 )
 from backend.schemas import (
     Cell,
+    DiscrepancyBlock,
+    DiscrepancyItemState,
     EvidenceState,
     HeadingBlock,
     IssueBlock,
     ListBlock,
     ParagraphBlock,
+    PolicyRole,
     Section,
     Segment,
     TableBlock,
@@ -294,6 +297,24 @@ def cell_text(cell: Cell) -> str:
     return value
 
 
+def slot_text(cell: Cell | None) -> str:
+    """What a Policy Check slot says in the DOCX (the slot conventions in schemas.py)."""
+    if cell is None or cell.state == EvidenceState.ABSENT:
+        return "N/A"
+    if cell.state == EvidenceState.FAILED:
+        return "Not read"
+    if cell.state == EvidenceState.CONFLICTING:
+        listed = _conflict_list(cell)
+        return "Needs review: " + listed if listed else "Needs review: conflicting values"
+    if cell.state == EvidenceState.NOT_FOUND:
+        return "Needs review: couldn't verify"
+    if cell.value is None:
+        return "N/A"
+    if cell.state == EvidenceState.SCAN_READ:
+        return f"{cell.value} (Read from scan, unverified)"
+    return cell.value
+
+
 class _Writer:
     def __init__(self, data: ExportData) -> None:
         self.data = data
@@ -429,6 +450,32 @@ class _Writer:
                     self.segments(self.doc.add_paragraph(), block.impact)
             elif isinstance(block, TableBlock):
                 self.table(block)
+            elif isinstance(block, DiscrepancyBlock):
+                self.discrepancy(block)
+
+    def discrepancy(self, block: DiscrepancyBlock) -> None:
+        """Title with severity, state and line of business; the explanation; one row of role slots."""
+        p = self.doc.add_paragraph()
+        p.add_run(clean(block.title)).bold = True
+        meta = [block.severity.label]
+        if block.item_state == DiscrepancyItemState.NEEDS_REVIEW:
+            meta.append("Needs review")
+        if block.lob:
+            meta.append(block.lob)
+        p.add_run(clean(f" ({', '.join(meta)})"))
+        if block.prose:
+            self.segments(self.doc.add_paragraph(), block.prose)
+        roles = list(PolicyRole)
+        t = self.doc.add_table(rows=2, cols=len(roles))
+        t.style = self.doc.styles["Table Grid"]
+        for j, role in enumerate(roles):
+            self._cell(t.rows[0].cells[j], role.label, bold=True, shade=True)
+            cell = block.slot(role)
+            para = self._cell(t.rows[1].cells[j], slot_text(cell))
+            note = cell_note(self.data, cell) if cell is not None else ""
+            if note:
+                self.notes.add(para, note)
+        self.doc.add_paragraph()
 
     def table(self, block: TableBlock) -> None:
         if block.title:
@@ -519,4 +566,4 @@ def to_docx(data: ExportData) -> bytes:
     return _Writer(data).build()
 
 
-__all__ = ["DEFAULT_THEME", "DOCX_MIME", "cell_text", "resolve_theme", "to_docx"]
+__all__ = ["DEFAULT_THEME", "DOCX_MIME", "cell_text", "resolve_theme", "slot_text", "to_docx"]

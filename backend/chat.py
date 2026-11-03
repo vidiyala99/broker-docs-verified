@@ -45,10 +45,13 @@ from backend.providers import CallRole, Message, ProviderError, StructuredSchema
 from backend.schemas import (
     CITED_STATES,
     ArtifactContent,
+    Cell,
+    DiscrepancyBlock,
     EvidenceState,
     IssueBlock,
     ListBlock,
     ParagraphBlock,
+    PolicyRole,
     RunDocumentStatus,
     Segment,
 )
@@ -96,7 +99,47 @@ def _section_prose(section) -> str:
             parts.extend(f"- {segs(item)}" for item in block.items)
         elif isinstance(block, IssueBlock):
             parts.append(f"{block.code} {block.title}: {segs(block.impact)}")
+        elif isinstance(block, DiscrepancyBlock):
+            parts.append(f"{block.title} ({block.severity.label}): {segs(block.prose)}".rstrip(": "))
     return "\n".join(p for p in parts if p)
+
+
+def _slot_evidence(cell: Cell | None) -> str:
+    """The slot conventions of schemas.DiscrepancyBlock, in words the model can use."""
+    if cell is None or cell.state in (None, EvidenceState.ABSENT):
+        return "not_applicable"
+    if cell.state == EvidenceState.FAILED:
+        return "not_read"
+    return str(cell.state)
+
+
+def discrepancy_items(content: ArtifactContent) -> tuple[list[dict[str, Any]], list[str]]:
+    """Policy Check discrepancies for the chat payload, plus their slot values for the number check.
+
+    Slots are listed in role order with every role present, so an absent role reads
+    as not_applicable and a failed one as not_read, never as a missing key.
+    """
+    items: list[dict[str, Any]] = []
+    values: list[str] = []
+    for _, block in content.iter_blocks():
+        if not isinstance(block, DiscrepancyBlock):
+            continue
+        slots = []
+        for role in PolicyRole:
+            cell = block.slot(role)
+            slot: dict[str, Any] = {"role": str(role), "value": cell.value if cell else None,
+                                    "evidence": _slot_evidence(cell),
+                                    "passage_ids": list(cell.passage_ids) if cell else []}
+            if cell is not None and cell.conflicts:
+                slot["conflicts"] = [{"value": c.value, "page": c.page_no, "passage_id": c.passage_id}
+                                     for c in cell.conflicts]
+            if cell is not None:
+                values.extend(v for v in (cell.value, *(c.value for c in cell.conflicts)) if v)
+            slots.append(slot)
+        items.append({"id": block.id, "key": block.key, "title": block.title, "severity": str(block.severity),
+                      "state": str(block.item_state), "lob": block.lob,
+                      "explanation": " ".join(s.text for s in block.prose).strip(), "slots": slots})
+    return items, values
 
 
 def build_context(ctx: AppContext, run_id: int) -> ChatContext:
@@ -137,6 +180,8 @@ def build_context(ctx: AppContext, run_id: int) -> ChatContext:
                 item["original_passage_ids"] = cell.original_passage_ids
             cells_out.append(item)
             values.extend(v for v in (cell.value, cell.original_value) if v)
+        discrepancies, slot_values = discrepancy_items(content)
+        values.extend(slot_values)
 
         readable = [rd for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.DONE]
         page_rows = list(s.scalars(select(models.Page).where(
@@ -164,6 +209,7 @@ def build_context(ctx: AppContext, run_id: int) -> ChatContext:
                               **({"may_be_out_of_date": True} if sec.stale else {}),
                               "prose": _section_prose(sec)} for sec in content.sections],
                 "table_cells": cells_out,
+                **({"discrepancies": discrepancies} if discrepancies else {}),
             },
             "passages": [{"passage_id": pid, "document": letters.get(p.document_id), "page": p.page_no,
                           **({"read_from_scan": True} if not p.verified else {})}
@@ -358,13 +404,15 @@ each under 100 characters, answerable from the compared quotes.
 
 
 def _outline(content: ArtifactContent) -> dict[str, Any]:
-    columns, rows = [], []
+    columns, rows, discrepancies = [], [], []
     for _, block in content.iter_blocks():
         if hasattr(block, "rows"):
             columns = columns or [c.label for c in block.columns]
             rows.extend(r.label for r in block.rows)
+        elif isinstance(block, DiscrepancyBlock):
+            discrepancies.append(block.title)
     return {"sections": [f"{s.number} {s.title}" for s in content.sections], "documents": columns,
-            "fields": rows}
+            "fields": rows, **({"discrepancies": discrepancies} if discrepancies else {})}
 
 
 def clean_suggestions(items: Sequence[Any]) -> list[str]:
