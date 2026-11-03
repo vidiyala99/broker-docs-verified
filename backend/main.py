@@ -13,7 +13,7 @@ Baseline, outermost first:
                   headers on every response
     routes        /api/... (backend/routes, contract in backend/API.md)
 
-Lifespan: init_db (tables + seed), reconcile_interrupted_runs (M6), then one
+Lifespan: init_db (schema check D10, tables + seed), reconcile_interrupted_runs (M6), then one
 RunManager for the process; on shutdown every run task is cancelled and awaited.
 
 Secrets (R3): the provider reads OPENAI_API_KEY from the environment only
@@ -267,6 +267,7 @@ def main() -> None:  # pragma: no cover - starts a server
     import uvicorn
 
     settings = Settings.from_env()
+    db.exit_if_outdated(settings.database_url)  # D10: an old database stops here with the instruction
     uvicorn.run(create_app(settings), **uvicorn_options(settings))
 
 

@@ -48,3 +48,33 @@ def test_seeded_long_120_other_values_are_unaffected(long_120_merged):
     assert long_120_merged["retention"].value == "$10,000 per occurrence"
     assert long_120_merged["policy_form"].state == EvidenceState.VERIFIED
     assert long_120_merged["aggregate_limit"].value == "$2,000,000"
+
+
+def test_seeded_policy_checks_are_personal_and_two_tasks_exist(tmp_path, monkeypatch):
+    """Slice 3b spec 1.4: the Policy Check runs (7 and 8 in a full seed) are tagged personal, and the
+    seed adds one free-standing overdue task and one task linked to a discrepancy of the first run."""
+    import datetime as dt
+
+    monkeypatch.setenv("BROKERDOCS_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    s = dev_seed.Seeder()
+    try:
+        compare = s.run(s.upload("carrier_a_clean.pdf"))
+        first, second = dev_seed.seed_policy_checks(s)
+        dev_seed.seed_tasks(s, first)
+        runs = {r["id"]: r for r in s.client.get("/api/runs").json()["runs"]}
+        assert runs[first]["line"] == runs[second]["line"] == "personal"
+        assert runs[compare["id"]]["line"] == "commercial"
+        personal = s.client.get("/api/runs", params={"line": "personal"}).json()["runs"]
+        assert sorted(r["id"] for r in personal) == sorted([first, second])
+        tasks = s.client.get("/api/tasks").json()["tasks"]
+        assert len(tasks) == 2
+        free = next(t for t in tasks if t["run_id"] is None)
+        assert free["status"] == "open" and dt.date.fromisoformat(free["due_date"]) < dt.date.today()
+        linked = next(t for t in tasks if t["run_id"] is not None)
+        assert linked["run_id"] == first and linked["discrepancy"]["in_report"] is True
+        assert linked["title"].startswith("Follow up: ") and len(linked["title"]) <= 200
+        items = s.client.get(f"/api/runs/{first}/discrepancies").json()["items"]
+        assert [i["task"]["id"] for i in items if i["task"]] == [linked["id"]]
+    finally:
+        s.close()

@@ -21,6 +21,9 @@ seed   uploads fixture PDFs from tests/fixtures/quotes and runs these comparison
             disagree so its slot needs review); one item resolved with a note, one flagged
             "changed since resolved"
          8. Policy Check with a corrupt quote (its slots read Not read) and no AMS export (N/A)
+       Runs 7 and 8 (homeowners) are tagged `line: personal`, the others commercial (slice 3b).
+       Two tasks: one free-standing, due three days ago (overdue), and one linked to run 7's
+       first discrepancy.
 serve  runs the real API with the same scripted model, slowed down (BROKERDOCS_DEV_DELAY seconds
        per call, default 1.2) so run progress is visible. Upload a file whose name contains
        "compose_fail" to force the template fallback; ask a chat question containing "fail" to
@@ -361,9 +364,9 @@ class Seeder:
         r.raise_for_status()
         return r.json()["documents"][0]["id"]
 
-    def policy_check(self, slots: dict[int, str]) -> dict:
+    def policy_check(self, slots: dict[int, str], line: str = "commercial") -> dict:
         r = self.client.post("/api/runs", json={"document_ids": list(slots), "workflow": "policy-check",
-                                                "slots": {str(k): v for k, v in slots.items()}})
+                                                "slots": {str(k): v for k, v in slots.items()}, "line": line})
         r.raise_for_status()
         run = self.wait(r.json()["run"]["id"])
         print(f"  run {run['id']}: {run['status']}")
@@ -437,22 +440,24 @@ def seed() -> None:
             "value": "$1,120.00", "base_version": art["version"]})
         print("  edit:", r.status_code, r.json().get("stale_sections") if r.is_success else r.text)
         print("  counts:", art["counts"])
-        seed_policy_checks(s)
+        first, _ = seed_policy_checks(s)
+        seed_tasks(s, first)
     finally:
         s.close()
     print("Done. Start the dev server with: python -m backend.dev_seed serve")
 
 
-def seed_policy_checks(s: Seeder) -> None:
+def seed_policy_checks(s: Seeder) -> tuple[int, int]:
+    """Runs 7 and 8 of a full seed: homeowners renewals, so both are tagged personal (slice 3b)."""
     from sqlalchemy import select
 
     from backend import db, models
 
-    print("7. policy check, four roles")
+    print("7. policy check, four roles (personal lines)")
     exp, ren, quo = s.upload("pc_homeowners_expiring.pdf", "pc_homeowners_renewal.pdf", "pc_homeowners_quote.pdf",
                              folder=POLICY_FIXTURES)
     ams_id = s.upload_ams("pc_homeowners_ams.json")
-    run = s.policy_check({exp: "expiring", quo: "quote", ren: "renewal", ams_id: "ams"})
+    run = s.policy_check({exp: "expiring", quo: "quote", ren: "renewal", ams_id: "ams"}, line="personal")
     items = s.client.get(f"/api/runs/{run['id']}/discrepancies").json()["items"]
     print("  items:", [(i["key"], i["severity"], i["item_state"]) for i in items])
     by_key = {i["key"]: i for i in items}
@@ -470,10 +475,29 @@ def seed_policy_checks(s: Seeder) -> None:
                 models.DiscrepancyState.run_id == run["id"], models.DiscrepancyState.item_id == flagged["id"]))
             row.changed_since_resolved = True
 
-    print("8. policy check, quote not read, no AMS")
+    print("8. policy check, quote not read, no AMS (personal lines)")
     exp2, ren2 = s.upload("pc_homeowners_expiring.pdf", "pc_homeowners_renewal.pdf", folder=POLICY_FIXTURES)
     bad = s.upload("corrupt_truncated.pdf", as_names={"corrupt_truncated.pdf": "carrier_quote_scan.pdf"})[0]
-    s.policy_check({exp2: "expiring", bad: "quote", ren2: "renewal"})
+    second = s.policy_check({exp2: "expiring", bad: "quote", ren2: "renewal"}, line="personal")
+    return run["id"], second["id"]
+
+
+def seed_tasks(s: Seeder, policy_run_id: int) -> None:
+    """Two tasks (slice 3b spec 1.4): a free-standing one already past its due date (shows overdue)
+    and one linked to the first discrepancy of the four-role Policy Check run."""
+    import datetime as dt
+
+    print("tasks: one overdue, one linked to a discrepancy")
+    overdue = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+    s.client.post("/api/tasks", json={"title": "Send the Cedar Hollow renewal summary to the insured",
+                                      "due_date": overdue}).raise_for_status()
+    items = s.client.get(f"/api/runs/{policy_run_id}/discrepancies").json()["items"]
+    if not items:
+        print("  no discrepancy to link")
+        return
+    item = items[0]
+    s.client.post("/api/tasks", json={"title": f"Follow up: {item['title']}"[:200], "run_id": policy_run_id,
+                                      "discrepancy_item_id": item["id"]}).raise_for_status()
 
 
 def serve() -> None:
@@ -484,6 +508,8 @@ def serve() -> None:
     _guard_env()
     delay = float(os.environ.get("BROKERDOCS_DEV_DELAY", "1.2"))
     app, settings = build_app(delay)
+    from backend import db
+    db.exit_if_outdated(settings.database_url)  # D10: an old dev database stops here with the instruction
     print(f"Dev backend (scripted model, {delay}s per call) on http://127.0.0.1:{settings.port}")
     uvicorn.run(app, **uvicorn_options(settings))
 
