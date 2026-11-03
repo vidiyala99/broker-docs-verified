@@ -2,7 +2,8 @@
 
 Decision order for one document:
 
-    pages ─► page text (model-OCR text for scanned pages, else the text layer)
+    pages ─► page text (model-OCR text for scanned pages, else the text layer, with a
+             two-column label/value table read row by row as printed: parse.reading_text)
           ─► prompt: rules (system) + field list + document inside a data block
              delimited by a random boundary that does not occur in the text (R3);
              rule 7: a value is the stated value, never a heading, running
@@ -59,6 +60,7 @@ from backend.providers import (
     TextPart,
     fact_extraction_schema,
 )
+from backend.pipeline import parse
 from backend.schemas import ExtractedFact, FactField, form_key, scalar_fields
 
 
@@ -155,9 +157,12 @@ def new_boundary() -> str:
 
 
 def page_text(page: TextPage) -> str:
-    """Text sent to extraction: model-OCR text when present (D5), else the text layer."""
+    """Text sent to extraction: model-OCR text when present (D5), else the text layer, with a
+    two-column label/value table read row by row as printed (parse.reading_text)."""
     ocr = getattr(page, "ocr_text", None)
-    return ocr if ocr else (getattr(page, "text", "") or "")
+    if ocr:
+        return ocr
+    return parse.reading_text(getattr(page, "text", "") or "", getattr(page, "words", None))
 
 
 def _field_lines(fields: Sequence[FactField]) -> str:

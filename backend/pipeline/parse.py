@@ -299,3 +299,128 @@ def apply_ocr(
     if all(_non_ws(p.extraction_text) == 0 for p in parsed.pages):
         raise ParseError(ParseErrorCode.EMPTY, "No readable text was found in this PDF.")
     return parsed
+
+
+# --------------------------------------------------------------------- reading order for extraction
+
+_VALUE_MAX_TOKENS = 6  # "$5.466 per $1,000 of gross sales"
+_COLUMN_X_TOLERANCE = 1.0  # points: one column's lines start at one x
+
+
+@dataclass
+class _Line:
+    text: str
+    x0: float
+    x1: float
+    y0: float
+    y1: float
+
+    @property
+    def yc(self) -> float:
+        return (self.y0 + self.y1) / 2
+
+    @property
+    def height(self) -> float:
+        return max(self.y1 - self.y0, 0.1)
+
+    @property
+    def value_like(self) -> bool:
+        return any(c.isdigit() for c in self.text) and len(self.text.split()) <= _VALUE_MAX_TOKENS
+
+
+def _text_lines(words) -> list[_Line]:
+    """Text-layer lines (block, line) in text-layer order, from word boxes (Word or JSON list)."""
+    lines: dict[tuple[int, int], list] = {}
+    for w in words:
+        lines.setdefault((int(w[5]), int(w[6])), []).append(w)
+    out = []
+    for ws in lines.values():
+        out.append(_Line(" ".join(str(w[4]) for w in ws), min(float(w[0]) for w in ws),
+                         max(float(w[2]) for w in ws), min(float(w[1]) for w in ws),
+                         max(float(w[3]) for w in ws)))
+    return out
+
+
+def _columns(lines: list[_Line]) -> list[list[int]]:
+    """Runs of consecutive lines that start at one x and go down the page: one printed column."""
+    runs: list[list[int]] = []
+    for i, ln in enumerate(lines):
+        if runs:
+            prev = lines[runs[-1][-1]]
+            if abs(ln.x0 - lines[runs[-1][0]].x0) <= _COLUMN_X_TOLERANCE and ln.yc > prev.yc:
+                runs[-1].append(i)
+                continue
+        runs.append([i])
+    return runs
+
+
+def _aligned(a: _Line, b: _Line) -> bool:
+    return abs(a.yc - b.yc) <= min(a.height, b.height) / 2
+
+
+def _pair_window(values: list[int], other: list[int], lines: list[_Line]) -> list[int] | None:
+    """The lines of `other` that sit on the printed rows of `values`, one each, in order."""
+    first = lines[values[0]]
+    for j, k in enumerate(other):
+        if _aligned(first, lines[k]):
+            window = other[j:j + len(values)]
+            if len(window) == len(values) and all(_aligned(lines[v], lines[k2]) for v, k2 in zip(values, window)):
+                return window
+            return None
+    return None
+
+
+def reading_text(text: str, words) -> str:
+    """The page text sent to extraction: the text layer, except that a two-column table whose
+    value column the text layer lists apart from its labels is read row by row, as printed.
+
+    PyMuPDF's text layer follows the PDF's blocks. A schedule drawn as a column of labels and
+    a column of values (one block per cell) then reads every value, then every label, and the
+    model has to pair them by position (live eval 2026-11-02, pc_homeowners renewal: label-less
+    and reversed quotes, and one deductible paired with its neighbour's value). Here such a
+    pair of columns becomes one line per printed row, left to right ("Coverage A (Dwelling)
+    $360,000"), the same order as verify's visual row stream, so a label-and-value quote
+    verifies. Every token is kept; only line order and line breaks change.
+
+    A column is paired only when it is a value column (two or more lines, each with a digit
+    and at most six words), the column next to it in text-layer order has a line on each of
+    its rows, the two do not overlap across the page, and the other column is not a value
+    column itself. Anything else (side-by-side label-over-value fields, two columns of prose,
+    a column of words such as "Included") is left as the text layer has it, and so is a page
+    without word boxes."""
+    if not words:
+        return text
+    lines = _text_lines(words)
+    runs = _columns(lines)
+    merged: dict[int, str] = {}  # first line index of a pair -> its row lines
+    skip: set[int] = set()
+    for r, run in enumerate(runs):
+        if len(run) < 2 or any(i in skip for i in run) or not all(lines[i].value_like for i in run):
+            continue
+        for n in (r + 1, r - 1):
+            if not 0 <= n < len(runs) or any(i in skip for i in runs[n]):
+                continue
+            window = _pair_window(run, runs[n], lines)
+            if window is None or all(lines[i].value_like for i in window):
+                continue
+            vx0, vx1 = min(lines[i].x0 for i in run), max(lines[i].x1 for i in run)
+            ox0, ox1 = min(lines[i].x0 for i in window), max(lines[i].x1 for i in window)
+            if not (vx1 < ox0 or ox1 < vx0):
+                continue
+            rows = []
+            for v, o in zip(run, window):
+                pair = sorted((lines[v], lines[o]), key=lambda ln: ln.x0)
+                rows.append(f"{pair[0].text} {pair[1].text}")
+            merged[min(run[0], window[0])] = "\n".join(rows)
+            skip.update(run)
+            skip.update(window)
+            break
+    if not merged:
+        return text
+    out = []
+    for i, ln in enumerate(lines):
+        if i in merged:
+            out.append(merged[i])
+        elif i not in skip:
+            out.append(ln.text)
+    return "\n".join(out) + "\n"
