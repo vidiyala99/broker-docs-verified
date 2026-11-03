@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { api, ApiError } from "./api/client";
 import { pointerAction } from "./ui/input";
@@ -51,8 +51,19 @@ function parseRoute(hash: string): Route {
   };
 }
 
+// PHASE A THROWAWAY (slice 4 C11): `#/dev/certificates/<a|b|c>/<runId>`, dev server only.
+const CertificatePrototypes = import.meta.env.DEV
+  ? lazy(() => import("./certificates/phaseA/Prototypes").then((m) => ({ default: m.CertificatePrototypes })))
+  : () => null;
+function devCertRoute(hash: string): { direction: string; runId: number } | null {
+  if (!import.meta.env.DEV) return null;
+  const m = /^#\/dev\/certificates\/([abc])\/(\d+)/.exec(hash);
+  return m ? { direction: m[1]!, runId: Number(m[2]) } : null;
+}
+
 export function App() {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash));
+  const devCert = devCertRoute(window.location.hash);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [wsError, setWsError] = useState<string | null>(null);
   const [runs, setRuns] = useState<Run[] | null>(null);
@@ -202,7 +213,7 @@ export function App() {
       : policyRun
         ? [bookCrumb, { label: "Policy check", href: `#/policy-check/new${preset}` }, { label: runLabel }]
         : [bookCrumb, { label: WORKFLOW_NAME, href: `#/${preset}` }, { label: runLabel }];
-  const crumbs: Crumb[] = route.activity
+  const crumbs: Crumb[] = devCert ? [{ label: "Certificates" }, { label: "Draft (prototype)" }] : route.activity
     ? [{ label: "Activity" }]
     : route.tasks
     ? [{ label: "Tasks" }]
@@ -234,8 +245,13 @@ export function App() {
         <Rail section={section} />
         <div className="app__main">
           <TopBar crumbs={crumbs} />
-          {viewport === "narrow" && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
-          {route.integrations ? (
+          {viewport === "narrow" && !devCert && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
+          {devCert ? (
+            // PHASE A THROWAWAY (slice 4 C11): dev-only certificate prototypes; not in a production build.
+            <Suspense fallback={null}>
+              <CertificatePrototypes direction={devCert.direction} runId={devCert.runId} />
+            </Suspense>
+          ) : route.integrations ? (
             // Static mock: needs nothing from the server, so it renders even when the backend is down.
             <IntegrationsPage />
           ) : wsError ? (

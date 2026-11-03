@@ -23,6 +23,10 @@ seed   uploads fixture PDFs from tests/fixtures/quotes and runs these comparison
          8. Policy Check with a corrupt quote (its slots read Not read) and no AMS export (N/A)
          9. Proposal Builder built from run 4 (`source_run_id`) whose document is corrupt: it fails,
             so run 4 shows in the work queue's Ready group with "Proposal didn't finish"
+        10. Certificate issued for a past holder (Calloway Build Group LLC, GL only), so the holder is
+            remembered for the client and the Certificates page has a Done recently row
+        11. Certificate draft for the same client from tests/fixtures/certificates (cert_contractor): a mix of
+            Supported and Not supported claims, one Overridden with a reason, a description sign-off open
        Runs 7 and 8 (homeowners) are tagged `line: personal`, the others commercial (slice 3b).
        Client names (work queue): runs 2, 3, 4, 6, 7 and 8 have a broker-typed name (CLIENTS), each a
        different client; run 6 is the Cedar Hollow file itself. Run 5 uses the extracted named insured
@@ -55,6 +59,7 @@ from backend.providers.types import TextPart
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "tests" / "fixtures" / "quotes"
 POLICY_FIXTURES = ROOT / "tests" / "fixtures" / "policy"
+CERT_FIXTURES = ROOT / "tests" / "fixtures" / "certificates"
 
 # Label in the fixture PDFs -> fact key in the Compare Quotes schema.
 ALIASES = {
@@ -274,6 +279,40 @@ def policy_extract(text: str, truth: dict[str, Any] | None) -> dict[str, Any]:
     return {"facts": facts, "forms": forms, "options_detected": 1, "option_compared": None}
 
 
+def _cert_truth(filename: str) -> dict[str, Any] | None:
+    """Ground truth of a tests/fixtures/certificates document, by its upload name (cert_<case>_<doc>.pdf)."""
+    if not filename.startswith("cert_"):
+        return None
+    path = CERT_FIXTURES / (Path(filename).stem + ".truth.json")
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def cert_extract(text: str, truth: dict[str, Any] | None) -> dict[str, Any]:
+    """The certificate combined pass (slice 4), scripted from the fixture's ground truth: the scalar
+    cert: facts as printed plus the endorsements array, only for the pages this window shows (the
+    reply shape of tests/eval/test_certificate_eval.py's perfect fake). Unknown documents state nothing."""
+    pages = {int(n) for n in re.findall(r"\[page (\d+)\]", text)}
+    facts, by_form = [], {}
+    for key, f in ((truth or {}).get("facts") or {}).items():
+        if not f or f.get("page") not in pages:
+            continue
+        m = re.fullmatch(r"cert:endorsement:([A-Z0-9]+):(\w+)", key)
+        if m:
+            by_form.setdefault(m.group(1), {})[m.group(2)] = f
+        else:
+            facts.append({"field": key, "value": f["printed"], "page": f["page"], "quote": f["quote"]})
+
+    def part(f: dict | None) -> dict:
+        return {"value": f["printed"] if f else None, "page": f["page"] if f else None,
+                "quote": f["quote"] if f else None}
+
+    endorsements = [{"form_number": a["form_number"]["printed"], "edition": None, "page": a["form_number"]["page"],
+                     "quote": a["form_number"]["quote"],
+                     **{p: part(a.get(p)) for p in ("type", "policy_number", "named_party", "condition")}}
+                    for a in by_form.values() if a.get("form_number")]
+    return {"facts": facts, "endorsements": endorsements, "options_detected": 1, "option_compared": None}
+
+
 class DevProvider(FakeProvider):
     """FakeProvider with a per-call delay and OCR text taken from the clean twin of a scanned fixture."""
 
@@ -290,6 +329,9 @@ class DevProvider(FakeProvider):
     def respond(self, req: ProviderRequest):
         text = _user_text(req)
         if req.role is CallRole.EXTRACT:
+            if "- cert:" in text:  # the certificate combined schema (slice 4)
+                m = re.match(r"extract:(\d+)", req.label or "")
+                return cert_extract(text, _cert_truth(self.filename_of(int(m.group(1)))) if m else None)
             if "Also return forms" in text:  # the policy-check combined schema
                 m = re.match(r"extract:(\d+)", req.label or "")
                 return policy_extract(text, _policy_truth(self.filename_of(int(m.group(1)))) if m else None)
@@ -475,6 +517,7 @@ def seed() -> None:
         first, _ = seed_policy_checks(s)
         seed_tasks(s, first)
         seed_failed_proposal(s, fallback["id"])
+        seed_certificates(s)
     finally:
         s.close()
     print("Done. Start the dev server with: python -m backend.dev_seed serve")
@@ -515,6 +558,56 @@ def seed_policy_checks(s: Seeder) -> tuple[int, int]:
     second = s.policy_check({exp2: "expiring", bad: "quote", ren2: "renewal"}, line="personal",
                             client=CLIENTS["policy_check_quote_unread"])
     return run["id"], second["id"]
+
+
+CERT_CLIENT = "Calloway Build Group LLC"
+CERT_PAST_HOLDER = ("Larkspur Commons Owners Association", "88 Harbor View Road\nTacoma, WA 98403")
+CERT_HOLDER = ("Marlowe Property Group LLC", "2200 Larkspur Avenue, Suite 400\nTacoma, WA 98402")
+CERT_DESCRIPTION = "Tenant improvements at 2200 Larkspur Avenue, Suite 140."
+CERT_OVERRIDE_NOTE = "Lease section 14.3 waives subrogation for GL; carrier confirmed by email on 11/02."
+
+
+def _certificate(s: Seeder, files: list[str], holder: tuple[str, str], wording: dict[str, bool],
+                 description: str = "") -> dict:
+    ids = s.upload(*files, folder=CERT_FIXTURES)
+    r = s.client.post("/api/runs", json={
+        "document_ids": ids, "workflow": "certificate", "client_name": CERT_CLIENT,
+        "parameters": {"holder_name": holder[0], "holder_address": holder[1], "wording": wording,
+                       "certificate_date": "2026-11-03", "description": description}})
+    r.raise_for_status()
+    run = s.wait(r.json()["run"]["id"])
+    print(f"  run {run['id']}: {run['status']}")
+    return s.client.get(f"/api/certificates/{run['id']}").json()
+
+
+def seed_certificates(s: Seeder) -> tuple[int, int]:
+    """Runs 10 and 11 of a full seed (slice 4), both for one client (tests/fixtures/certificates,
+    case cert_contractor; certificate date 2026-11-03):
+    10. issued: the GL declarations only, no wording, for a past holder, so the holder is remembered for
+        the client and the Certificates page shows a Done recently row.
+    11. the draft: GL, auto and WC declarations plus three endorsements, all three wordings requested and a
+        description. Supported: three in force, insured, AI and P&NC on GL, waiver on WC; Not supported: AI,
+        waiver and P&NC on auto, waiver on GL; the description is a sign-off. Waiver on GL is overridden with
+        a reason, so the draft shows every claim state and Issue waits on 4 rows."""
+    print("10. certificate, issued for a past holder")
+    issued = _certificate(s, ["cert_contractor_gl.pdf"], CERT_PAST_HOLDER, {})
+    r = s.client.post(f"/api/certificates/{issued['run']['id']}/issue", json={"version": issued["version"]})
+    r.raise_for_status()
+    print("  issued version", r.json()["issue"]["version"])
+
+    print("11. certificate draft, mixed claims, one overridden")
+    draft = _certificate(s, ["cert_contractor_gl.pdf", "cert_contractor_auto.pdf", "cert_contractor_wc.pdf",
+                             "cert_contractor_ai_scheduled.pdf", "cert_contractor_waiver_wc.pdf",
+                             "cert_contractor_pnc_gl.pdf"], CERT_HOLDER,
+                         {"additional_insured": True, "waiver_of_subrogation": True, "primary_noncontributory": True},
+                         CERT_DESCRIPTION)
+    print("  claims:", {c["key"]: c["verdict"] for c in draft["claims"]})
+    target = next((c for c in draft["claims"] if c["key"] == "waiver_of_subrogation:A"), None)
+    if target:
+        s.client.patch(f"/api/runs/{draft['run']['id']}/discrepancies/{target['id']}", json={
+            "status": "resolved", "note": CERT_OVERRIDE_NOTE,
+            "expected_fingerprint": target["fingerprint"]}).raise_for_status()
+    return issued["run"]["id"], draft["run"]["id"]
 
 
 def seed_failed_proposal(s: Seeder, comparison_id: int) -> int:
