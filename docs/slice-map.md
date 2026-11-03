@@ -32,6 +32,11 @@ Evidence: `docs/reference/brokerdocs-workflows-evidence.md`, `../BrokerDocs-REA-
 | unscheduled | Vault (document store with folders) | Vault, Documents |
 | deferred | ACORD application fill beyond COI (after slice 4) | Certificates |
 
+Data for slices 5 and 6 (owner decision 2026-11-03): real carrier appetite, loss runs and agency history are beyond
+our control, so these slices use synthetic data (generated appetite guides, product sheets, loss-run files), shown
+with a visible "synthetic sample data" label per PRODUCT.md ("mocks say they are mocks"). The engine still applies
+verify-before-cite to the synthetic documents; general-knowledge Assistant answers stay out or are labelled not cited.
+
 Insights/Analytics: the only observed screen (Data Intelligence forecast, `yt/frame_0033` to `0035`) needs
 agency-wide data the clone does not have; tie it to Loss Run data in slice 5 rather than invent numbers.
 
