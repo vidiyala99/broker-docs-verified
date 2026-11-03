@@ -3,6 +3,8 @@ import { QueueView } from "../queue/QueueView";
 import { useQueue } from "../queue/useQueue";
 import { isEmpty } from "../queue/queueUtil";
 import "./personal.css";
+import { VOICE } from "../voice/voice";
+import { WorkflowMark } from "../voice/marks";
 
 export const PERSONAL_COMPARE_HREF = "#/?line=personal";
 export const PERSONAL_CHECK_HREF = "#/policy-check/new?line=personal";
@@ -11,10 +13,10 @@ function Actions() {
   return (
     <div className="personal__actions">
       <a href={PERSONAL_COMPARE_HREF} className="btn btn--secondary">
-        <Scales size={18} aria-hidden /> Compare homeowners quotes
+        {VOICE ? <WorkflowMark voice={VOICE} slug="compare-quotes" summary="3 carriers" className="vmark--btn" /> : <Scales size={18} aria-hidden />} Compare homeowners quotes
       </a>
       <a href={PERSONAL_CHECK_HREF} className="btn btn--secondary">
-        <ShieldCheck size={18} aria-hidden /> Check a renewal
+        {VOICE ? <WorkflowMark voice={VOICE} slug="policy-check" className="vmark--btn" /> : <ShieldCheck size={18} aria-hidden />} Check a renewal
       </a>
     </div>
   );

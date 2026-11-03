@@ -42,6 +42,8 @@ import {
   SEVERITIES,
 } from "./queueUtil";
 import "./queue.css";
+import { VOICE } from "../voice/voice";
+import { GroupMark, stampWord, WorkflowMark } from "../voice/marks";
 
 const runHref = (id: number) => `#/runs/${id}`;
 
@@ -289,7 +291,7 @@ function Group({ group, items, actions, animate }: { group: QueueGroup; items: Q
   const GroupIcon = GROUP_ICON[group];
   const title = (
     <>
-      <GroupIcon size={20} weight="duotone" className="queue-group__icon" aria-hidden />
+      {VOICE ? <GroupMark voice={VOICE} group={group} /> : <GroupIcon size={20} weight="duotone" className="queue-group__icon" aria-hidden />}
       <span className="queue-group__label">{GROUP_LABEL[group]}</span>
       <Count value={items.length} animate={animate} className="queue-group__count" />
     </>
@@ -320,6 +322,14 @@ function Group({ group, items, actions, animate }: { group: QueueGroup; items: Q
           title
         )}
       </h2>
+      {VOICE === "a" && (
+        <div className="vA-cols" aria-hidden>
+          <span />
+          <span>Named insured</span>
+          <span>Status</span>
+          <span>Next step</span>
+        </div>
+      )}
       {collapsible ? (
         <Collapse open={open.value} animate={open.animate} id={`${id}-list`}>
           {list}
@@ -438,7 +448,17 @@ function QueueRow({
       <div className={`queue-row queue-row--${group}${group === "in_progress" ? " motion-live" : ""}`}>
         {group === "in_progress" && <span className="motion-live__line" aria-hidden />}
         <span className="queue-row__mark" aria-hidden>
-          {group === "in_progress" ? <span className="spinner spinner--sm" /> : <WorkflowIcon size={20} weight="duotone" />}
+          {VOICE && !(VOICE === "b" && group === "in_progress") ? (
+            group === "in_progress" ? (
+              <GroupMark voice={VOICE} group="in_progress" />
+            ) : (
+              <WorkflowMark voice={VOICE} slug={item.workflow_slug} summary={item.summary} />
+            )
+          ) : group === "in_progress" ? (
+            <span className="spinner spinner--sm" />
+          ) : (
+            <WorkflowIcon size={20} weight="duotone" />
+          )}
         </span>
         <div className="queue-row__who">
           <span className={`queue-row__client${item.client == null ? " is-unnamed" : ""}`}>{name}</span>
@@ -448,6 +468,11 @@ function QueueRow({
           </span>
         </div>
         <div className="queue-row__status">
+          {VOICE === "b" && (
+            <span className={`vB-stamp vB-stamp--${group === "ready" && item.reasons?.length ? "needs_attention" : group}`} aria-hidden>
+              {stampWord(group, item.queue_state, group === "ready" && !!item.reasons?.length)}
+            </span>
+          )}
           <Status item={item} group={group} />
         </div>
         <div className="queue-row__actions">

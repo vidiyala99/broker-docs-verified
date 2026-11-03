@@ -37,6 +37,8 @@ const PdfViewer = lazy(() => import("../pdf/PdfViewer").then((m) => ({ default: 
 import { Chat } from "./Chat";
 import { RunProgress } from "./RunProgress";
 import { RunClient } from "./RunClient";
+import { VOICE } from "../voice/voice";
+import { WorkflowMark } from "../voice/marks";
 
 type Tab = "report" | number; // number = document id of an open PDF
 
@@ -539,6 +541,7 @@ export function RunView({
 
         <div className="toolbar">
           <h1 id="pane-title" className="toolbar__title">
+            {VOICE && run && <WorkflowMark voice={VOICE} slug={isPolicy ? "policy-check" : isProposal ? "proposal" : "compare-quotes"} summary={`${run.documents.length} carriers`} className="vmark--title" />}
             {isProposal ? (artifact?.title ?? "Proposal") : isPolicy ? "Policy check" : "Compare Quotes"}, run {runId}
             {artifact && (
               <span className="toolbar__version">
