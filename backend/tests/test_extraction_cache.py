@@ -137,6 +137,26 @@ def test_cache_copy_failure_falls_back_to_a_live_read(scan_api, monkeypatch):
     assert _calls(a, CallRole.EXTRACT) == 2
 
 
+def test_a_read_made_with_the_cache_off_never_serves_a_later_hit(scan_api, monkeypatch):
+    """Off means no reuse in either direction: a run read with the cache off stores no key, so a later
+    run with the cache on still reads live. This is what keeps the dev seed's reads (made off, D9) from
+    serving e2e uploads of the same fixture bytes on the dev server, where the cache is on."""
+    a = scan_api
+    pdf = make_pdf(DOC_A)
+    monkeypatch.setenv(cache.ENV_SWITCH, "off")
+    first = _run(a, [a.upload(("a.pdf", pdf))["documents"][0]["id"]])
+    assert first["status"] == "done"
+    with a.ctx.factory() as s:
+        assert s.scalar(select(models.RunDocument.extraction_key)) is None
+    monkeypatch.delenv(cache.ENV_SWITCH)
+    second = _run(a, [a.upload(("a2.pdf", pdf))["documents"][0]["id"]])
+    assert second["status"] == "done" and second["documents"][0]["reused_from_run_id"] is None
+    assert _calls(a, CallRole.EXTRACT) == 2
+    third = _run(a, [a.upload(("a3.pdf", pdf))["documents"][0]["id"]])  # the cache-on read does serve
+    assert third["documents"][0]["reused_from_run_id"] == second["id"]
+    assert _calls(a, CallRole.EXTRACT) == 2
+
+
 def test_another_workflow_does_not_reuse_a_compare_read(scan_api):
     a = scan_api
     pdf = make_pdf(DOC_A)

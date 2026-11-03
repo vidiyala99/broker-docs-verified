@@ -4,7 +4,8 @@ Applies to every workflow (C8). Before a run reads a document:
 
     document.sha256 + extraction_key(fields, prompts, models, EXTRACTION_VERSION)
         │
-        ├─ cache off (BROKERDOCS_EXTRACTION_CACHE=off, or RunManager(extraction_cache=False)) ─► read live
+        ├─ cache off (BROKERDOCS_EXTRACTION_CACHE=off, or RunManager(extraction_cache=False)) ─► read live,
+        │                                       and store no key: an off read never serves a later hit
         ├─ AMS export (facts come from its key table, no model call) ──────────────────────────► read live
         ▼
     latest run_document in ANOTHER run that is DONE, has the same key, and whose document has the

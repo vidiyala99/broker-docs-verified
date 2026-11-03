@@ -1009,7 +1009,10 @@ class RunManager:
             self._store_facts(run_id, ref.id, verified)
             self._update_doc(run_id, rd_id, RunDocumentStatus.DONE, progress=None,
                              option_count=result.option_count, option_label=result.option_label,
-                             extraction_key=plan.cache_key, reused_from_run_id=None, read_at=models.utcnow())
+                             # Off means no reuse either way: a read made with the cache off stores no
+                             # key, so it never serves a later run (keeps dev-seed reads out of e2e).
+                             extraction_key=plan.cache_key if self.cache_enabled() else None,
+                             reused_from_run_id=None, read_at=models.utcnow())
         except asyncio.CancelledError:
             raise
         except ams.AmsError as exc:
