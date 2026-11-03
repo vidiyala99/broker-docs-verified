@@ -67,7 +67,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend import ams, db, models
+from backend import ams, db, models, work_queue
 from backend.pipeline import compose, extract, parse, policy_check, verify, windows
 from backend.providers import CallRecord, Provider, ProviderError, RunBudget
 from backend.schemas import (
@@ -445,6 +445,7 @@ def reconcile_interrupted_runs(factory: sessionmaker[Session]) -> list[int]:
             run.error = "Interrupted by a restart. Retry to continue."
             run.retryable = True
             run.finished_at = models.utcnow()
+            work_queue.on_run_terminal(s, run, run.finished_at)
             ids.append(run.id)
     if ids:
         log.warning("reconciled %d interrupted run(s): %s", len(ids), ids)
@@ -569,7 +570,8 @@ class RunManager:
 
     def submit(self, workflow_id: int, document_ids: Sequence[int],
                parameters: dict[str, Any] | None = None, *,
-               slots: Mapping[int, str] | None = None, line: str | None = None) -> tuple[int, bool]:
+               slots: Mapping[int, str] | None = None, line: str | None = None,
+               client_name: str | None = None) -> tuple[int, bool]:
         """Create and start a run, or return the active identical one. Returns (run_id, created).
 
         `slots` maps each document id to one of the workflow's input slot keys (D8);
@@ -579,7 +581,8 @@ class RunManager:
 
         `line` (slice 3b, "commercial" or "personal", validated by the caller) is a tag outside
         that identity: a new run gets it (default commercial), and a reused active run takes
-        it when it is given (D4).
+        it when it is given (D4). `client_name` (work queue, cleaned by the caller) follows the
+        same rule: outside the identity, set on a new run, applied to a reused one when given.
 
         Raises SlotError for a slot assignment that does not fit the workflow, ValueError
         for an invalid document list (messages are user-safe) and LookupError for an
@@ -617,12 +620,14 @@ class RunManager:
                     existing = run.id
                     if line is not None:
                         run.line = line  # D4: reuse the run, apply the requested line
+                    if client_name is not None:
+                        run.client_name = client_name  # same rule as line (work queue)
                     break
             else:
                 existing = None
             if existing is None:
                 run = models.Run(workspace_id=workflow.workspace_id, workflow_id=workflow_id, parameters=params,
-                                 line=line or "commercial",
+                                 line=line or "commercial", client_name=client_name, queue_state="open",
                                  status=RunStatus.QUEUED, retryable=False, tokens_in=0, tokens_out=0, cost_usd=0.0)
                 for pos, (doc_id, slot) in enumerate(wanted):
                     run.documents.append(models.RunDocument(document_id=doc_id, position=pos, slot=slot,
@@ -630,6 +635,7 @@ class RunManager:
                 s.add(run)
                 s.flush()
                 new_id = run.id
+            work_queue.link_proposal(s, s.get(models.Run, existing if existing is not None else new_id))
         if existing is not None:
             if not self.is_active(existing):
                 self.start(existing)
@@ -666,6 +672,7 @@ class RunManager:
                 return False
             models.transition_run(run, RunStatus.QUEUED)
             run.error, run.retryable, run.finished_at = None, False, None
+            work_queue.on_run_retry(run)  # D8: a retried item is open work again
             redo = set()
             for rd in run.documents:
                 if RunDocumentStatus(rd.status) == RunDocumentStatus.DONE:
@@ -840,6 +847,7 @@ class RunManager:
             changed = _fail_open_documents(run, "cancelled", failure_message("cancelled"))
             models.transition_run(run, RunStatus.CANCELLED)
             run.retryable, run.finished_at = True, models.utcnow()
+            work_queue.on_run_terminal(s, run, run.finished_at)
             s.flush()
             docs = [_doc_payload(rd) for rd in changed]
             payload = _run_payload(run)
@@ -855,6 +863,7 @@ class RunManager:
             changed = _fail_open_documents(run, "internal_error", failure_message("internal_error"))
             models.transition_run(run, RunStatus.FAILED)
             run.error, run.retryable, run.finished_at = message, True, models.utcnow()
+            work_queue.on_run_terminal(s, run, run.finished_at)
             s.flush()
             docs = [_doc_payload(rd) for rd in changed]
             payload = _run_payload(run)
@@ -1063,6 +1072,7 @@ class RunManager:
                     run.error = "No document could be read. " + " ".join(reasons)
                 run.retryable = True
                 run.finished_at = models.utcnow()
+                work_queue.on_run_terminal(s, run, run.finished_at)
                 s.flush()
                 payload = _run_payload(run)
                 inp = None
@@ -1099,6 +1109,7 @@ class RunManager:
             models.transition_run(run, final)
             run.retryable = final == RunStatus.PARTIAL
             run.finished_at = models.utcnow()
+            work_queue.on_run_terminal(s, run, run.finished_at)
             s.flush()
             artifact = {"artifact_id": art.id, "version": art.current_version, "fallback": result.fallback}
             payload = _run_payload(run)

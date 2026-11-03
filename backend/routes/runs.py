@@ -37,12 +37,45 @@ class RunCreate(BaseModel):
     # Slice 3b: "commercial" | "personal". Typed Any on purpose: a bad value is a domain
     # 400 invalid_run checked in the route (O10), not the global 422.
     line: Any = None
+    # Work queue, both typed Any for the same reason as `line` (400 invalid_run, not 422):
+    # the broker's client name, and for proposal-builder the done Compare Quotes run it is built from.
+    client_name: Any = None
+    source_run_id: Any = None
 
 
 def _check_line(value: Any) -> str:
     if not isinstance(value, str) or value not in models.RUN_LINES:
         raise ApiError(400, "invalid_run", "line must be commercial or personal.")
     return value
+
+
+_NOTE_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")  # also used for discrepancy notes below
+
+
+def _clean_client_name(value: Any) -> str | None:
+    """A client name: control characters dropped (the note pattern), whitespace runs made one
+    space, trimmed. Empty means no name (None). Over 120 characters is 400 invalid_run."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ApiError(400, "invalid_run", "client_name must be text.")
+    cleaned = " ".join(_NOTE_CONTROL.sub("", value).split())
+    if len(cleaned) > models.MAX_CLIENT_NAME_CHARS:
+        raise ApiError(400, "invalid_run",
+                       f"client_name can be at most {models.MAX_CLIENT_NAME_CHARS} characters.")
+    return cleaned or None
+
+
+def _check_source_run(s, value: Any) -> models.Run:
+    """`source_run_id` must name a Compare Quotes run that is done (M3)."""
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ApiError(400, "invalid_run", "source_run_id must be a run id.")
+    source = s.get(models.Run, value)
+    if source is None or source.workflow is None or source.workflow.slug != db.COMPARE_QUOTES_SLUG:
+        raise ApiError(400, "invalid_run", "source_run_id must name a Compare Quotes run.")
+    if str(source.status) != "done":
+        raise ApiError(400, "invalid_run", "A proposal can be built only from a comparison that is done.")
+    return source
 
 
 def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
@@ -57,11 +90,17 @@ def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
 async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSONResponse:
     parameters = body.parameters
     line = None if body.line is None else _check_line(body.line)
+    client_name = _clean_client_name(body.client_name)
     with ctx.factory() as s:
         wf = find_workflow(s, body.workflow)
         if wf is None:
             raise not_found("workflow", body.workflow)
         workflow_id = wf.id
+        source = None
+        if body.source_run_id is not None:
+            if wf.slug != db.PROPOSAL_BUILDER_SLUG:
+                raise ApiError(400, "invalid_run", "source_run_id is only for proposal-builder runs.")
+            source = _check_source_run(s, body.source_run_id)
         if wf.slug == db.PROPOSAL_BUILDER_SLUG:
             # Untrusted outline (it reaches the prompt): validate, then snapshot the template (D6).
             try:
@@ -71,9 +110,14 @@ async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSO
                           for loc, msg in exc.errors]
                 raise ApiError(422, "invalid_request", "The proposal settings are not valid.",
                                fields=fields) from None
+        if source is not None:
+            # M3: inside parameters, so the same documents built from two comparisons are two runs.
+            parameters = {**parameters, "source_run_id": source.id}
+            if line is None:
+                line = source.line or "commercial"  # M5: the proposal takes the comparison's line
     try:
         run_id, created = ctx.manager.submit(workflow_id, body.document_ids, parameters, slots=body.slots,
-                                             line=line)
+                                             line=line, client_name=client_name)
     except SlotError as exc:
         raise ApiError(400, "invalid_run", str(exc)) from None
     except ValueError as exc:
@@ -104,16 +148,37 @@ async def get_run(run_id: int, ctx: AppContext = Depends(get_ctx)) -> dict[str, 
 
 @router.patch("/runs/{run_id}")
 async def patch_run(run_id: int, body: Any = Body(...), ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
-    """Re-tag a run (slice 3b): the body is `{"line": "commercial" | "personal"}` and nothing else."""
+    """Change a run's tags: any non-empty subset of `line` (slice 3b), `client_name` and
+    `queue_state` (work queue), and no other key. Everything is checked before anything changes."""
     with db.session_scope(ctx.factory) as s:
         run = s.get(models.Run, run_id)
         if run is None:
             raise not_found("run", run_id)
-        if not isinstance(body, dict) or set(body) != {"line"}:
-            raise ApiError(400, "invalid_run", 'Only the line can be changed: send {"line": "commercial"} '
-                                               'or {"line": "personal"}.')
-        run.line = _check_line(body["line"])
+        if not isinstance(body, dict) or not body or not set(body) <= _PATCHABLE:
+            raise ApiError(400, "invalid_run", "Send one or more of line, client_name and queue_state, "
+                                               'for example {"line": "personal"}.')
+        changes: dict[str, Any] = {}
+        if "line" in body:
+            changes["line"] = _check_line(body["line"])
+        if "client_name" in body:
+            changes["client_name"] = _clean_client_name(body["client_name"])  # "" or null clears
+        if "queue_state" in body:
+            state = body["queue_state"]
+            if not isinstance(state, str) or state not in models.QUEUE_STATES:
+                raise ApiError(400, "invalid_run", "queue_state must be open, done or dismissed.")
+            active = ctx.manager.is_active(run_id) or str(run.status) in _ACTIVE
+            if state != "open" and active:  # M1: a running item cannot leave the queue
+                raise ApiError(409, "run_active", "This run is still running; it can be marked done or "
+                                                  "dismissed once it finishes.", run_status=str(run.status))
+            changes["queue_state"] = state
+            changes["queue_changed_at"] = models.utcnow()
+        for key, value in changes.items():
+            setattr(run, key, value)
     return _run_json(ctx, run_id)
+
+
+_PATCHABLE = {"line", "client_name", "queue_state"}
+_ACTIVE = {"queued", "running", "composing"}
 
 
 @router.post("/runs/{run_id}/retry", status_code=202)
@@ -142,7 +207,6 @@ async def cancel_run(run_id: int, ctx: AppContext = Depends(get_ctx)) -> dict[st
 # its decision from discrepancy_state. No bulk endpoint and no "accepted" status (D1, D2).
 
 _SEVERITIES = tuple(s.value for s in Severity)
-_NOTE_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 MAX_NOTE_CHARS = 2000
 
 
@@ -199,17 +263,12 @@ async def list_discrepancies(run_id: int, severity: str | None = Query(None, max
         sources = discrepancy_sources(s, run, blocks)
         tasks = models.item_tasks(s, run_id)
         all_items = [_item_out(b, rows.get(b.id), sources, tasks.get(b.id)) for b in blocks]
-        counts = {k: 0 for k in _SEVERITIES}
-        open_counts = {k: 0 for k in _SEVERITIES}
-        for it in all_items:
-            counts[it["severity"]] += 1
-            if it["status"] == "open":
-                open_counts[it["severity"]] += 1
+        tally = models.discrepancy_counts(s, run, blocks=blocks, rows=rows)  # shared with the queue (R7)
         items = [it for it in all_items
                  if (wanted is None or it["severity"] in wanted) and not (hide_resolved and it["status"] == "resolved")]
         return {"run_id": run_id, "artifact_id": run.artifact.id, "version": run.artifact.current_version,
-                "items": items, "counts": counts, "open_counts": open_counts, "total": len(all_items),
-                "resolved": sum(1 for it in all_items if it["status"] == "resolved")}
+                "items": items, "counts": tally.counts, "open_counts": tally.open_counts, "total": tally.total,
+                "resolved": tally.resolved}
 
 
 class DiscrepancyPatch(BaseModel):

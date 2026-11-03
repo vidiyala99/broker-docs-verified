@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter
 
-from backend.routes import artifacts, chat, documents, runs, tasks, templates, workspace
+from backend.routes import artifacts, chat, documents, queue, runs, tasks, templates, workspace
 
 api_router = APIRouter()
-for _module in (workspace, templates, documents, runs, artifacts, chat, tasks):
+for _module in (workspace, templates, documents, runs, artifacts, chat, tasks, queue):
     api_router.include_router(_module.router)
 
 __all__ = ["api_router"]

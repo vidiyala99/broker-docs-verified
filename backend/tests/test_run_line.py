@@ -23,6 +23,10 @@ from pipeline_fakes import GatedProvider
 OLD_RUN_KEYS = {"id", "workflow_id", "workflow_name", "status", "active", "terminal", "error", "retryable",
                 "parameters", "tokens_in", "tokens_out", "cost_usd", "created_at", "started_at", "finished_at",
                 "documents", "artifact"}
+# D7 exception (work queue spec 1.1, 2026-11-02): run_out gains these four keys, so the Run-shape
+# assertions below compare against OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS. The old keys are still
+# pinned exactly; nothing else in this file changed.
+QUEUE_RUN_KEYS = {"client_name", "queue_state", "proposal_run_id", "queue_changed_at"}
 
 
 def _run(api, doc_ids, **extra) -> dict:
@@ -45,9 +49,9 @@ def _error(r, status, code):
 def test_line_defaults_to_commercial_and_is_in_every_run_payload(api):
     run = _run(api, [api.upload_pages(DOC_A)])
     assert run["line"] == "commercial"
-    assert set(run) == OLD_RUN_KEYS | {"line"}  # D7: the old keys, plus line
+    assert set(run) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS  # D7: the old keys, plus line (+ queue, see top)
     listed = api.client.get("/api/runs").json()["runs"][0]
-    assert listed["line"] == "commercial" and set(listed) == OLD_RUN_KEYS | {"line"}
+    assert listed["line"] == "commercial" and set(listed) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS
     with api.ctx.factory() as s:
         assert s.get(models.Run, run["id"]).line == "commercial"
 
@@ -107,7 +111,7 @@ def test_patch_line_moves_a_run_between_lines(api):
     assert r.status_code == 200, r.text
     out = r.json()
     assert out["line"] == "personal" and out["id"] == run["id"]
-    assert set(out) == OLD_RUN_KEYS | {"line"}  # the Run shape, like GET /api/runs/{id}
+    assert set(out) == OLD_RUN_KEYS | {"line"} | QUEUE_RUN_KEYS  # the Run shape, like GET /api/runs/{id}
     assert api.client.get(f"/api/runs/{run['id']}").json()["line"] == "personal"
     back = api.client.patch(f"/api/runs/{run['id']}", json={"line": "commercial"}).json()
     assert back["line"] == "commercial"
@@ -122,7 +126,15 @@ def test_patch_unknown_run_is_404(api):
 
 @pytest.mark.parametrize("body", [{"line": "household"}, {"line": None}, {"line": 1}, {},
                                   {"line": "personal", "status": "done"}, {"status": "done"},
-                                  {"parameters": {}}])
+                                  {"parameters": {}},
+                                  # work queue rows (appended; the rows above are unchanged): bad
+                                  # client_name / queue_state values, and a bad key next to a good line,
+                                  # which must change nothing (the assertion below checks line)
+                                  {"queue_state": "closed"}, {"queue_state": None}, {"queue_state": 1},
+                                  {"client_name": 5}, {"client_name": ["Acme"]}, {"client_name": "x" * 121},
+                                  {"line": "personal", "client_name": 5},
+                                  {"line": "personal", "queue_state": "archived"},
+                                  {"line": "personal", "queue_state": "done", "parameters": {}}])
 def test_patch_bad_body_is_400_invalid_run(api, body):
     run = _run(api, [api.upload_pages(DOC_A)])
     _error(api.client.patch(f"/api/runs/{run['id']}", json=body), 400, "invalid_run")
