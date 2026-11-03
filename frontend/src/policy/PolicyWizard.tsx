@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Database, FilePdf, Trash, WarningCircle } from "
 import { api, ApiError, uploadFile } from "../api/client";
 import type { DocumentInfo, Line, PolicyRole, Workspace } from "../api/types";
 import { LineChoice } from "../personal/LineChoice";
+import { ClientField } from "../queue/ClientField";
 import { DropZone, formatBytes } from "../launch/Upload";
 import { hueOf } from "../report/Chip";
 import type { Viewport } from "../shell/layout";
@@ -120,7 +121,7 @@ export function PolicyWizard({ workspace, viewport, line: entryLine }: { workspa
         .sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b))
         .filter((role) => draft.roles[role] != null)
         .map((role) => ({ documentId: draft.roles[role]!, role }));
-      const res = await api.startPolicyCheck(slots, line);
+      const res = await api.startPolicyCheck(slots, line, draft.client_name);
       started.current = true;
       clearPcDraft();
       setDraft(EMPTY_PC_DRAFT);
@@ -172,7 +173,12 @@ export function PolicyWizard({ workspace, viewport, line: entryLine }: { workspa
                 workspace={workspace}
                 setDocs={setDocs}
                 onBusy={(k, b) => setBusy((s) => (s[k] === b ? s : { ...s, [k]: b }))}
-                lineChoice={<LineChoice value={line} onChange={setLine} />}
+                lineChoice={
+                  <>
+                    <ClientField value={draft.client_name} onChange={(v) => setDraft((d) => ({ ...d, client_name: v }))} />
+                    <LineChoice value={line} onChange={setLine} />
+                  </>
+                }
               />
             ) : (
               <StepRoles

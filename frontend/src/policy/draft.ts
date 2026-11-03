@@ -17,11 +17,13 @@ export interface PcDraft {
   roles: Record<PolicyRole, number | null>;
   /** True once roles were guessed or set, so a later visit keeps the user's choice. */
   rolesSet: boolean;
+  /** Work queue W4: the optional Client field on step 1, sent as `client_name`. */
+  client_name: string;
 }
 
 export const EMPTY_ROLES: Record<PolicyRole, number | null> = { expiring: null, quote: null, renewal: null, ams: null };
 
-export const EMPTY_PC_DRAFT: PcDraft = { step: 0, reached: 0, pdfs: [], ams: [], roles: EMPTY_ROLES, rolesSet: false };
+export const EMPTY_PC_DRAFT: PcDraft = { step: 0, reached: 0, pdfs: [], ams: [], roles: EMPTY_ROLES, rolesSet: false, client_name: "" };
 
 const KEY = "brokerdocs.policyCheckDraft.v1";
 

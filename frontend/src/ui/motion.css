@@ -1,0 +1,163 @@
+/* Reusable motion primitives (ui/motion.tsx). Tokens only: --ease-out, --dur-base (200ms), --dur-fast (150ms).
+   Reduced motion (tokens.css sets --dur-base to 0 and --press-scale to 1) keeps opacity fades and drops movement. */
+
+/* ------------------------------------------------------------------ list item enter / exit */
+
+/* Enter: a row that arrives after the list was shown (moved between groups, Undo, a finished run). */
+.motion-enter {
+  /* backwards, not both: no transform is left behind, so a menu inside is not trapped in a stacking context. */
+  animation: motion-enter 200ms var(--ease-out) backwards;
+}
+
+@keyframes motion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Exit: the row fades and its height folds away, so the rows below close the gap instead of jumping. */
+.motion-exit {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: motion-exit 190ms var(--ease-out) both;
+  pointer-events: none;
+}
+
+.motion-exit > * {
+  min-height: 0;
+  overflow: hidden;
+  /* The child's own padding would hold the fold open at its padding height. */
+  animation: motion-exit-pad 190ms var(--ease-out) both;
+}
+
+@keyframes motion-exit-pad {
+  to {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+@keyframes motion-exit {
+  to {
+    opacity: 0;
+    grid-template-rows: 0fr;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-top-color: transparent;
+  }
+}
+
+/* ------------------------------------------------------------------ collapse (disclosure height) */
+
+.collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.collapse[data-open="false"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.collapse__inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Menus inside must not be clipped once the body has finished opening. */
+.collapse[data-settled="true"] > .collapse__inner {
+  overflow: visible;
+}
+
+.collapse--animate {
+  transition:
+    grid-template-rows var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out);
+}
+
+@starting-style {
+  .collapse--animate[data-open="true"] {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ count bump */
+
+.count-bump {
+  display: inline-block;
+  animation: count-bump 200ms var(--ease-out);
+}
+
+@keyframes count-bump {
+  from {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+/* ------------------------------------------------------------------ live indicator */
+
+/* A thin line that sweeps while work runs (state indication: "still going"). The host stays unclipped (menus open
+   out of it); only the line's own track clips the sweep. Markup: <div class="motion-live"><span class="motion-live__line" /> */
+.motion-live {
+  position: relative;
+}
+
+.motion-live__line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.motion-live__line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  transform: translateX(-100%);
+  animation: motion-live 1.6s linear infinite;
+}
+
+@keyframes motion-live {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-enter {
+    animation: motion-fade 150ms ease backwards;
+  }
+  .motion-exit {
+    animation: motion-fade-out 150ms ease both;
+  }
+  .motion-exit > * {
+    animation: none;
+  }
+  .count-bump {
+    animation: none;
+  }
+  .motion-live__line::after {
+    animation: none;
+    transform: none;
+    background: var(--color-primary-tint);
+  }
+}
+
+@keyframes motion-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-fade-out {
+  to {
+    opacity: 0;
+  }
+}

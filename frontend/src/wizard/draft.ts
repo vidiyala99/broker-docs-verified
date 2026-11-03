@@ -1,5 +1,5 @@
 // Proposal Builder draft: lives in the browser until Generate (spec section 4).
-import type { BlockKind, DocumentInfo, FieldError, OutlineBlock, ProposalParameters, Template, TemplateKind } from "../api/types";
+import type { BlockKind, DocumentInfo, FieldError, Line, OutlineBlock, ProposalParameters, Template, TemplateKind } from "../api/types";
 
 export type StepIndex = 0 | 1 | 2 | 3;
 
@@ -23,6 +23,10 @@ export interface Draft {
   brokerage_name: string;
   additional_context: string;
   no_ai_prose: boolean;
+  /** Work queue Build proposal (D6, M5): the comparison this draft was started from, its client label and line. */
+  source_run_id: number | null;
+  source_client: string | null;
+  line: Line | null;
 }
 
 export const EMPTY_DRAFT: Draft = {
@@ -39,7 +43,13 @@ export const EMPTY_DRAFT: Draft = {
   brokerage_name: "",
   additional_context: "",
   no_ai_prose: false,
+  source_run_id: null,
+  source_client: null,
+  line: null,
 };
+
+/** Fired on `window` when a draft is put back from outside the wizard (Build proposal's Undo), so an open wizard reloads it. */
+export const DRAFT_RESTORED_EVENT = "brokerdocs:proposal-draft-restored";
 
 const KEY = "brokerdocs.proposal-draft.v1";
 

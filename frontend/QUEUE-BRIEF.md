@@ -120,3 +120,49 @@ the queue footer and the run view's "All runs" tab. Rail: Personal lines when th
 - The client-name source tag "from the documents" on extracted names.
 - The launch tab reads "Work queue" (it was "All runs" over the run list); the run view's "All runs" tab opens Activity.
 - Activity crumbs "Activity"; filter preset from the opening link.
+
+## Owner feedback 2026-11-03 06:56 (folded in during round 2)
+
+**1. Retry proposal.** A Ready comparison whose proposal did not finish no longer offers the same "Build proposal" as a
+fresh one. Primary: "Retry proposal" = `POST /api/runs/{proposal_run_id}/retry` (template, details and outline kept); the
+row moves to In progress ("Building proposal") at once and D3 moves it on. Overflow: Mark done, Dismiss, "Open failed
+proposal", "Start new proposal" (the Build proposal flow with its draft-replace Undo), Open run, Move. Backend: queue
+items carry `proposal_retryable` (the linked proposal run's `retryable`, `null` without one; `work_queue.py`, tests in
+`test_work_queue_api.py`, API.md). Fresh comparisons keep "Build proposal".
+
+**2. Product voice and motion.** Structure and IA stay as the BrokerDocs evidence has them; the queue gets a voice:
+
+- Icons with meaning (Phosphor duotone, one family, no hand-rolled SVG): one glyph per group naming what the broker does
+  there (In progress: hourglass; Needs review: list with a magnifier; Ready: handshake, the hand-off to the client;
+  Needs attention: warning diamond; Done recently: seal, the stamped file), one mark per workflow (Compare Quotes:
+  scales; Policy Check: shield with check, the same glyphs as the Personal lines start actions) drawn as a small
+  document tab in the accent tint at the start of each row (stale tint for Needs attention, canvas for Done), and verbs
+  on the action buttons (rotate for Retry, file-plus for Build proposal).
+- Type: section headers move to the report-heading size (20px semibold, -0.01em) with a plain tabular count; the slim
+  In progress strip and the archive stay at 16px so they read quieter than the work.
+- Status with character: Needs review shows the Policy Check four-tick severity meter set to the worst open item, before
+  "9 open: 2 critical, 5 high, 1 medium, 1 low" (tier reads without colour).
+- Motion (reusable primitives in `ui/motion.tsx` + `ui/motion.css` for the later motion lane): a row that arrives after
+  the queue was shown fades in from 6px above (200ms, `--ease-out`); a row that leaves fades while its height folds
+  (190ms) so rows below close the gap instead of jumping (Mark done, Dismiss, Undo, Retry, polling moves); Done recently
+  opens with a grid-row height expand and fade on pointer opens, instantly by keyboard; a group's count pops (200ms)
+  when it changes; In progress rows carry a 2px sweeping line (1.6s linear) as the live indicator next to the spinner;
+  pointer-only row hover tint (150ms) and the existing press scale on actions; toasts keep their existing enter/exit.
+  First load does not animate (no entrance staggers). `prefers-reduced-motion`: opacity fades only, no movement, no
+  bump, the sweep stands still.
+- Font: Inter is `[exact]` from the live BrokerDocs sign-in DOM (`docs/reference/brokerdocs-ui-reference.md`), so it stays.
+  Proposal for the owner, not applied: switch the app to Inter's optical-size build (`@fontsource-variable/inter/opsz.css`,
+  same family, display cuts at large sizes) with `cv11` (single-storey a) and `ss03` (round quotes), and -0.025em on
+  36px titles. Before/after: `qa-screenshots/queue/font-proposal-before.png`, `font-proposal-after.png`.
+
+| Decision | gstack | ui-ux-pro-max | taste-core | taste-redesign | impeccable | emil-design-eng | frontend-design | animate | apple-design |
+|---|---|---|---|---|---|---|---|---|---|
+| Retry proposal as the primary, Start new in the menu | Name the action plainly | One visible primary action | No duplicate CTA intent per row | n/a | Operate: the next step is the obvious one | n/a | The button says what happens | n/a | Agency: easy path forward, alternatives one level deeper |
+| Group and workflow glyphs, duotone, one family | n/a | SVG icons from one set, no emoji | Phosphor first; no hand-rolled SVG | Avoid default cliche metaphors | Brand in precise details | n/a | Visual structure is information | n/a | Familiarity: metaphors neither too literal nor too abstract (seal, scales) |
+| 20px section headers, quieter strip/archive | n/a | Hierarchy by size and weight | Control hierarchy with weight, not raw scale | Headlines need presence; tighten tracking | typeset within tokens | n/a | Type carries the personality | n/a | Tracking is size-specific; weight + size + leading as a set |
+| Severity meter in the row | n/a | Never colour alone | Colour lock: severity tokens | Tabular figures | Reuse the Policy Check silhouette | n/a | Spend boldness in one place | n/a | Craft: nothing random |
+| Row enter/exit, count bump | n/a | Motion conveys meaning; exit faster than enter | Motion must be motivated (state transition) | Transform/opacity only | animate: purposeful, not decorative | ease-out, <300ms, never from scale(0), no keyboard animation | Motion answers a person's action | Gate: tens/day, purpose spatial consistency; transitions or CSS keyframes, transform+opacity, height only for collapse | Spatial consistency; prevent jarring change |
+| Done recently height expand | n/a | Animating height only where needed | n/a | n/a | n/a | Keyboard opens instant | n/a | Accordion recipe: grid rows, 200ms ease-out | Hint in the direction of the gesture |
+| Live sweep on In progress | n/a | Loading feedback | Perpetual motion only where state is live | n/a | Status by silhouette | Constant motion = linear | One orchestrated moment | Purpose: state indication | Avoid slow full-surface loops; small, thin |
+| Reduced motion | n/a | Respect prefers-reduced-motion | Mandatory | n/a | Floor | Keep opacity, drop movement | Floor | Ships with the animation | Gentler, non-vestibular equivalent |
+| Font proposal, not applied | n/a | n/a | Inter override path (brief pins it) | Font swap is the biggest lift, so ask | Do not change the incumbent world unasked | n/a | Choose type deliberately | n/a | Optical sizing; tighten large text |

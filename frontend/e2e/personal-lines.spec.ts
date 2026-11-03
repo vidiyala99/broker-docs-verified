@@ -51,7 +51,9 @@ async function setLine(page: Page, id: number, line: "personal" | "commercial") 
   expect(res.ok(), `PATCH run ${id}`).toBeTruthy();
 }
 
-const runLink = (page: Page, id: number) => page.getByRole("main").locator(`a.run-link[href="#/runs/${id}"]`);
+// Work queue lane (D7 allowed edit): Personal lines and the Compare screen show the work queue instead of the run
+// list (spec W1, W2), so "the page lists run N" now means the queue has a row for run N. The raw list is Activity.
+const runLink = (page: Page, id: number) => page.getByRole("main").locator(`li[data-run-id="${id}"]`);
 const crumbs = (page: Page) => page.getByRole("navigation", { name: "Breadcrumb" });
 const railPersonal = (page: Page) => page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Personal lines" });
 
@@ -74,11 +76,14 @@ test("Personal lines lists runs 7 and 8 and no Compare runs; Workflows lists nei
   await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveAttribute("href", "#/?line=personal");
   await expect(main.getByRole("link", { name: "Check a renewal" })).toHaveAttribute("href", "#/policy-check/new?line=personal");
 
-  await expect(runLink(page, 7)).toContainText("Policy check, run 7");
-  await expect(runLink(page, 8)).toContainText("Policy check, run 8");
-  // Exactly the personal runs, none of them a seeded Compare run.
-  const personal = await runsOf(page, "personal");
-  await expect(main.locator("a.run-link")).toHaveCount(personal.length);
+  // Work queue lane (D7 allowed edit): rows are named by client, not "Policy check, run N"; the count is the
+  // personal queue's items rather than every personal run.
+  await expect(runLink(page, 7)).toContainText("Avery and Jordan Pellham");
+  await expect(runLink(page, 8)).toContainText("Jordan Pellham (lake house)");
+  // Exactly the personal queue items, none of them a seeded Compare run.
+  const q = (await (await page.request.get(`${API}/api/queue?line=personal`)).json()) as Record<string, unknown[]>;
+  const items = ["in_progress", "needs_review", "ready", "needs_attention", "done_recently"].reduce((n, g) => n + q[g]!.length, 0);
+  await expect(main.locator("li[data-run-id]")).toHaveCount(items);
   const compare = (await runsOf(page)).filter((r) => r.workflow_name === "Compare Quotes" && r.line === "commercial");
   expect(compare.length).toBeGreaterThan(0);
   for (const r of compare) await expect(runLink(page, r.id)).toHaveCount(0);
@@ -88,7 +93,7 @@ test("Personal lines lists runs 7 and 8 and no Compare runs; Workflows lists nei
   // Workflows (rail) = commercial only (D9).
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Workflows" }).click();
   await expect(page).toHaveURL(/#\/$/);
-  await expect(main.locator("a.run-link").first()).toBeVisible();
+  await expect(main.locator("li[data-run-id]").first()).toBeVisible(); // D7 edit: queue rows, see runLink
   await expect(runLink(page, 7)).toHaveCount(0);
   await expect(runLink(page, 8)).toHaveCount(0);
   await expect(runLink(page, compare[0]!.id)).toBeVisible();
@@ -185,7 +190,8 @@ test("Re-tag from the run header moves the run between the lists; a failed PATCH
   await expect(crumbs(page)).toHaveText(/^Personal lines.*Policy check.*Run 7$/);
   // The rail names the tool: Policy check stays current for a personal Policy Check run.
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "#/personal-lines");
+  // Work queue lane (D7 allowed edit): the run view's All runs tab opens Activity (spec section 2).
+  await expect(page.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "#/activity");
 
   // Personal -> Commercial: PATCH body exactly {"line": "commercial"}, crumbs and toast follow.
   const [patch] = await Promise.all([
@@ -236,12 +242,13 @@ test("Empty state when no run is personal", async ({ page }) => {
   try {
     await page.goto("/#/personal-lines");
     const main = page.getByRole("main");
-    await expect(main.getByRole("heading", { name: "No personal-lines runs yet." })).toBeVisible();
-    await expect(main.locator("a.run-link")).toHaveCount(0);
+    // Work queue lane (D7 allowed edit): the queue's empty state replaces the run list's.
+    await expect(main.getByRole("heading", { name: "No personal-lines work yet." })).toBeVisible();
+    await expect(main.locator("li[data-run-id]")).toHaveCount(0);
     // The two actions appear once, in the empty state.
     await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveCount(1);
     await expect(main.getByRole("link", { name: "Check a renewal" })).toHaveCount(1);
-    await expect(main.locator(".personal__empty").getByRole("link", { name: "Check a renewal" })).toBeVisible();
+    await expect(main.locator(".queue-empty").getByRole("link", { name: "Check a renewal" })).toBeVisible();
     await shot(page, "1440-empty");
     await axe(page, "empty 1440");
     await page.setViewportSize({ width: 390, height: 844 });

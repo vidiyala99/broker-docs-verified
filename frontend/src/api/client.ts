@@ -9,6 +9,8 @@ import type {
   Line,
   Message,
   ProposalParameters,
+  Queue,
+  QueueState,
   Rejection,
   Run,
   Task,
@@ -68,19 +70,27 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
 const json = (body: unknown) => JSON.stringify(body);
 
+/** The optional Client field of the start screens: sent only when it holds text (API.md `client_name`). */
+const clientBody = (name?: string) => (name && name.trim() ? { client_name: name.trim() } : {});
+
 export const api = {
   workspace: () => request<Workspace>("/api/workspace"),
   /** Newest first. `line` filters (D9: Workflows = commercial; D5: Personal lines = personal, limit 100); omitted = all runs. */
   runs: (limit = 20, line?: Line) =>
     request<{ runs: Run[] }>(`/api/runs?limit=${limit}${line ? `&line=${line}` : ""}`).then((r) => r.runs),
   run: (id: number) => request<Run>(`/api/runs/${id}`),
-  startRun: (documentIds: number[], line?: Line) =>
+  startRun: (documentIds: number[], line?: Line, clientName?: string) =>
     request<{ run: Run; created: boolean }>("/api/runs", {
       method: "POST",
-      body: json({ document_ids: documentIds, workflow: "compare-quotes", ...(line ? { line } : {}) }),
+      body: json({ document_ids: documentIds, workflow: "compare-quotes", ...(line ? { line } : {}), ...clientBody(clientName) }),
     }),
   /** Re-tag a run (run header control). The body is exactly {"line": ...} (API.md). */
   setRunLine: (id: number, line: Line) => request<Run>(`/api/runs/${id}`, { method: "PATCH", body: json({ line }) }),
+  /** Work queue: any subset of line / client_name ("" clears) / queue_state (API.md PATCH /api/runs/{id}). */
+  patchRun: (id: number, body: { line?: Line; client_name?: string; queue_state?: QueueState }) =>
+    request<Run>(`/api/runs/${id}`, { method: "PATCH", body: json(body) }),
+  /** Work queue groups for one line (API.md "Work queue"). */
+  queue: (line: Line) => request<Queue>(`/api/queue?line=${line}`),
   cancelRun: (id: number) => request<{ run: Run; cancelled: boolean }>(`/api/runs/${id}/cancel`, { method: "POST" }),
   retryRun: (id: number) => request<{ run: Run }>(`/api/runs/${id}/retry`, { method: "POST" }),
   deleteDocument: (id: number) => request<void>(`/api/documents/${id}`, { method: "DELETE" }),
@@ -117,12 +127,18 @@ export const api = {
   documents: () => request<{ documents: DocumentInfo[] }>("/api/documents").then((r) => r.documents),
   templates: () => request<{ templates: TemplateSummary[] }>("/api/templates").then((r) => r.templates),
   template: (idOrSlug: string | number) => request<Template>(`/api/templates/${encodeURIComponent(String(idOrSlug))}`),
-  startProposal: (documentIds: number[], parameters: ProposalParameters) =>
+  /** `source` (work queue Build proposal): the comparison it is built from and its line (M5). */
+  startProposal: (documentIds: number[], parameters: ProposalParameters, source?: { runId: number; line: Line | null }) =>
     request<{ run: Run; created: boolean }>("/api/runs", {
       method: "POST",
-      body: json({ document_ids: documentIds, workflow: "proposal-builder", parameters }),
+      body: json({
+        document_ids: documentIds,
+        workflow: "proposal-builder",
+        parameters,
+        ...(source ? { source_run_id: source.runId, ...(source.line ? { line: source.line } : {}) } : {}),
+      }),
     }),
-  startPolicyCheck: (slots: { documentId: number; role: PolicyRole }[], line?: Line) =>
+  startPolicyCheck: (slots: { documentId: number; role: PolicyRole }[], line?: Line, clientName?: string) =>
     request<{ run: Run; created: boolean }>("/api/runs", {
       method: "POST",
       body: json({
@@ -130,6 +146,7 @@ export const api = {
         workflow: "policy-check",
         slots: Object.fromEntries(slots.map((s) => [String(s.documentId), s.role])),
         ...(line ? { line } : {}),
+        ...clientBody(clientName),
       }),
     }),
   discrepancies: (runId: number) => request<DiscrepancyList>(`/api/runs/${runId}/discrepancies`),

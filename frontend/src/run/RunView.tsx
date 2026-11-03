@@ -36,6 +36,7 @@ import type { PdfTarget } from "../pdf/PdfViewer";
 const PdfViewer = lazy(() => import("../pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })));
 import { Chat } from "./Chat";
 import { RunProgress } from "./RunProgress";
+import { RunClient } from "./RunClient";
 
 type Tab = "report" | number; // number = document id of an open PDF
 
@@ -158,6 +159,25 @@ export function RunView({
       }
     },
     [run, onRunChanged, toast],
+  );
+
+  // Work queue W4: the Client control beside Line. Optimistic like retag; "" clears (the queue then falls back to the
+  // extracted named insured).
+  const rename = useCallback(
+    async (name: string) => {
+      if (!run) return;
+      const before = run.client_name;
+      setRun((r) => (r ? { ...r, client_name: name || null } : r));
+      try {
+        const saved = await api.patchRun(run.id, { client_name: name });
+        setRun((r) => (r ? { ...r, client_name: saved.client_name } : r));
+        toast({ message: saved.client_name ? "Client name saved." : "Client name cleared.", hold: 4000 });
+      } catch (e) {
+        setRun((r) => (r ? { ...r, client_name: before } : r));
+        toast({ message: e instanceof ApiError ? e.message : "Couldn't save the client name. Retry.", tone: "error" });
+      }
+    },
+    [run, toast],
   );
 
   const updateDoc = (doc: RunDocument) =>
@@ -477,7 +497,7 @@ export function RunView({
 
       <main className="pane" id="main" tabIndex={-1} aria-labelledby="pane-title">
         <nav className="tabs" aria-label="Report and sources">
-          <a href={personal ? "#/personal-lines" : "#/"} className="tab">
+          <a href="#/activity" className="tab">
             <ClockCounterClockwise size={16} aria-hidden /> All runs
           </a>
           <button
@@ -528,6 +548,7 @@ export function RunView({
             )}
           </h1>
           {run && <LineChoice compact value={run.line} onChange={(l) => void retag(l)} />}
+          {run && <RunClient key={run.id} value={run.client_name} onSave={(name) => void rename(name)} />}
           <div className="toolbar__actions" role="toolbar" aria-label="Report actions">
             <Tip text="Good report">
               <button type="button" className="icon-btn" aria-label="Good report" aria-pressed={artifact?.feedback?.rating === 1} disabled={!artifact} onClick={() => void rate(1)}>
