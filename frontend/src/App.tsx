@@ -16,7 +16,7 @@ import { PolicyWizard } from "./policy/PolicyWizard";
 import { PersonalLinesPage } from "./personal/PersonalLinesPage";
 import { ActivityPage } from "./activity/ActivityPage";
 import { lineFromHash } from "./personal/LineChoice";
-import { lineMoveVariant } from "./run/lineMove";
+import { BOOK_NAME } from "./run/BookTab";
 import { TasksPage } from "./tasks/TasksPage";
 import { taskIdFromHash } from "./tasks/taskUtil";
 import { ReadingMark } from "./voice/marks";
@@ -105,7 +105,6 @@ export function App() {
   // Queue navigation: a run with a client (typed, or read from the documents as the queue shows it) is named by the
   // client in the crumbs and the tab title; proposals keep "Run N" (their title already names the client).
   const runClient = !proposalRun ? (runOfRoute?.client ?? runOfRoute?.client_name ?? null) : null;
-  const lmVariant = lineMoveVariant();
   // An entry screen opened from Personal lines (`?line=personal`) belongs to Personal lines.
   const personalEntry =
     route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks && !route.activity;
@@ -169,34 +168,40 @@ export function App() {
     ? "integrations"
     : route.personal || personalEntry
       ? "personal-lines"
-      : lmVariant === "c" && runOfRoute && !proposalRun
-        ? personalRun
-          ? "personal-lines"
-          : "workflows"
       : route.wizard || proposalRun
         ? "proposals"
         : route.policy || policyRun
           ? "policy-check"
           : "workflows";
-  // A personal run's crumbs start with Personal lines; their links keep the personal preset.
+  // Personal lines crumb: personal runs and personal entry screens start with it; links keep the personal preset.
   const toPersonal: Crumb = { label: "Personal lines", href: "#/personal-lines" };
   const preset = personalRun ? "?line=personal" : "";
   const runLabel = runClient ?? `Run ${route.runId}`;
-  // PROTOTYPE (line-move A/B/C): every run's crumbs lead with its book, Commercial included.
-  const bookCrumb: Crumb = personalRun
-    ? { ...toPersonal, refile: pointerAction(600) }
-    : { label: "Commercial", href: "#/", refile: pointerAction(600) };
-  const lmRunCrumbs: Crumb[] | null =
-    lmVariant !== "0" && runOfRoute && !proposalRun
-      ? [bookCrumb, { label: policyRun ? "Policy check" : WORKFLOW_NAME, href: policyRun ? `#/policy-check/new${preset}` : `#/${preset}` }, { label: runLabel }]
-      : null;
-  const runCrumbs: Crumb[] = proposalRun
-    ? [{ label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
-    : policyRun
-      ? [{ label: "Policy check", href: `#/policy-check/new${preset}` }, { label: runLabel }]
-      : personalRun
-        ? [{ label: WORKFLOW_NAME, href: `#/${preset}` }, { label: runLabel }]
-        : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: runLabel }];
+  // Line move B (owner-approved 2026-11-03, LINE-MOVE-BRIEF.md): every run's crumbs lead with its book, Commercial
+  // included ("Commercial > Policy check > client"), so the book is always named. When a pointer move changes the
+  // book of the run on screen, the new book crumb fades in (`refile`); keyboard moves and navigation stay still.
+  // `refiled` remembers the pointer move until the next one, so the class (and its animation) is not dropped by the
+  // re-render that follows the PATCH.
+  const lastBook = useRef<{ runId: number; line: Line } | null>(null);
+  const refiled = useRef<{ runId: number; line: Line } | null>(null);
+  if (refiled.current && refiled.current.runId !== route.runId) refiled.current = null;
+  if (runOfRoute && lastBook.current?.runId === runOfRoute.id && lastBook.current.line !== runOfRoute.line) {
+    refiled.current = pointerAction() ? { runId: runOfRoute.id, line: runOfRoute.line } : null;
+  }
+  useEffect(() => {
+    lastBook.current = runOfRoute ? { runId: runOfRoute.id, line: runOfRoute.line } : null;
+  });
+  const bookCrumb: Crumb = {
+    ...(personalRun ? toPersonal : { label: BOOK_NAME.commercial, href: "#/" }),
+    refile: refiled.current?.runId === runOfRoute?.id && refiled.current?.line === runOfRoute?.line,
+  };
+  const runCrumbs: Crumb[] = !runOfRoute
+    ? [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME, href: "#/" }, { label: runLabel }] // still loading
+    : proposalRun
+      ? [bookCrumb, { label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
+      : policyRun
+        ? [bookCrumb, { label: "Policy check", href: `#/policy-check/new${preset}` }, { label: runLabel }]
+        : [bookCrumb, { label: WORKFLOW_NAME, href: `#/${preset}` }, { label: runLabel }];
   const crumbs: Crumb[] = route.activity
     ? [{ label: "Activity" }]
     : route.tasks
@@ -212,11 +217,7 @@ export function App() {
             ? [toPersonal, { label: "Policy check" }, { label: "New check" }]
             : [{ label: "Policy check" }, { label: "New check" }]
           : route.runId
-            ? lmRunCrumbs
-              ? lmRunCrumbs
-              : personalRun
-              ? [toPersonal, ...runCrumbs]
-              : runCrumbs
+            ? runCrumbs
             : personalEntry
               ? [toPersonal, { label: WORKFLOW_NAME }]
               : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME }];

@@ -2,7 +2,6 @@ import type { GlyphName } from "../voice/marks";
 import { RailGlyph } from "../voice/railMarks";
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
-import { useRailTravel } from "../run/lineMove";
 
 export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "tasks" | "integrations";
 
@@ -39,7 +38,6 @@ const GROUPS: RailItem[][] = [
 ];
 
 export function Rail({ section }: { section: Section }) {
-  useRailTravel(section);
   return (
     <nav className="rail" aria-label="Main">
       <a href="#/" className="rail__home" aria-label={`${APP_NAME} home`}>
@@ -91,7 +89,7 @@ export function Rail({ section }: { section: Section }) {
 export interface Crumb {
   label: string;
   href?: string;
-  /** PROTOTYPE (line-move): the book crumb fades in when it just changed. */
+  /** Line move B: this (book) crumb just changed by a pointer move, so it fades in (app.css `.is-refiled`). */
   refile?: boolean;
 }
 

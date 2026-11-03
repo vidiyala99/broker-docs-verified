@@ -129,7 +129,7 @@ Stale section tag "May be out of date": `--color-stale-bg/fg`, glyph plus text.
 - Durations: press 120ms (scale 0.97), hover and tooltip 150ms, tabs and
   side-by-side 200ms, toast enter 250ms and exit 150ms, ceiling 300ms. The
   reference animates at 300ms [live]; we run shorter on purpose.
-- Allowed moments (voice + motion lane, 2026-11-03): press feedback, tooltip, toast, side-by-side panel, the sliding
+- Allowed moments (voice + motion lane, 2026-11-03; line move B adds the book tab and book crumb re-file): press feedback, tooltip, toast, side-by-side panel, the sliding
   segmented indicator (200ms `--ease-in-out`), folder-tab cross-fade and PDF tab enter/close, wizard step body,
   list fades on pointer filter/sort changes (opacity 0.35 to 1, 150ms, rows not remounted), disclosure height +
   opacity (`Collapse`), dialog/menu/overlay exits, queue row enter/exit, the reading line, the seal, and a 150ms
@@ -190,6 +190,26 @@ See `frontend/QUEUE-BRIEF.md`. No new tokens.
   190ms), disclosure collapse (grid rows 0fr to 1fr, pointer only), count bump (scale 0.85 + opacity, 200ms), live sweep
   (2px line, 1.6s linear). First load never animates. Reduced motion: opacity only.
 
+## Line move: book tab (owner-approved 2026-11-03, direction B)
+See `frontend/LINE-MOVE-BRIEF.md`. No new tokens.
+- A run is filed in a book, Commercial or Personal lines, and the page always says which:
+  - **Crumbs** lead with the book for every run, Commercial included: "Commercial > Policy check > client",
+    "Personal lines > Compare Quotes > client", "Commercial > Proposals > Run N". Entry screens keep their crumbs.
+  - **Run header**: a book tab (the book's mark at 18px plus its name; 32px tall, `--color-canvas` fill, 3px
+    `--color-text-muted` left edge like a binder divider, 4px chip radius, no border so it never reads as a button),
+    then one text button that names the consequence: "Move to Commercial" / "Move to Personal lines" (link colour,
+    resting underline in `--color-border-input`, `currentColor` on hover, 32px drawn, 44px hit area). This replaced the
+    Commercial / Personal radios in the run header; the start screens keep their full-size "Line of business" choice.
+  - Phone (<600px): the button takes its own row under the tab.
+- The move is optimistic. The toast names the file and the book ("Avery and Jordan Pellham moved to Commercial.") and
+  offers Undo (6s; Ctrl/Cmd+Z while it shows). Undo says "... moved back to Personal lines." and offers nothing more.
+  A failed PATCH puts the old book back and shows the server's message.
+- Motion: on a pointer move the new tab drops in (opacity + translateY 6px to 0, `--dur-base`, `--ease-out`) and the
+  book crumb fades in (opacity + translateY 4px, same timing). Keyboard moves are instant and focus stays on the button
+  (its label flips). Reduced motion: fades only. The rail keeps highlighting the tool (D7).
+- The line choice segment (start screens) always draws its check glyph and hides it when unchecked, so both halves keep
+  one width and a flip never shifts the control.
+
 ## Voice: "Paper trail" (owner-approved 2026-11-03, direction C)
 See `frontend/VOICE-BRIEF.md`. The product's promise is that every value traces to a page in a source document, so
 the voice is the paperwork itself. Structure and layout stay as the BrokerDocs evidence has them.
@@ -224,6 +244,9 @@ the meaning. Each needs its own silhouette at 20 to 28px:
   an overhanging lid; Documents = file folder with its tab. A new rail item must not share an outline with an existing
   one (check it blurred at 20px). Active/disabled colours, hover and focus as in "Focus, disabled, rail". The rail
   marks are rail-only: the Proposal workflow mark on queue rows, wizard titles and start buttons stays the bound sheet.
+- Books (line move B, owner-approved 2026-11-03): Personal lines = the house (shared with the rail item); Commercial = an
+  office block on its ground line (sheet-filled block, two rows of windows, a door). Used only in the run header's book
+  tab (18px); not a rail item.
 - Colour inside marks: `currentColor` for the drawing; document hues (`--doc-N-mark`) only as small sheet tabs;
   `--color-primary` only for the citation box, the reading line and the ribbon.
 
