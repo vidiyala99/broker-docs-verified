@@ -2,6 +2,7 @@ import type { GlyphName } from "../voice/marks";
 import { RailGlyph } from "../voice/railMarks";
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
+import { useRailTravel } from "../run/lineMove";
 
 export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "tasks" | "integrations";
 
@@ -38,6 +39,7 @@ const GROUPS: RailItem[][] = [
 ];
 
 export function Rail({ section }: { section: Section }) {
+  useRailTravel(section);
   return (
     <nav className="rail" aria-label="Main">
       <a href="#/" className="rail__home" aria-label={`${APP_NAME} home`}>
@@ -89,6 +91,8 @@ export function Rail({ section }: { section: Section }) {
 export interface Crumb {
   label: string;
   href?: string;
+  /** PROTOTYPE (line-move): the book crumb fades in when it just changed. */
+  refile?: boolean;
 }
 
 export function TopBar({ crumbs }: { crumbs: Crumb[] }) {
@@ -101,7 +105,7 @@ export function TopBar({ crumbs }: { crumbs: Crumb[] }) {
       <nav aria-label="Breadcrumb" className="crumbs">
         <ol>
           {crumbs.map((c, i) => (
-            <li key={`${c.label}-${i}`}>
+            <li key={`${c.label}-${i}`} className={c.refile ? "is-refiled" : undefined}>
               {i === crumbs.length - 1 ? (
                 <span aria-current="page">{c.label}</span>
               ) : c.href ? (

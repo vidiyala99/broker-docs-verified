@@ -1,0 +1,119 @@
+/* PROTOTYPE (line-move lane, Phase A). See lineMove.tsx. */
+
+/* Direction A: the book named in the header metadata, ahead of the run number. */
+.toolbar__book {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+/* Directions B and C: the book as a paper tab, then the one action that moves the file. */
+.booktab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.booktab__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 0;
+  border-left: 3px solid var(--color-text-muted);
+  border-radius: var(--radius-chip, 4px);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.booktab__tab .bookmark {
+  flex: none;
+}
+
+.booktab__move {
+  height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-input);
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .booktab__move:not(:disabled):hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+.booktab__move:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+}
+
+.booktab__move:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Crumb book segment: fades in when it changes (pointer only, set from JS). */
+.crumbs li.is-refiled {
+  animation: crumb-refile 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes crumb-refile {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crumbs li.is-refiled {
+    animation-name: crumb-fade;
+  }
+  @keyframes crumb-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/* Direction C: the travelling rail tint. Multiply keeps the icon strokes visible through it. */
+.rail-ghost {
+  position: fixed;
+  z-index: 30;
+  border-radius: var(--radius-control);
+  background: var(--color-primary-tint);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.rail__item.is-active.is-arriving {
+  background: transparent;
+}
+
+@media (max-width: 599px) {
+  .booktab {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .booktab__tab {
+    padding: 0 var(--space-2);
+  }
+}

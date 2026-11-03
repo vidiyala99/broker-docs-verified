@@ -16,6 +16,7 @@ import { PolicyWizard } from "./policy/PolicyWizard";
 import { PersonalLinesPage } from "./personal/PersonalLinesPage";
 import { ActivityPage } from "./activity/ActivityPage";
 import { lineFromHash } from "./personal/LineChoice";
+import { lineMoveVariant } from "./run/lineMove";
 import { TasksPage } from "./tasks/TasksPage";
 import { taskIdFromHash } from "./tasks/taskUtil";
 import { ReadingMark } from "./voice/marks";
@@ -104,6 +105,7 @@ export function App() {
   // Queue navigation: a run with a client (typed, or read from the documents as the queue shows it) is named by the
   // client in the crumbs and the tab title; proposals keep "Run N" (their title already names the client).
   const runClient = !proposalRun ? (runOfRoute?.client ?? runOfRoute?.client_name ?? null) : null;
+  const lmVariant = lineMoveVariant();
   // An entry screen opened from Personal lines (`?line=personal`) belongs to Personal lines.
   const personalEntry =
     route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks && !route.activity;
@@ -167,6 +169,10 @@ export function App() {
     ? "integrations"
     : route.personal || personalEntry
       ? "personal-lines"
+      : lmVariant === "c" && runOfRoute && !proposalRun
+        ? personalRun
+          ? "personal-lines"
+          : "workflows"
       : route.wizard || proposalRun
         ? "proposals"
         : route.policy || policyRun
@@ -176,6 +182,14 @@ export function App() {
   const toPersonal: Crumb = { label: "Personal lines", href: "#/personal-lines" };
   const preset = personalRun ? "?line=personal" : "";
   const runLabel = runClient ?? `Run ${route.runId}`;
+  // PROTOTYPE (line-move A/B/C): every run's crumbs lead with its book, Commercial included.
+  const bookCrumb: Crumb = personalRun
+    ? { ...toPersonal, refile: pointerAction(600) }
+    : { label: "Commercial", href: "#/", refile: pointerAction(600) };
+  const lmRunCrumbs: Crumb[] | null =
+    lmVariant !== "0" && runOfRoute && !proposalRun
+      ? [bookCrumb, { label: policyRun ? "Policy check" : WORKFLOW_NAME, href: policyRun ? `#/policy-check/new${preset}` : `#/${preset}` }, { label: runLabel }]
+      : null;
   const runCrumbs: Crumb[] = proposalRun
     ? [{ label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
     : policyRun
@@ -198,7 +212,9 @@ export function App() {
             ? [toPersonal, { label: "Policy check" }, { label: "New check" }]
             : [{ label: "Policy check" }, { label: "New check" }]
           : route.runId
-            ? personalRun
+            ? lmRunCrumbs
+              ? lmRunCrumbs
+              : personalRun
               ? [toPersonal, ...runCrumbs]
               : runCrumbs
             : personalEntry

@@ -39,6 +39,7 @@ const PdfViewer = lazy(() => import("../pdf/PdfViewer").then((m) => ({ default: 
 import { Chat } from "./Chat";
 import { RunProgress } from "./RunProgress";
 import { RunClient } from "./RunClient";
+import { BOOK_NAME, BookMeta, BookTab, lineMoveVariant } from "./lineMove";
 import { ReadingMark, WorkflowMark } from "../voice/marks";
 
 type Tab = "report" | number; // number = document id of an open PDF
@@ -162,7 +163,17 @@ export function RunView({
         const saved = await api.setRunLine(before.id, line);
         setRun((r) => (r ? { ...r, line: saved.line } : r));
         onRunChanged?.({ ...optimistic, line: saved.line });
-        toast({ message: saved.line === "personal" ? "Moved to Personal lines." : "Moved to Commercial.", hold: 4000 });
+        if (lineMoveVariant() === "0") {
+          toast({ message: saved.line === "personal" ? "Moved to Personal lines." : "Moved to Commercial.", hold: 4000 });
+        } else {
+          // PROTOTYPE (line-move): the toast names the file and the book, and offers Undo (the queue's Move already does).
+          const who = before.client ?? before.client_name ?? `Run ${before.id}`;
+          toast({
+            message: `${who} moved to ${BOOK_NAME[saved.line]}.`,
+            hold: 6000,
+            action: { label: "Undo", run: () => void undoRef.current?.(before.line) },
+          });
+        }
       } catch (e) {
         setRun((r) => (r ? { ...r, line: before.line } : r));
         onRunChanged?.(before);
@@ -174,6 +185,8 @@ export function RunView({
     },
     [run, onRunChanged, toast],
   );
+  const undoRef = useRef<((line: Line) => Promise<void>) | null>(null);
+  undoRef.current = retag;
 
   // Work queue W4: the Client control beside Line. Optimistic like retag; "" clears (the queue then falls back to the
   // extracted named insured).
@@ -465,6 +478,7 @@ export function RunView({
   const paneLeaving = !panePdf && leavingPdf != null;
   const summary = artifact ? warningSummary(artifact) : null;
   const running = Boolean(run?.active);
+  const lmVariant = lineMoveVariant();
   const isProposal = run?.workflow_name === PROPOSAL_WORKFLOW;
   const isPolicy = run?.workflow_name === POLICY_WORKFLOW;
   const workflowTitle = isPolicy ? "Policy check" : "Compare Quotes";
@@ -603,6 +617,7 @@ export function RunView({
                   {headClient} · {workflowTitle}
                 </span>
                 <span className="toolbar__meta">
+                  {run && lmVariant === "a" && <BookMeta line={run.line} />}
                   {run?.client_source === "extracted" && <span className="toolbar__source">name from the documents</span>}
                   <span className="toolbar__version">
                     Run {runId}
@@ -623,7 +638,11 @@ export function RunView({
               </>
             )}
           </h1>
-          {run && <LineChoice compact value={run.line} onChange={(l) => void retag(l)} />}
+          {run && (lmVariant === "b" || lmVariant === "c") ? (
+            <BookTab line={run.line} onMove={(l) => void retag(l)} />
+          ) : (
+            run && <LineChoice compact value={run.line} onChange={(l) => void retag(l)} />
+          )}
           {run && <RunClient key={run.id} value={run.client ?? run.client_name} onSave={(name) => void rename(name)} />}
           <div className="toolbar__actions" role="toolbar" aria-label="Report actions">
             <Tip text="Good report">

@@ -27,7 +27,8 @@ export function LineChoice({ value, onChange, compact }: { value: Line; onChange
       {LINES.map((l) => (
         <label key={l} className="line-choice__opt">
           <input type="radio" name={name} value={l} checked={value === l} onChange={() => onChange(l)} />
-          {value === l && <Check size={14} weight="bold" className="line-choice__check" aria-hidden />}
+          {/* Always drawn, hidden when unchecked: the segment keeps one width, so a flip never shifts it sideways. */}
+          <Check size={14} weight="bold" className={`line-choice__check${value === l ? "" : " is-off"}`} aria-hidden />
           <span>{LINE_LABEL[l]}</span>
         </label>
       ))}
