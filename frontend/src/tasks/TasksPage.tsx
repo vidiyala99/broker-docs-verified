@@ -408,7 +408,8 @@ function FilterChoice({ value, onChange }: { value: Filter; onChange: (f: Filter
         {FILTERS.map((f) => (
           <label key={f.value} className="line-choice__opt">
             <input type="radio" name={name} value={f.value} checked={value === f.value} onChange={() => onChange(f.value)} />
-            {value === f.value && <Check size={14} weight="bold" className="line-choice__check" aria-hidden />}
+            {/* Always drawn (line switch): the glyph cross-fades and the option keeps one width. */}
+            <Check size={14} weight="bold" className={`line-choice__check${value === f.value ? "" : " is-off"}`} aria-hidden />
             <span>{f.label}</span>
           </label>
         ))}

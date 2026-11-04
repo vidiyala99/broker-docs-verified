@@ -20,13 +20,50 @@
   color: var(--color-text);
 }
 
-/* Two equal halves so the check glyph never shifts the other option. */
+/* Shared segmented control (line switch, owner-approved 2026-11-03, LINE-SWITCH-BRIEF.md): one joined track with one
+   moving selection. A single 1px input-border outline, no gap and no per-option borders; equal halves so the check
+   glyph never shifts the other option. The indicator (tint fill, primary border) covers its half of the track edge and
+   slides 220ms on --ease-out, so it visibly leaves on the first frame; the check glyph and the label colour cross-fade
+   with it. Pure CSS: the index comes from :has(), so it retargets mid-flight (a transition, not a keyframe). Keyboard
+   changes are instant (ui/input.ts); reduced motion drops the slide and keeps the fades. */
 .line-choice__seg {
+  --seg-n: 2;
+  --seg-i: 0;
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  /* minmax(0, 1fr), not 1fr: in a narrow column (the 300px Compare Upload panel) plain 1fr gives way to the longer
+     label's min-content and the halves go unequal, so the one indicator would miss the second option. */
+  grid-auto-columns: minmax(0, 1fr);
   justify-self: start;
-  gap: var(--space-2);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.line-choice__seg:has(> :nth-child(3)) { --seg-n: 3; }
+.line-choice__seg:has(> :nth-child(4)) { --seg-n: 4; }
+.line-choice__seg:has(> :nth-child(2) input:checked) { --seg-i: 1; }
+.line-choice__seg:has(> :nth-child(3) input:checked) { --seg-i: 2; }
+.line-choice__seg:has(> :nth-child(4) input:checked) { --seg-i: 3; }
+
+/* Sits on the track's border box (-1px each side), so the selected half's primary edge replaces the grey one and
+   translateX(i * 100%) lands exactly on option i (100% is the indicator's own width, one option plus its border share). */
+.line-choice__seg::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: calc(-1 * var(--border-width));
+  bottom: calc(-1 * var(--border-width));
+  left: calc(-1 * var(--border-width));
+  width: calc((100% + 2 * var(--border-width)) / var(--seg-n));
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary-tint);
+  transform: translateX(calc(var(--seg-i) * 100%));
+  transition: transform var(--dur-segment) var(--ease-out);
+  pointer-events: none;
 }
 
 .line-choice__opt {
@@ -35,27 +72,30 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  height: 36px;
+  height: 34px; /* 36px drawn with the track's two 1px edges */
   padding: 0 var(--space-3);
-  border: var(--border-width) solid var(--color-border-button);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: transparent;
+  color: var(--color-text-muted);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   white-space: nowrap;
   cursor: pointer;
   transition:
     transform var(--dur-press) var(--ease-out),
-    background-color var(--dur-fast) ease,
-    border-color var(--dur-fast) ease;
+    color var(--dur-segment) var(--ease-out),
+    background-color var(--dur-fast) ease;
 }
 
-/* 44px hit area (DESIGN.md) without growing the drawn control. */
+.line-choice__opt:has(input:checked) {
+  color: var(--color-text);
+}
+
+/* 44px hit area (DESIGN.md) without growing the drawn control; no sideways overlap, the halves touch. */
 .line-choice__opt::before {
   content: "";
   position: absolute;
-  inset: -4px -2px;
+  inset: -5px 0;
 }
 
 .line-choice__opt input {
@@ -71,68 +111,24 @@
   transform: scale(var(--press-scale));
 }
 
-/* Shared sliding segmented control (voice + motion lane): one indicator per segment slides to the checked option.
-   Pure CSS: the index comes from :has(), so it retargets mid-flight (a transition, not a keyframe). 200ms
-   --ease-in-out (an on-screen move); instant for keyboard changes and under reduced motion. */
-.line-choice__seg {
-  --seg-n: 2;
-  --seg-i: 0;
-  position: relative;
-  isolation: isolate;
-}
-
-.line-choice__seg:has(> :nth-child(3)) { --seg-n: 3; }
-.line-choice__seg:has(> :nth-child(4)) { --seg-n: 4; }
-.line-choice__seg:has(> :nth-child(2) input:checked) { --seg-i: 1; }
-.line-choice__seg:has(> :nth-child(3) input:checked) { --seg-i: 2; }
-.line-choice__seg:has(> :nth-child(4) input:checked) { --seg-i: 3; }
-
-.line-choice__seg::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: calc((100% - (var(--seg-n) - 1) * var(--space-2)) / var(--seg-n));
-  border: var(--border-width) solid var(--color-primary);
-  border-radius: var(--radius-control);
-  background: var(--color-primary-tint);
-  transform: translateX(calc(var(--seg-i) * (100% + var(--space-2))));
-  transition: transform var(--dur-base) var(--ease-in-out);
-  pointer-events: none;
-}
-
-/* Keyboard changes (arrow keys) are instant: the shared input helper (ui/input.ts) marks the last input method. */
-:root[data-input="keyboard"] .line-choice__seg::after {
-  transition: none;
-}
-
-.line-choice__opt {
-  background: transparent;
-}
-
-.line-choice__opt:has(input:checked) {
-  border-color: transparent;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .line-choice__seg::after {
-    transition: none;
-  }
-}
-
 .line-choice__opt:has(input:focus-visible) {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
 
+/* Always drawn so both halves keep one width; the unchecked one is transparent. In: 220ms ease-out from 0.85 (never
+   from nothing). Out: 120ms, faster than the way in. The transition on the target state is the one that runs. */
 .line-choice__check {
   flex: none;
+  transition:
+    opacity var(--dur-segment) var(--ease-out),
+    transform var(--dur-segment) var(--ease-out);
 }
 
 .line-choice__check.is-off {
-  visibility: hidden;
+  opacity: 0;
+  transform: scale(0.85);
+  transition-duration: var(--dur-press);
 }
 
 /* Text and glyph paint above the ::before hit area, so a pointer on the words lands on them (inside the label). */
@@ -143,7 +139,27 @@
 
 @media (hover: hover) and (pointer: fine) {
   .line-choice__opt:hover:not(:has(input:checked)) {
+    color: var(--color-text);
     background: var(--color-canvas);
+  }
+}
+
+/* Keyboard changes (arrow keys) are instant: the shared input helper (ui/input.ts) marks the last input method. */
+:root[data-input="keyboard"] .line-choice__seg::after,
+:root[data-input="keyboard"] .line-choice__check,
+:root[data-input="keyboard"] .line-choice__opt {
+  transition: none;
+}
+
+/* Reduced motion: the indicator jumps; the glyph and the label colour still fade (opacity, no scale). */
+@media (prefers-reduced-motion: reduce) {
+  .line-choice__seg::after {
+    transition: none;
+  }
+  .line-choice__check,
+  .line-choice__check.is-off {
+    transform: none;
+    transition: opacity var(--dur-fade) ease;
   }
 }
 
@@ -162,15 +178,17 @@
 }
 
 .line-choice--compact .line-choice__opt {
-  height: 32px;
+  height: 30px;
   padding: 0 var(--space-3);
 }
 
 .line-choice--compact .line-choice__opt::before {
-  inset: -6px -2px;
+  inset: -7px 0;
 }
 
-/* Phone: the pane is narrow. The inline label stays the accessible name but is not drawn; options size to text. */
+/* Phone: the pane is narrow. The inline label stays the accessible name but is not drawn; options size to text, so
+   one sliding indicator of equal width would miss them. Each option draws its own selection instead (the same tint
+   and primary edge), cross-fading its background: the halves are unequal, the motion is a fade, not a slide. */
 @media (max-width: 599px) {
   .line-choice__inline-label {
     position: absolute;
@@ -183,8 +201,23 @@
   .line-choice--compact .line-choice__seg {
     grid-auto-columns: auto;
   }
+  .line-choice--compact .line-choice__seg::after {
+    content: none;
+  }
   .line-choice--compact .line-choice__opt {
     padding: 0 var(--space-2);
+    margin: calc(-1 * var(--border-width));
+    border: var(--border-width) solid transparent;
+    height: 32px;
+    transition:
+      transform var(--dur-press) var(--ease-out),
+      color var(--dur-segment) var(--ease-out),
+      background-color var(--dur-segment) var(--ease-out),
+      border-color var(--dur-segment) var(--ease-out);
+  }
+  .line-choice--compact .line-choice__opt:has(input:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-primary-tint);
   }
 }
 

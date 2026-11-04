@@ -73,7 +73,8 @@ export function ActivityPage({ preset }: { preset: Line | null }) {
                 {FILTERS.map((f) => (
                   <label key={f.value} className="line-choice__opt">
                     <input type="radio" name={name} value={f.value} checked={filter === f.value} onChange={() => choose(f.value)} />
-                    {filter === f.value && <Check size={14} weight="bold" className="line-choice__check" aria-hidden />}
+                    {/* Always drawn (line switch): the glyph cross-fades and the option keeps one width. */}
+                    <Check size={14} weight="bold" className={`line-choice__check${filter === f.value ? "" : " is-off"}`} aria-hidden />
                     <span>{f.label}</span>
                   </label>
                 ))}

@@ -30,14 +30,24 @@ test("segmented control: the indicator slides to the picked option; reduced moti
   expect(await indicatorX(page)).toBeCloseTo(0, 0);
 
   // Pointer change: the indicator is part-way through its move shortly after the click, then rests on the option.
+  // Line switch (deliberate update): sampled in the page on every frame, not by round trips 20ms apart, because the
+  // 220ms ease-out covers 95% of the move in about 100ms and a busy run could miss it from outside.
+  await seg.evaluate((el) => {
+    const w = window as unknown as { __segX: number[] };
+    w.__segX = [];
+    const t0 = performance.now();
+    const step = () => {
+      w.__segX.push(new DOMMatrix(getComputedStyle(el, "::after").transform).m41);
+      if (performance.now() - t0 < 1500) requestAnimationFrame(step);
+    };
+    el.addEventListener("change", () => requestAnimationFrame(step), { once: true });
+  });
   await seg.getByText("Personal", { exact: true }).click();
-  const target = await seg.locator(".line-choice__opt").nth(1).evaluate((el) => (el as HTMLElement).offsetLeft);
-  const samples: number[] = [];
-  for (let i = 0; i < 8; i++) {
-    samples.push(await indicatorX(page));
-    await page.waitForTimeout(20);
-  }
+  // Line switch (deliberate update): the indicator now sits on the joined track's border box (left: -1px), so its
+  // translate to option 1 is the option's offset plus the 1px track edge.
+  const target = await seg.locator(".line-choice__opt").nth(1).evaluate((el) => (el as HTMLElement).offsetLeft + 1);
   await expect.poll(() => indicatorX(page)).toBeCloseTo(target, 0);
+  const samples = await page.evaluate(() => (window as unknown as { __segX: number[] }).__segX);
   expect(samples.some((x) => x > 1 && x < target - 1), `an in-between position was seen: ${samples.join(", ")}`).toBe(true);
   const transition = await seg.evaluate((el) => getComputedStyle(el, "::after").transitionProperty);
   expect(transition).toContain("transform");

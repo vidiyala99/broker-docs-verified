@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { api, ApiError } from "./api/client";
-import { pointerAction } from "./ui/input";
+import { keyboardAction, pointerAction } from "./ui/input";
 import { reducedMotion } from "./ui/motion";
 import type { Line, Run, Workspace } from "./api/types";
 import { LaunchView } from "./launch/LaunchView";
@@ -125,6 +125,21 @@ export function App() {
   const personalEntry =
     route.line === "personal" && route.runId == null && !route.wizard && !route.personal && !route.integrations && !route.tasks && !route.activity;
 
+  // Line switch (LINE-SWITCH-BRIEF.md): the Policy Check wizard's Line choice lives here, so the crumbs can lead with
+  // the book the new check will be filed in. Defaults to the entry preset; a new visit (another preset) starts over.
+  // `pointer` marks a flip made with a pointer, so the new book crumb fades in (keyboard flips are instant).
+  const checkEntry = route.policy ? (route.line ?? "commercial") : null;
+  const [checkChoice, setCheckChoice] = useState<{ entry: Line; line: Line; pointer: boolean } | null>(null);
+  const checkLine: Line = checkChoice && checkChoice.entry === checkEntry ? checkChoice.line : (checkEntry ?? "commercial");
+  const checkRefiled = !!checkChoice && checkChoice.entry === checkEntry && checkChoice.pointer;
+  const chooseCheckLine = useCallback(
+    (line: Line) => setCheckChoice({ entry: checkEntry ?? "commercial", line, pointer: !keyboardAction() && pointerAction() }),
+    [checkEntry],
+  );
+  useEffect(() => {
+    if (!route.policy) setCheckChoice(null);
+  }, [route.policy]);
+
   // Which runs the shell lists: only the run view's "Recent work" section reads this list now (the run's own line,
   // unknown until the run loads). Personal lines and the Compare screen show the work queue; Activity loads its own.
   const listLine: Line | null = route.runId != null ? (runOfRoute?.line ?? null) : null;
@@ -199,6 +214,7 @@ export function App() {
           : "workflows";
   // Personal lines crumb: personal runs and personal entry screens start with it; links keep the personal preset.
   const toPersonal: Crumb = { label: "Personal lines", href: "#/personal-lines" };
+  const commercialCrumb: Crumb = { label: BOOK_NAME.commercial, href: "#/" };
   const preset = personalRun ? "?line=personal" : "";
   const runLabel = runClient ?? `Run ${route.runId}`;
   // Line move B (owner-approved 2026-11-03, LINE-MOVE-BRIEF.md): every run's crumbs lead with its book, Commercial
@@ -243,14 +259,17 @@ export function App() {
       : route.wizard
         ? [{ label: "Proposals" }, { label: "New proposal" }]
         : route.policy
-          ? personalEntry
-            ? [toPersonal, { label: "Policy check" }, { label: "New check" }]
-            : [{ label: "Policy check" }, { label: "New check" }]
+          ? // Line switch: the book crumb follows the wizard's Line choice, as a run's crumbs lead with its book.
+            [
+              { ...(checkLine === "personal" ? toPersonal : commercialCrumb), refile: checkRefiled },
+              { label: "Policy check" },
+              { label: "New check" },
+            ]
           : route.runId
             ? runCrumbs
-            : personalEntry
-              ? [toPersonal, { label: WORKFLOW_NAME }]
-              : [{ label: "Workflows", href: "#/" }, { label: WORKFLOW_NAME }];
+            : // Line switch: the Compare start screen is its book's work queue, so it leads with that book. Its Upload
+              // panel's Line choice files the next comparison and does not rename the page (LINE-SWITCH-BRIEF.md).
+              [personalEntry ? toPersonal : commercialCrumb, { label: WORKFLOW_NAME }];
 
   return (
     <ToastProvider>
@@ -310,7 +329,13 @@ export function App() {
           ) : route.personal ? (
             <PersonalLinesPage />
           ) : route.policy ? (
-            <PolicyWizard workspace={workspace} viewport={viewport} line={route.line ?? "commercial"} />
+            <PolicyWizard
+              workspace={workspace}
+              viewport={viewport}
+              entryLine={route.line ?? "commercial"}
+              line={checkLine}
+              onLineChange={chooseCheckLine}
+            />
           ) : route.runId ? (
             <RunView
               key={route.runId}
