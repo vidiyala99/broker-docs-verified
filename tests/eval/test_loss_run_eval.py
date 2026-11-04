@@ -751,11 +751,12 @@ def test_failed_document_and_wrong_document_facts_are_reported(lr_cases, lr_docs
     assert m.doc_fact_accuracy < 1.0
 
 
-def test_doc_token_budget_is_a_placeholder_until_measured(lr_cases, lr_docs, paths):
-    assert lg.LOSS_RUN_DOC_TOKEN_BUDGET is None  # set from the first approved live run (L8)
+def test_doc_token_budget_is_set_from_the_measured_live_run(lr_cases, lr_docs, paths):
+    # L8: measured 382,855 input tokens on the 120-page file (live run 2026-11-04), under the 1.2M runtime cap.
+    assert lg.LOSS_RUN_DOC_TOKEN_BUDGET == 500_000
     m, rep = _all(lr_cases, lr_docs, paths)
     r = next(x for x in rep.results if x.name == lg.GATE_DOC_TOKENS)
-    assert not r.gated and "placeholder" in r.threshold
+    assert r.gated and r.threshold == "<= 500000"
     scores = [_score(lr_cases, lr_docs, paths, cid) for cid in sorted(lr_cases)]
     m, rep = _gate(*scores, budget=10)
     assert not rep.passed and lg.GATE_DOC_TOKENS in [f.name for f in rep.failures]
@@ -1067,11 +1068,15 @@ def test_recorded_live_replies_replay(lr_cases, lr_docs, paths):
         pytest.skip("no recorded live loss_run run yet (tests/eval/recorded/loss_run_live_<date>.json)")
     data = json.loads(recorded[-1].read_text(encoding="utf-8"))
     assert data.get("format") == rr.FORMAT, recorded[-1]
-    for cid, rec in data["cases"].items():
+    scores = []
+    for cid in sorted(data["cases"]):
         case = lr_cases[cid]
-        out, p = _replay_run(case, paths, rec["replies"])
-        m, rep = _gate(lg.score_loss_run_case(case, lr_docs, out, p))
-        assert rep.passed, f"{recorded[-1].name} {cid}\n" + lg.format_loss_run_report(m, rep)
+        out, p = _replay_run(case, paths, data["cases"][cid]["replies"])
+        scores.append(lg.score_loss_run_case(case, lr_docs, out, p))
+    # One gate over every recorded case, as run_loss_run_suite gates a live run (a case without sheets has no
+    # sheet rows of its own), with the per-document token budget set from that run.
+    m, rep = _gate(*scores, budget=lg.LOSS_RUN_DOC_TOKEN_BUDGET)
+    assert rep.passed, f"{recorded[-1].name}\n" + lg.format_loss_run_report(m, rep)
 
 
 # ---------------------------------------------------------------------------

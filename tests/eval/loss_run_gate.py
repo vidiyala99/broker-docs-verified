@@ -27,8 +27,8 @@ Gate (spec section 8, ledger O1/R4):
   * PDF row recall >= 0.95;
   * amount accuracy on verified rows >= 0.99;
   * a case with no rows fails (no data is not a pass).
-Totals, notices, statuses, document facts and tokens per document are reported. The loss-run token budget
-per document is a placeholder until the first approved live run is measured (L8, see LOSS_RUN_DOC_TOKEN_BUDGET).
+Totals, notices, statuses and document facts are reported. Input tokens per document are gated by
+LOSS_RUN_DOC_TOKEN_BUDGET, set from the measured live run of 2026-11-04 (L8).
 
 BACKEND VOCABULARY AND ADAPTER CONTRACT, reconciled with lane A's backend (``backend/loss_runs/``, main cf45e13)
 and kept in one block. ``test_loss_run_eval`` compares it with the backend.
@@ -56,7 +56,10 @@ and kept in one block. ``test_loss_run_eval`` compares it with the backend.
                      "recovery": int, "deductible": int},
           "checks": [{"document": path, "metric": str, "scope_kind": str, "scope_value": str | None,
                       "printed": int, "computed": int, "difference": int,
-                      "verdict": "matches" | "off"}],
+                      "verdict": "matches" | "off" | "needs_review"}],
+              # needs_review: the backend could not check the total (fail safe). Truth is only ever
+              # matches/off, so the gate scores needs_review as a wrong verdict: it is safe for the
+              # broker but not a pass; a missing check for an "off" total is a hard fail as before.
           "notices": [{"kind": str, "document": path | None, "sheet": str | None, "message": str}]}}
 
 ``rows`` are every extracted row of the run (all roles, before any broker decision; the paged claims API
@@ -128,10 +131,13 @@ SHEET_ROW_ACCURACY_MIN = 1.0
 PDF_ROW_RECALL_MIN = 0.95
 VERIFIED_AMOUNT_ACCURACY_MIN = 0.99
 
-# PLACEHOLDER (L8): the loss-run token budget per document is set from the measured input tokens of the
-# first owner-approved live ``-k loss_run`` run. While it is None the per-document tokens are reported, not
-# gated. Set it to the measured maximum plus headroom and record the run in HANDOFF.md.
-LOSS_RUN_DOC_TOKEN_BUDGET: int | None = None
+# L8, measured: the live run of 2026-11-04 (recorded/loss_run_live_2026-11-04.json) read the 120-page file
+# with 382,855 input tokens (~3.2k per page, 119 two-page windows, each page read twice by the overlap); the
+# lr_main files are far smaller. 500,000 leaves ~30% headroom for reply variance and split-and-retry on a
+# cut-off window (a split re-reads its pages) while still catching a regression that re-reads pages or bloats
+# the prompt (+30% on the largest fixture). It is the gate for the fixtures, not the product cap: the
+# per-document runtime budget stays 1.2M (backend), so a real 300-page file is not refused by this number.
+LOSS_RUN_DOC_TOKEN_BUDGET: int | None = 500_000
 
 HARD_FAIL_KINDS = ("wrong_amount_counted", "unverified_counted", "wrong_reconciliation_verdict", "wrong_role",
                    "claims_merged", "canary_followed")
