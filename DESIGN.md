@@ -262,6 +262,41 @@ secondary look; the primary violet stays for the one next step per region.
 rotation settle, 220ms `--ease-out`) only when a pointer action filed it; keyboard actions, polling and first load
 show it still; reduced motion: no motion.
 
+## Certificates (slice 4, owner-approved 2026-11-03, direction A "Proof and ledger")
+See `frontend/CERTIFICATES-BRIEF.md`. No new tokens.
+- **Rail and pages**: Certificates is live (`#/certificates`): the certificate queue (In progress, Needs attention, Ready to
+  issue, Done recently) with the work-queue row pattern (certificate mark, serif client link, one secondary action per
+  row: "Resolve checks", "Review and issue", "Retry"), and New certificate. Certificates are not in the main queue (C8);
+  Activity lists them ("Certificate, run N"). A queue row's menu offers "Issue certificate", which opens the wizard with
+  the client filled in.
+- **Wizard** (Who, Policies, Read): past holders for the client as radio cards (serif name, address, last used), New
+  holder; wording as checkboxes; certificate date; description with its count. Policies: the client's documents as
+  checkbox rows with "Read on <date>, no new read" in `--doc-3-fg` when the bytes were read before, and an upload zone.
+- **Draft**: the certificate is drawn as one sheet (`--color-surface`, 1px hairline, 2px radius, no shadow, max 760px)
+  on the canvas; serif for its title, the insured's and holder's names; Inter for every value; "Not stated" in muted
+  text. The legal header and cancellation text carry "Sample wording: ..." in `--color-stale-fg` (owner, 2026-11-03),
+  on screen and on the PDF. Each checked line carries its claim glyph in the left margin (16px).
+- **Ledger** (right column, 400px; 340px under 1280; first on phone): To resolve, Handled by you, Supported by the
+  documents (folded). Claim states have their own silhouettes (Phosphor, decorative) plus the plain uppercase status
+  word: Supported = ticked circle `--doc-3-fg`; Not supported = crossed circle, bold, `--severity-critical-fg`; Needs
+  sign-off = signature, bold, `--severity-high-fg`; Confirmed = signature `--doc-3-fg`; Overridden = stamp
+  `--color-primary`; Removed = eraser `--color-text-muted`. Open rows have a 3px inset rule in their state colour.
+  Actions: Add document (secondary), then Override... / Confirm... and the Remove verb named by its effect ("Remove from
+  certificate", "Remove this policy", "Remove the description", "Restore the extracted value") as ghost buttons.
+  Override and Confirm open an inline reason editor ("Saved on the issued record. Not printed."), never a modal.
+- **Pointing**: hovering or focusing a check boxes its line on the paper with the viewer's dashed passage box and
+  scrolls only the paper's column when the line is out of view (smooth on pointer, instant on keyboard and reduced
+  motion). A chip swaps the paper for the cited page in the same column ("Back to certificate", Esc).
+- **Issue gate**: "Issue certificate" is the one primary button, `aria-disabled` with the reason under it ("4 checks to
+  resolve", "Every check is handled" in `--doc-3-fg`). A refused Issue (version changed, still reading, checks open,
+  no policy in force) reloads the draft and explains in a stale-tinted banner. Issued: "ISSUED <date>" with the done
+  mark, Download PDF (primary), New version (ghost); the ledger becomes the Record (no actions).
+- **Left panel**: folded to the strip at every width (Policies with Add document, Input parameters, Issued versions);
+  no chat; hidden on phone.
+- **Motion**: a row that changes group after a pointer decision enters its new place with the list enter (opacity +
+  translateY 6px, `--dur-base`); keyboard decisions and reloads are still. The Supported fold and the reason editor use
+  `Collapse` (pointer only).
+
 ## Open item: collapsed-outline warning mark (recommendation, not decided)
 Recommend: when the outline is collapsed and any value is scan-read,
 couldn't verify, or failed, the collapse handle shows the triangle glyph from

@@ -2,7 +2,7 @@ import type { Run } from "../api/types";
 import { hueOf } from "../report/Chip";
 import { WorkflowMark } from "../voice/marks";
 
-const SLUG: Record<string, string> = { "Proposal Builder": "proposal", "Policy Check": "policy-check" };
+const SLUG: Record<string, string> = { "Proposal Builder": "proposal", "Policy Check": "policy-check", "Certificate of Insurance": "certificate" };
 
 const STATUS_TEXT: Record<Run["status"], string> = {
   queued: "Queued",
@@ -21,6 +21,7 @@ export function statusText(s: Run["status"]): string {
 export function runTitle(run: Run): string {
   if (run.workflow_name === "Proposal Builder") return `Proposal, run ${run.id}`;
   if (run.workflow_name === "Policy Check") return `Policy check, run ${run.id}`;
+  if (run.workflow_name === "Certificate of Insurance") return `Certificate, run ${run.id}`;
   return `Run ${run.id}`;
 }
 
@@ -56,7 +57,7 @@ export function RecentRuns({ runs, compact, currentId }: { runs: Run[]; compact?
             )}
             <span className="run-link__meta">
               {r.documents.length}{" "}
-              {r.workflow_name === "Policy Check" ? (r.documents.length === 1 ? "document" : "documents") : r.documents.length === 1 ? "quote" : "quotes"},{" "}
+              {r.workflow_name === "Policy Check" || r.workflow_name === "Certificate of Insurance" ? (r.documents.length === 1 ? "document" : "documents") : r.documents.length === 1 ? "quote" : "quotes"},{" "}
               {formatWhen(r.created_at)}
             </span>
           </a>

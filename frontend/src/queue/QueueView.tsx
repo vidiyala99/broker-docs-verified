@@ -4,6 +4,7 @@ import {
   ArrowCounterClockwise,
   ArrowSquareOut,
   ArrowsLeftRight,
+  Certificate,
   CaretRight,
   CheckCircle,
   FilePlus,
@@ -15,6 +16,7 @@ import type { Line, Queue, QueueGroup, QueueItem, QueueState } from "../api/type
 import { useToast } from "../ui/Toast";
 import { Collapse, Count, usePresence } from "../ui/motion";
 import { RowMenu, type MenuItem } from "../tasks/RowMenu";
+import { certificateNewHref } from "../certificates/certUtil";
 import { discrepancyHref } from "../tasks/taskUtil";
 import { draftFromComparison, restoreDraft } from "./buildProposal";
 import type { QueueData } from "./useQueue";
@@ -454,6 +456,8 @@ function QueueRow({
     menu.push({ label: openLabel(item), icon: <ArrowSquareOut size={16} aria-hidden />, run: open(item.run_id) });
   }
   menu.push({ label: moveLabel(otherLine(item.line)), icon: <ArrowsLeftRight size={16} aria-hidden />, run: () => actions.move(item) });
+  // Slice 4 hook: a certificate for this client, prefilled (spec section 4 "Hooks").
+  menu.push({ label: "Issue certificate", icon: <Certificate size={16} aria-hidden />, run: () => (window.location.hash = certificateNewHref(item.client)) });
 
   return (
     <li

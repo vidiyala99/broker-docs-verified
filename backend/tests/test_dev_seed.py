@@ -143,3 +143,41 @@ def test_seeded_queue_names_clients_and_links_a_failed_proposal(tmp_path, monkey
         assert personal["needs_review"][0]["client_source"] == "broker"
     finally:
         s.close()
+
+
+def test_seeded_certificates_show_every_claim_state_and_a_past_holder(tmp_path, monkeypatch):
+    """Slice 4 (C11 demo data): run 10 is issued for a past holder, run 11 is a draft for the same client with
+    Supported, Not supported, one Overridden claim and the description sign-off, read with the cache off (D9)."""
+    from backend.pipeline import cache
+
+    monkeypatch.setenv("BROKERDOCS_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv(cache.ENV_SWITCH, raising=False)
+    dev_seed.scenario_environment()
+    s = dev_seed.Seeder()
+    try:
+        issued, draft = dev_seed.seed_certificates(s)
+        done = s.client.get(f"/api/certificates/{issued}").json()
+        assert done["issue"] and done["issue"]["version"] == done["version"]
+        view = s.client.get(f"/api/certificates/{draft}").json()
+        assert view["run"]["status"] == "done" and view["client"] == dev_seed.CERT_CLIENT
+        assert all(d["reused_from_run_id"] is None for d in view["run"]["documents"])  # D9: read live
+        verdicts = {c["key"]: c["verdict"] for c in view["claims"]}
+        assert verdicts == {
+            "in_force:A": "supported", "in_force:B": "supported", "in_force:C": "supported", "insured": "supported",
+            "additional_insured:A": "supported", "primary_noncontributory:A": "supported",
+            "waiver_of_subrogation:C": "supported",
+            "additional_insured:B": "not_supported", "waiver_of_subrogation:B": "not_supported",
+            "primary_noncontributory:B": "not_supported", "waiver_of_subrogation:A": "not_supported",
+            "description": "needs_signoff"}
+        override = next(c for c in view["claims"] if c["key"] == "waiver_of_subrogation:A")
+        assert override["status"] == "resolved" and override["note"] == dev_seed.CERT_OVERRIDE_NOTE
+        assert view["counts"]["overridden"] == 1 and view["counts"]["open"] == 4
+        assert not view["can_issue"] and "claims_open" in view["blocked"]
+        holders = s.client.get("/api/certificates/holders", params={"client": dev_seed.CERT_CLIENT}).json()["holders"]
+        assert [h["name"] for h in holders] == [dev_seed.CERT_PAST_HOLDER[0]]
+        q = s.client.get("/api/certificates/queue").json()
+        assert [i["run_id"] for i in q["needs_attention"]] == [draft]
+        assert [i["run_id"] for i in q["done_recently"]] == [issued]
+    finally:
+        s.close()

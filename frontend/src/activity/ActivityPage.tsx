@@ -66,7 +66,7 @@ export function ActivityPage({ preset }: { preset: Line | null }) {
             <h1 id="activity-title" className="page-title">
               Activity
             </h1>
-            <p className="personal__sub">Every comparison, check and proposal, newest first.</p>
+            <p className="personal__sub">Every comparison, check, proposal and certificate, newest first.</p>
             <fieldset className="line-choice activity__filter">
               <legend className="line-choice__legend">Show</legend>
               <div className="line-choice__seg">

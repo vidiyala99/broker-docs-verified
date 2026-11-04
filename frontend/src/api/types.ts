@@ -198,7 +198,9 @@ export type Block =
       affected_layers: string;
       follow_form: string;
     }
-  | DiscrepancyBlock;
+  | DiscrepancyBlock
+  | ClaimBlock
+  | CertificateBlock;
 
 // ---------------------------------------------------------------- policy check (slice 3)
 
@@ -239,7 +241,6 @@ export interface DiscrepancyItem extends DiscrepancyBlock {
 }
 
 // ---------------------------------------------------------------- certificates (slice 4, backend/API.md "Certificates")
-// The two block types below are not in the `Block` union yet: the UI lane (C11) adds them with their rendering.
 
 export type Wording = "additional_insured" | "waiver_of_subrogation" | "primary_noncontributory";
 export type ClaimKind = "wording" | "in_force" | "insured" | "description" | "edited";
@@ -351,6 +352,18 @@ export interface Holder {
   name: string;
   address: string;
   last_used_at: string;
+}
+
+/** GET /api/certificates/documents: the client's documents, newest upload per sha256 (C3). */
+export interface ClientDocument extends DocumentInfo {
+  already_read: boolean;
+  read_at: string | null;
+}
+
+/** GET /api/certificates/documents: the client's documents, newest upload per sha256 (C3). */
+export interface ClientDocument extends DocumentInfo {
+  already_read: boolean;
+  read_at: string | null;
 }
 
 export type CertificateQueueGroup = "in_progress" | "needs_attention" | "ready" | "done_recently";

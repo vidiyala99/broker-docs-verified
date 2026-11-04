@@ -1,6 +1,13 @@
 import { API_BASE } from "../config";
 import type {
   Artifact,
+  CertificateIssue,
+  CertificateParameters,
+  CertificateQueue,
+  CertificateView,
+  ClaimStatus,
+  ClientDocument,
+  Holder,
   DiscrepancyItem,
   DiscrepancyList,
   DocumentInfo,
@@ -155,6 +162,32 @@ export const api = {
       method: "PATCH",
       body: json(body),
     }),
+  // ---------------------------------------------------------------- certificates (slice 4, API.md "Certificates")
+  startCertificate: (documentIds: number[], parameters: CertificateParameters, clientName?: string) =>
+    request<{ run: Run; created: boolean }>("/api/runs", {
+      method: "POST",
+      body: json({ document_ids: documentIds, workflow: "certificate", parameters, ...clientBody(clientName) }),
+    }),
+  certificate: (runId: number) => request<CertificateView>(`/api/certificates/${runId}`),
+  certificateQueue: () => request<CertificateQueue>("/api/certificates/queue"),
+  holders: (client: string) =>
+    request<{ client_key: string; holders: Holder[] }>(`/api/certificates/holders?client=${encodeURIComponent(client)}`).then((r) => r.holders),
+  clientDocuments: (client: string) =>
+    request<{ client_key: string; documents: ClientDocument[] }>(`/api/certificates/documents?client=${encodeURIComponent(client)}`).then(
+      (r) => r.documents,
+    ),
+  addCertificateDocuments: (runId: number, documentIds: number[]) =>
+    request<CertificateView>(`/api/certificates/${runId}/documents`, { method: "POST", body: json({ document_ids: documentIds }) }),
+  issueCertificate: (runId: number, version: number) =>
+    request<{ issue: CertificateIssue; created: boolean; certificate: CertificateView }>(`/api/certificates/${runId}/issue`, {
+      method: "POST",
+      body: json({ version }),
+    }),
+  newCertificateVersion: (runId: number) => request<CertificateView>(`/api/certificates/${runId}/new-version`, { method: "POST" }),
+  certificatePdfUrl: (runId: number, version: number) => `${API_BASE}/api/certificates/${runId}/issues/${version}/pdf`,
+  /** D10/D15: a certificate claim decision; `resolved` needs a note (the override reason), every call sends the fingerprint. */
+  patchClaim: (runId: number, itemId: string, body: { status: ClaimStatus; note?: string | null; expected_fingerprint: string }) =>
+    request<unknown>(`/api/runs/${runId}/discrepancies/${encodeURIComponent(itemId)}`, { method: "PATCH", body: json(body) }),
   tasks: () => request<{ tasks: Task[] }>("/api/tasks").then((r) => r.tasks),
   createTask: (body: TaskInput) => request<Task>("/api/tasks", { method: "POST", body: json(body) }),
   patchTask: (id: number, body: TaskInput) => request<Task>(`/api/tasks/${id}`, { method: "PATCH", body: json(body) }),

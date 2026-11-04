@@ -3,7 +3,7 @@ import { RailGlyph } from "../voice/railMarks";
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
 
-export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "tasks" | "integrations";
+export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "certificates" | "tasks" | "integrations";
 
 interface RailItem {
   label: string;
@@ -15,7 +15,7 @@ interface RailItem {
 }
 
 // DG1: the full rail from the reference. Live: Workflows (slice 1), Proposals (slice 2, the wizard),
-// Policy check (slice 3, the new-check wizard), Integrations (slice 3b, a static mock), Personal lines (slice 3b T6,
+// Policy check (slice 3, the new-check wizard), Certificates (slice 4, the certificate queue), Integrations (slice 3b, a static mock), Personal lines (slice 3b T6,
 // runs tagged personal) and Tasks (slice 3b T7). `tip` is the tooltip and accessible name of a live item.
 // Marks: `voice/railMarks.tsx` (one outline per item, RAIL-BRIEF.md).
 const GROUPS: RailItem[][] = [
@@ -24,7 +24,7 @@ const GROUPS: RailItem[][] = [
     { label: "Proposals", glyph: "proposal", href: "#/proposals/new", section: "proposals", tip: "Proposals: new proposal" },
     { label: "Personal lines", glyph: "personal", href: "#/personal-lines", section: "personal-lines" },
     { label: "Policy check", glyph: "policy-check", href: "#/policy-check/new", section: "policy-check", tip: "Policy check: new check" },
-    { label: "Certificates", glyph: "certificate" },
+    { label: "Certificates", glyph: "certificate", href: "#/certificates", section: "certificates" },
     { label: "Tasks", glyph: "tasks", href: "#/tasks", section: "tasks" },
     { label: "Integrations", glyph: "integrations", href: "#/integrations", section: "integrations" },
   ],
