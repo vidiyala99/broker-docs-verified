@@ -502,6 +502,21 @@ def row_rect(meta: dict[str, Any], page: dict[str, Any], row_no: int) -> list[fl
     return None
 
 
+def locate(meta: dict[str, Any], sheet_index: int, row_no: int) -> tuple[int, list[float]] | None:
+    """(sheet page, highlight box) of a sheet row from the layout alone (no page read): what a chip opens."""
+    sm = meta["sheets"][sheet_index]
+    numbers = sm["row_numbers"]
+    pos = bisect_right(numbers, row_no) - 1
+    if pos < 0 or numbers[pos] != row_no:
+        return None
+    for page_no, sheet, start, end in meta["pages"]:
+        if sheet == sheet_index and start <= pos < end:
+            repeat = sm.get("header_row") is not None and numbers[start] > sm["header_row"]
+            y = TOP + (pos - start + (1 if repeat else 0)) * LINE_H
+            return page_no, [MARGIN - 2, y - 1, PAGE_W - MARGIN + 2, y + LINE_H - 1]
+    return None
+
+
 def render_page(meta: dict[str, Any], page: dict[str, Any], *, title: str) -> bytes:
     """One landscape PDF page drawing the page's rows as a grid, the header repeated when it is above them."""
     import fitz  # noqa: PLC0415
