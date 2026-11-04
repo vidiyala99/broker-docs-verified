@@ -216,7 +216,9 @@ test("rail entry, seeded tasks and overdue; create, edit, mark done, reopen; fie
       ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: { code: "internal_error", message: "Server error." } }) })
       : route.fallback(),
   );
-  await row(page, created.id).getByRole("checkbox").check();
+  // click(), not check(): check() re-reads the box after the click and throws if the rollback already landed
+  // (the fulfilled 500 can beat it), which made this test fail about 1 run in 10. The rollback is asserted below.
+  await row(page, created.id).getByRole("checkbox").click();
   await expect(toast(page)).toContainText("Couldn't save: Server error.");
   await expect(row(page, created.id).getByRole("checkbox")).not.toBeChecked();
   await page.unroute(`**/api/tasks/${created.id}`);

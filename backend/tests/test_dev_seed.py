@@ -181,3 +181,13 @@ def test_seeded_certificates_show_every_claim_state_and_a_past_holder(tmp_path, 
         assert [i["run_id"] for i in q["done_recently"]] == [issued]
     finally:
         s.close()
+
+
+def test_cert_truth_ignores_a_tag_suffix_so_e2e_can_upload_fresh_copies():
+    """certificates.spec.ts uploads cert_written_contract_gl--e2e<ms>.pdf (own name and bytes, so every run makes the
+    first read itself); the scripted reply must still be that fixture's truth."""
+    plain = dev_seed._cert_truth("cert_written_contract_gl.pdf")
+    assert plain is not None
+    assert dev_seed._cert_truth("cert_written_contract_gl--e2e1793760357.pdf") == plain
+    assert dev_seed._cert_truth("cert_no_such_fixture--e2e1.pdf") is None
+    assert dev_seed._cert_truth("quote--e2e1.pdf") is None

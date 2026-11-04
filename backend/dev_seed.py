@@ -280,10 +280,13 @@ def policy_extract(text: str, truth: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def _cert_truth(filename: str) -> dict[str, Any] | None:
-    """Ground truth of a tests/fixtures/certificates document, by its upload name (cert_<case>_<doc>.pdf)."""
+    """Ground truth of a tests/fixtures/certificates document, by its upload name (cert_<case>_<doc>.pdf).
+
+    A `--<tag>` suffix on the stem is ignored, so an e2e spec can upload a fixture under a fresh name
+    (cert_<case>_<doc>--<tag>.pdf) and still get that fixture's scripted reply."""
     if not filename.startswith("cert_"):
         return None
-    path = CERT_FIXTURES / (Path(filename).stem + ".truth.json")
+    path = CERT_FIXTURES / (Path(filename).stem.split("--")[0] + ".truth.json")
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 

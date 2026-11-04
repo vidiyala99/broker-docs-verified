@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -113,8 +114,13 @@ test("wizard: past-holder pick, upload and pick, read, then the read-on marker",
   const mine = page.getByRole("list", { name: `${CLIENT}'s documents` });
   await expect(mine.getByText("cert_contractor_gl.pdf")).toBeVisible();
   await mine.getByRole("checkbox").first().check();
-  await page.locator(".cpick input[type=file]").setInputFiles([path.join(FIX, "cert_written_contract_gl.pdf")]);
-  await expect(page.getByRole("list", { name: "Uploaded for this certificate" }).getByText("cert_written_contract_gl.pdf")).toBeVisible();
+  // Uploads dedupe by sha256 and the cache serves known bytes, so a fixed fixture is "new" only on a fresh seed.
+  // Upload a copy with its own name and bytes (a PDF comment after %%EOF) so every run makes the first read itself;
+  // dev_seed ignores the `--<tag>` suffix when it picks the scripted reply.
+  const upload = `cert_written_contract_gl--e2e${Date.now()}.pdf`;
+  const bytes = Buffer.concat([readFileSync(path.join(FIX, "cert_written_contract_gl.pdf")), Buffer.from(`\n% ${upload}\n`)]);
+  await page.locator(".cpick input[type=file]").setInputFiles([{ name: upload, mimeType: "application/pdf", buffer: bytes }]);
+  await expect(page.getByRole("list", { name: "Uploaded for this certificate" }).getByText(upload)).toBeVisible();
   await shot(page, "1440-03-wizard-policies");
   await axe(page, "wizard policies");
   await page.getByRole("button", { name: "Read and check" }).click();
@@ -129,13 +135,13 @@ test("wizard: past-holder pick, upload and pick, read, then the read-on marker",
   await page.getByLabel("Client").fill(CLIENT);
   await page.getByRole("radio", { name: new RegExp(PAST_HOLDER) }).check();
   await page.getByRole("button", { name: /Continue/ }).click();
-  const row = page.locator(".cpick__row").filter({ hasText: "cert_written_contract_gl.pdf" });
+  const row = page.locator(".cpick__row").filter({ hasText: upload });
   await expect(row).toContainText(/Read on .*no new read/);
   await row.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Read and check" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Checks" })).toBeVisible({ timeout: 90_000 });
   await page.getByRole("button", { name: "Show policies" }).click();
-  await expect(page.locator(".doc-row").filter({ hasText: "cert_written_contract_gl.pdf" })).toContainText(/Read on .*no new read/);
+  await expect(page.locator(".doc-row").filter({ hasText: upload })).toContainText(/Read on .*no new read/);
 });
 
 test("draft: resolve, add document, version-checked issue, download, new version", async ({ page }) => {
