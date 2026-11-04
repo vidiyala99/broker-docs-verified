@@ -31,10 +31,18 @@ export function LeftPanel({
   viewport,
   label,
   onReveal,
+  folded = false,
+  chat = true,
+  uploadsLabel = "Show uploads",
   children,
 }: {
   viewport: Viewport;
   label: string;
+  /** Certificates (owner, 2026-11-03): the panel starts folded to the strip at every width. */
+  folded?: boolean;
+  /** The strip's Chat button; certificate runs have no chat (C5). */
+  chat?: boolean;
+  uploadsLabel?: string;
   /** The strip's Uploads and Chat buttons open the overlay with that section expanded. */
   onReveal?: (section: "uploads" | "chat") => void;
   children: ReactNode;
@@ -61,7 +69,7 @@ export function LeftPanel({
     onReveal?.(section);
     show();
   };
-  const collapsed = viewport !== "wide";
+  const collapsed = folded || viewport !== "wide";
 
   useEffect(() => {
     if (!collapsed) {
@@ -98,12 +106,14 @@ export function LeftPanel({
         <button ref={showButton} type="button" className="icon-btn" aria-label={`Show ${label.toLowerCase()}`} aria-expanded={open} onClick={show}>
           <SidebarSimple size={20} aria-hidden />
         </button>
-        <button type="button" className="icon-btn" aria-label="Show uploads" onClick={() => reveal("uploads")}>
+        <button type="button" className="icon-btn" aria-label={uploadsLabel} onClick={() => reveal("uploads")}>
           <UploadSimple size={20} aria-hidden />
         </button>
-        <button type="button" className="icon-btn" aria-label="Show chat" onClick={() => reveal("chat")}>
-          <ChatCircleText size={20} aria-hidden />
-        </button>
+        {chat && (
+          <button type="button" className="icon-btn" aria-label="Show chat" onClick={() => reveal("chat")}>
+            <ChatCircleText size={20} aria-hidden />
+          </button>
+        )}
       </div>
       {(open || leaving) && (
         <div

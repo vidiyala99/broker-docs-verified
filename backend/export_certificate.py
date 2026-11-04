@@ -30,6 +30,9 @@ DISCLAIMER = ("This certificate is issued as a matter of information only and co
               "certificate holder. It does not amend, extend or alter the coverage of the policies listed. "
               "Every value printed here was checked against the policy documents; a value that could not be "
               "verified is printed as Not stated.")
+# Owner, 2026-11-03: the legal wording is the clone's own plain wording (C6), so it is marked as a sample wherever
+# it prints (the draft view shows the same note; frontend/src/certificates/paper.ts mirrors these strings).
+SAMPLE_NOTE = "Sample wording: replace with your agency's approved certificate language before use."
 WORDING_SHORT = {coi_checks.ADDITIONAL_INSURED: "Additional insured", coi_checks.WAIVER: "Waiver of subrogation",
                  coi_checks.PRIMARY_NONCONTRIBUTORY: "Primary and non-contributory"}
 
@@ -67,7 +70,7 @@ def render(data: CertificatePdf) -> bytes:
         Paragraph("Certificate of Insurance", title),
         Paragraph(f"Certificate date {_t(cert.certificate_date)}. Issued {_t(data.issued_on)}. "
                   f"{_t(data.reference)}.", small),
-        Spacer(1, 4), Paragraph(_t(DISCLAIMER), small),
+        Spacer(1, 4), Paragraph(_t(DISCLAIMER), small), Paragraph(f"<i>{_t(SAMPLE_NOTE)}</i>", small),
     ]
 
     def block(label: str, flowables: list) -> list:
@@ -119,7 +122,7 @@ def render(data: CertificatePdf) -> bytes:
                                                            body)])
     holder = block("Certificate holder", [Paragraph(_t(cert.holder_name), name),
                                           Paragraph(_t(cert.holder_address) if cert.holder_address else "", body)])
-    cancel = block("Cancellation", [Paragraph(_t(CANCELLATION), body)])
+    cancel = block("Cancellation", [Paragraph(_t(CANCELLATION), body), Paragraph(f"<i>{_t(SAMPLE_NOTE)}</i>", small)])
     bottom = Table([[holder, cancel]], colWidths=[width * 0.5, width * 0.5])
     bottom.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
                                 ("BOX", (0, 0), (0, 0), 0.5, rule), ("LEFTPADDING", (0, 0), (0, 0), 6)]))

@@ -1,6 +1,8 @@
-# CERTIFICATES-BRIEF.md: slice 4 UI (C11), phase A
+# CERTIFICATES-BRIEF.md: slice 4 UI (C11)
 
-Status: phase A (audit + directions), 2026-11-03. **Owner picks a direction before phase B builds anything.**
+Status: phase B built in direction A (owner, 2026-11-03 15:47). Sections 1 to 6 are the phase A record (audit,
+directions, recommendation); section 8 is what phase B built and why. The phase A prototype route
+(`#/dev/certificates`) and its code are deleted; the phase A screenshots stay in `qa-screenshots/certificates/phaseA/`.
 Spec: `docs/specs/2026-11-03-certificates-design.md` (ledger D1 to D18 overrides the text above it).
 Backend contract: `backend/API.md` "Certificates (slice 4)". Branch `slice4-ui`.
 
@@ -149,3 +151,66 @@ decision probe; nothing was built past prototypes. gstack is a router only; no s
   editor opened, a chip opened the PDF beside the ledger, Remove took the wording off the paper and dropped the count,
   Next mark moved focus to the first open note. `tsc --noEmit` clean.
 - Not run in phase A: axe and e2e (prototype route, deleted in phase B).
+
+## 8. Phase B: built in direction A
+
+Owner decisions (2026-11-03 15:47): direction A; certificate runs keep Policies + Input parameters in the left panel,
+no chat, folded by default; Supported folded by default; removed lines leave the paper and stay under Handled by you
+with "Put back on the certificate"; the legal wording stays mine but is marked "Sample wording" on screen and on the PDF.
+
+**Built** (`frontend/src/certificates/`): `CertificatesPage` (`#/certificates`, rail item live), `CertificateWizard`
+(`#/certificates/new?client=`), `CertificateRunView` (draft + issued, run page for certificate runs), `CertificatePaper`,
+`Ledger`, `PolicyPicker` (wizard Policies and the Add document dialog), `StateGlyph`, `certUtil`, `certificates.css`.
+`ClaimBlock` and `CertificateBlock` joined the `Block` union with a fallback rendering in `report/Report.tsx`. Hooks:
+queue row menu "Issue certificate" (prefills the client), Activity lists "Certificate, run N", reused documents say
+"Read on <date>, no new read" in the run's document rows (all workflows, spec section 5). Backend: the PDF prints the
+sample-wording note twice (`export_certificate.SAMPLE_NOTE`, test `test_pdf_marks_the_legal_wording_as_a_sample`).
+
+**Contract handling**: Issue sends the version on screen (D5); 409 `version_changed`, `run_active`, `claims_open`,
+`no_coverage` and 500 `issue_failed` reload the draft and explain in a banner. Every decision sends
+`expected_fingerprint` (D15); 409 `item_changed` reloads and puts "This check changed while you were deciding..." on
+that row, keeping the typed reason. Override and Confirm need a reason (422 `note_required` shows at the field).
+Remove is offered only when `removable` (never for the insured check, D13), named by its effect; the insured check
+says how to fix it (remove the differing policy, or override). A conditional endorsement (D14) shows its quoted
+condition and asks "Why does the condition hold for this holder?". The description (D11) and edited values (D12)
+are sign-off rows ("Confirm...", "Restore the extracted value"). Printed values are editable in place on a draft
+(pencil on hover or focus; Enter saves, Esc cancels); a save adds the sign-off row and offers Undo.
+
+**New decisions and what each skill said**
+
+| Decision | gstack | ui-ux-pro-max | taste-core | taste-redesign | impeccable | emil-design-eng | frontend-design |
+|---|---|---|---|---|---|---|---|
+| Ledger actions stacked: Add document, then the two quiet verbs | Plain verbs, no em dashes | 44px targets, 8px spacing | One loud action per region; CTA never wraps mid-label | Buttons align on one edge | Consistent affordances across the surface | Press scale from `.btn` | The verb says what happens ("Restore the extracted value") |
+| Remove named by its effect | Say the consequence | Clear labels over generic | No duplicate intents | Active voice | UX copy: name the result | | Same action, same name through the flow (toast repeats it) |
+| Refused Issue = reload + banner, never a silent retry | | Error near the action, recoverable | Honest error states | No `alert()` | Honest states over smooth ones (PRODUCT.md) | No motion on the banner | Errors explain what happened and what to do |
+| In-place edit of printed values | | Inline editing over modals | | Inline over modals | Modal as first thought is laziness | Keyboard instant, Esc cancels | |
+| Paper scrolls its own column only | | Spatial continuity | Motion motivated | | Scroll stays where the user is | Smooth on pointer, instant on keyboard | |
+| Moved row enters its new group | | Motion conveys change | Motion = feedback | | Motion explains change | List enter, 200ms ease-out, pointer only, reduced motion fades | One reused device |
+| Left panel folded, hidden on phone | | Mobile: no horizontal scroll | Explicit collapse per width | | Phone is for status (PRODUCT.md) | | |
+| Sample wording note in `--color-stale-fg` | Mocks say they are mocks | 7.52:1 contrast | No invented data shown as real | | Honest content | | |
+
+**Design review gate** (Playwright MCP on the live page, 3 rounds max, run by this lane):
+- Round 1 (1440, 1024, 390 after the first e2e pass): ledger action row wrapped "Remove from certificate" onto a ragged
+  line (fixed: stacked actions, quiet verbs aligned to the text edge); holder "Last used" showed the next day (UTC
+  timestamps parsed as local; fixed in `formatDate`); the left strip squeezed the phone layout to ~220px (hidden under
+  720px); a limit value wrapped ("$2,000,00 0", fixed with `nowrap`); the edit button's hit area covered the next row
+  (made horizontal only).
+- Round 2: 1px sideways scroll in the paper column at 1024 and 390 (clipped); the paper head crowded at 1024 (stacked
+  under 1280); "1 page , not read" spacing; pointing a check scrolled the whole page and the header (now scrolls the
+  paper column only); the issued record still said "Handled by you" (now "Decided before issue").
+- Round 3 (final screenshots from the full e2e run, 1440, 1024, 390): no blocking findings. Nit left as is: after
+  Issue the paper column keeps the scroll of the last pointed check (only that column; the header stays put).
+
+## 9. Final screenshots
+
+`frontend/qa-screenshots/certificates/`: `1440-01-page`, `1024-01-page`, `390-01-page` (Certificates page),
+`1440-02-wizard-who`, `1440-03-wizard-policies`, `1440-04-draft`, `1024-04-draft`, `390-04-draft`, `1440-05-source`,
+`1440-06-override`, `1440-07-issued` (written by `e2e/certificates.spec.ts`).
+
+## 10. Choices the owner may veto
+
+- The left panel is hidden on phone for certificate runs (Add document and parameters need a wider screen).
+- Client is optional in the wizard (the API allows it; without it there are no past holders or client documents).
+- Every Override, Remove and Confirm offers Undo in the toast (status back to open, fingerprint re-sent).
+- "Read on <date>, no new read" also shows on Compare Quotes and Policy Check document rows when the cache reused a read.
+- Margin glyphs are not drawn for edited limit rows (a `<dl>` row cannot hold them); the pointed box still shows them.

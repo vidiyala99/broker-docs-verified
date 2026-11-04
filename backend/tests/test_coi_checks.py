@@ -430,3 +430,14 @@ def test_pdf_prints_not_stated_for_missing_values():
 
     with fitz.open(stream=pdf, filetype="pdf") as d:
         assert "Not stated" in d[0].get_text() and d.page_count == 1
+
+
+def test_pdf_marks_the_legal_wording_as_a_sample():
+    """Owner, 2026-11-03: the disclaimer and cancellation clause are the clone's own wording, marked as a sample."""
+    block = CertificateBlock(certificate_date="2026-06-01", holder_name="H")
+    pdf = export_certificate.render(export_certificate.CertificatePdf(block, "2026-06-01", "Run 1, version 1"))
+    import fitz
+
+    with fitz.open(stream=pdf, filetype="pdf") as d:
+        words = " ".join(d[0].get_text().split())
+    assert words.count("Sample wording") == 2, words

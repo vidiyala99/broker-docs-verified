@@ -108,6 +108,9 @@ export function RunProgress({
 /** The second line of a row, only when it says something the glyph cannot. */
 function docNews(d: RunDocument): string | null {
   if (d.status === "failed") return d.error ?? "Failed";
+  if (d.status === "done" && d.reused_from_run_id != null && d.read_at)
+    // Slice 4 (spec section 5): a document whose earlier read was reused says when it was read.
+    return `Read on ${new Date(d.read_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}, no new read`;
   if (d.status === "done") return d.option_count > 1 ? `Compared option 1 of ${d.option_count}` : null;
   if (d.status === "queued") return null;
   return d.progress || DOC_TEXT[d.status];

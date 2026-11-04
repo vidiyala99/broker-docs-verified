@@ -114,6 +114,25 @@ function BlockView({ block, actions, skeleton }: { block: Block; actions: Report
           <p className="prose">{block.prose.map((p) => p.text).join("")}</p>
         </article>
       );
+    case "certificate":
+      // Certificate runs render in the certificate view (certificates/CertificateRunView.tsx); this is the fallback.
+      return (
+        <article className="issue">
+          <h3 className="report-subheading">Certificate for {block.holder_name}</h3>
+          <p className="prose">
+            {block.policies.length} {block.policies.length === 1 ? "policy" : "policies"} printed, certificate date {block.certificate_date}.
+          </p>
+        </article>
+      );
+    case "claim":
+      return (
+        <article className="issue">
+          <h3 className="report-subheading">{block.title}</h3>
+          <p className="prose">
+            <Segments segments={block.prose} chips={actions.chips} onOpen={actions.onOpen} />
+          </p>
+        </article>
+      );
     case "issue":
       return (
         <article className="issue">
