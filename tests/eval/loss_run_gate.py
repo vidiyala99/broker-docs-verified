@@ -30,11 +30,10 @@ Gate (spec section 8, ledger O1/R4):
 Totals, notices, statuses, document facts and tokens per document are reported. The loss-run token budget
 per document is a placeholder until the first approved live run is measured (L8, see LOSS_RUN_DOC_TOKEN_BUDGET).
 
-ASSUMED BACKEND VOCABULARY AND ADAPTER CONTRACT. Lane A builds the backend in parallel (``backend/loss_runs/``);
-the names below come from the spec and ledger, not from lane A's code, and are kept in one block so they can be
-reconciled in one place after lane A merges.
+BACKEND VOCABULARY AND ADAPTER CONTRACT, reconciled with lane A's backend (``backend/loss_runs/``, main cf45e13)
+and kept in one block. ``test_loss_run_eval`` compares it with the backend.
 
-    run_eval_batch(paths, workflow="loss_run", parameters={"client_name": str})
+    run_eval_batch(paths, workflow="loss-run" (or "loss_run"), parameters={"client_name": str})
     -> {"input_tokens": int, "documents": {path: {...}},       # the Compare Quotes dict
         "loss_run": {
           "workflow": "loss_run", "run_status": str, "warnings": [str],
@@ -78,17 +77,17 @@ from typing import Any, Callable, Iterable, Mapping
 import eval_gates as g
 
 # =============================================================================================
-# ASSUMED BACKEND VOCABULARY (reconcile with lane A after merge; one place on purpose)
+# BACKEND VOCABULARY (reconciled with lane A at main cf45e13; one place on purpose)
 # =============================================================================================
 
-LOSS_RUN_SLUG = "loss_run"  # spec section 3: Workflow row ``loss_run`` (backend/slugs.py)
+LOSS_RUN_SLUG = "loss-run"  # Workflow.slug (backend/slugs.py); the eval hook also accepts "loss_run"
 GATE_BUCKET = "loss_run"
 
 METRICS = ("paid", "reserve", "incurred", "recovery", "deductible")  # claim_row money columns, cents
 ROLES = ("counted", "superseded", "conflicting", "left_out")
 STATUSES = ("open", "closed", "reopened", "unknown")
 VERIFY_STATES = ("verified", "unverified")
-SCOPE_KINDS = ("all", "policy_year", "policy_number", "carrier", "page_subtotal")  # O3 printed_total
+SCOPE_KINDS = ("all", "policy_year", "policy_number", "carrier", "page_subtotal", "sheet")  # O3 printed_total
 VERDICTS = ("matches", "off")
 TOLERANCE_CENTS = 100  # L6: a difference of $1.00 or less matches
 
@@ -109,12 +108,15 @@ NOTICE_NO_TOTALS = "no_printed_totals"  # "<carrier> 2025 prints no totals: noth
 NOTICE_NO_VALUATION = "no_valuation_date"  # "No valuation date found in File C"
 NOTICE_NO_TABLE = "no_claims_table"  # "No claims table found on sheet 2023"
 NOTICE_UNVERIFIED = "rows_not_verified"  # one item per document for its unverified rows
-NOTICE_KINDS = (NOTICE_NO_TOTALS, NOTICE_NO_VALUATION, NOTICE_NO_TABLE, NOTICE_UNVERIFIED)
+NOTICE_NOT_READ = "document_not_read"  # a file that could not be read (reason + Retry)
+NOTICE_INFO = "info"  # any other notice the report shows
+NOTICE_KINDS = (NOTICE_NO_TOTALS, NOTICE_NO_VALUATION, NOTICE_NO_TABLE, NOTICE_UNVERIFIED, NOTICE_NOT_READ, NOTICE_INFO)
+UNMAPPED = "unmapped"  # header mapping answer for a header the model cannot map (never null)
 
 DOC_FACT_KEYS = ("lr:carrier", "lr:valuation_date")  # other lr: document facts (O3 keeps them)
 
 # Canonical sheet columns the header synonym table maps to (backend/loss_runs/headers.py, L7).
-COLUMNS = ("claim_number", "policy_number", "policy_year", "line", "feature", "claimant", "date_of_loss",
+COLUMNS = ("claim_number", "policy_number", "policy_year", "line", "carrier", "claimant", "date_of_loss",
            "status", "paid", "reserve", "incurred", "recovery", "deductible")
 
 # =============================================================================================
@@ -251,7 +253,7 @@ def sums_equal(a: Mapping, b: Mapping) -> bool:
 
 
 def _ident(line: Mapping) -> tuple:
-    return (line["claim_key"], line.get("policy_number"), line.get("feature"), line.get("claimant"),
+    return (line["claim_key"], line.get("policy_number"), line.get("claimant"),
             line.get("date_of_loss"), line.get("status_raw"), *(line.get(m) for m in METRICS))
 
 
@@ -901,18 +903,21 @@ def loss_run_oracle_output(case: Mapping, doc_truths: Mapping[str, Mapping], pat
 
 
 # =============================================================================================
-# Fake model replies built from the truth (recorded-reply shape; ASSUMED, reconcile with lane A)
+# Fake model replies built from the truth (the backend's strict reply schemas, main cf45e13)
 # =============================================================================================
 #
-# Row-window call (R2, ``CallRole.LOSS_ROWS``): the request text carries ``[page N]`` markers (as
-# backend/pipeline/extract.build_messages does) and the document file name; the reply is
-#   {"rows": [{"claim_number", "policy_number", "policy_year", "line", "feature", "claimant",
-#              "date_of_loss", "status", "paid", "reserve", "incurred", "recovery", "deductible",
-#              "page", "quote"}],            # amounts and dates as printed; code parses them
-#    "totals": [{"metric", "scope_kind", "scope_value", "amount", "page", "quote"}]}
+# Row-window call (R2, ``CallRole.LOSS_ROWS``, schema ``loss_rows``): the request text carries ``[page N]``
+# markers and the document file name; the reply is exactly
+#   {"rows": [{"claim_number", "claimant", "date_of_loss", "status", "policy_number", "line",
+#              "policy_year" (string or null), "carrier", "paid", "reserve", "incurred", "recovery",
+#              "deductible", "page", "quote"}],     # amounts and dates as printed; code parses them
+#    "totals": [{"label", "metric", "scope_kind", "scope_value" (string or null), "amount" (string),
+#                "page", "quote"}]}
+# There is no feature column: the lines of one claim (D5) are separate rows with the same claim number.
 # Document facts call (extract): {"facts": [{"field": "lr:carrier" | "lr:valuation_date", "value", "page",
 #   "quote"}], "options_detected": 1, "option_compared": None}
-# Header mapping call (L7, one per sheet with unknown headers): {"mappings": [{"header", "column"}]}
+# Header mapping call (``CallRole.LOSS_HEADERS``, schema ``loss_header_map``):
+#   {"mappings": [{"header", "column"}]}, column one of the offered values or "unmapped", never null.
 # Vision (scanned page): the page's text lines.
 
 
@@ -924,12 +929,15 @@ def fake_row_reply(doc: Mapping, pages: Iterable[int]) -> dict:
         if p not in pages:
             continue
         pr = ln["printed"]
-        rows.append({"claim_number": pr["claim_number"], "policy_number": ln.get("policy_number"),
-                     "policy_year": ln.get("policy_year"), "line": ln.get("line"), "feature": ln.get("feature"),
-                     "claimant": ln.get("claimant"), "date_of_loss": pr["date_of_loss"], "status": pr["status"],
+        year = ln.get("policy_year")
+        rows.append({"claim_number": pr["claim_number"], "claimant": ln.get("claimant"),
+                     "date_of_loss": pr["date_of_loss"], "status": pr["status"],
+                     "policy_number": ln.get("policy_number"), "line": ln.get("line"),
+                     "policy_year": None if year is None else str(year), "carrier": doc.get("carrier"),
                      **{m: pr.get(m) for m in METRICS}, "page": p, "quote": ln["quote"]})
-    totals = [{"metric": t["metric"], "scope_kind": t["scope_kind"], "scope_value": t["scope_value"],
-               "amount": t["printed"], "page": t["location"]["page"], "quote": t["quote"]}
+    totals = [{"label": t["label"], "metric": t["metric"], "scope_kind": t["scope_kind"],
+               "scope_value": None if t["scope_value"] is None else str(t["scope_value"]),
+               "amount": str(t["printed"]), "page": t["location"]["page"], "quote": t["quote"]}
               for t in doc["printed_totals"] if t["location"].get("page") in pages]
     return {"rows": rows, "totals": totals}
 
@@ -954,7 +962,7 @@ def fake_fact_reply(doc: Mapping) -> dict:
 
 def fake_header_reply(doc: Mapping, headers: Iterable[str]) -> dict:
     known = {h: col for s in doc.get("sheets") or [] for h, col in (s.get("columns") or {}).items()}
-    return {"mappings": [{"header": h, "column": known.get(h)} for h in headers]}
+    return {"mappings": [{"header": h, "column": known.get(h) or UNMAPPED} for h in headers]}
 
 
 PAGE_MARK = re.compile(r"\[page (\d+)\]")

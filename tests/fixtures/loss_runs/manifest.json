@@ -4,7 +4,7 @@
   "pymupdf_version": "1.28.0",
   "synthetic": true,
   "synthetic_notice": "Synthetic sample data: loss run for software testing. Every carrier, insured, claimant and claim number is invented.",
-  "workflow": "loss_run",
+  "workflow": "loss-run",
   "cases": [
     {
       "case_id": "lr_main",

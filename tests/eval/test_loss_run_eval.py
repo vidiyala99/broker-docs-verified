@@ -793,7 +793,7 @@ def test_suite_calls_the_loss_run_workflow(lr_cases, lr_docs, monkeypatch):
 
     m, rep = lg.run_loss_run_suite(adapter, LR_DIR, lr_cases, lr_docs)
     assert rep.passed, lg.format_loss_run_report(m, rep)
-    assert [c["workflow"] for c in calls] == ["loss_run", "loss_run"]
+    assert [c["workflow"] for c in calls] == [lg.LOSS_RUN_SLUG] * 2
     assert all(c["parameters"] == {"client_name": lgen.CLIENT} for c in calls)
     assert m.max_run_input_tokens == 5000 and m.max_doc_input_tokens is not None
 
@@ -848,7 +848,7 @@ def test_fake_replies_carry_the_printed_rows_and_totals(lr_docs):
     assert {f["field"]: f["value"] for f in facts} == {"lr:carrier": lgen.BELLWETHER, "lr:valuation_date": None}
     hdr = lg.fake_header_reply(lr_docs["lr_main_bellwether_messy"], ["O/S Rsv", "Indemnity Pd", "Mystery"])
     assert hdr["mappings"] == [{"header": "O/S Rsv", "column": "reserve"},
-                               {"header": "Indemnity Pd", "column": "paid"}, {"header": "Mystery", "column": None}]
+                               {"header": "Indemnity Pd", "column": "paid"}, {"header": "Mystery", "column": lg.UNMAPPED}]
 
 
 # ---------------------------------------------------------------------------
@@ -867,70 +867,102 @@ def _import_backend(module: str):
 
 
 def test_backend_vocabulary_matches_the_gate():
-    """Slug, status map, roles and warning names: the gate's assumed block must equal the backend's names
-    once lane A's modules exist (reconcile loss_run_gate on failure)."""
+    """Slug, status map, roles, scope kinds, columns and warning names: the gate's vocabulary block must equal
+    the backend's names (reconcile loss_run_gate on failure)."""
     slugs = _import_backend("backend.slugs")
     ledger = _import_backend("backend.loss_runs.ledger")
-    assert lg.LOSS_RUN_SLUG in {v for k, v in vars(slugs).items() if k.endswith("_SLUG")}
     headers = _import_backend("backend.loss_runs.headers")
-    status_map = getattr(headers, "STATUS_MAP", None) or getattr(ledger, "STATUS_MAP", None)
-    if status_map is None:
-        pytest.fail("backend.loss_runs has no STATUS_MAP; reconcile loss_run_gate.STATUS_MAP")
-    assert {k.lower(): str(v) for k, v in status_map.items()} == lg.STATUS_MAP
-    for name, ours in (("ROLES", set(lg.ROLES)), ("SCOPE_KINDS", set(lg.SCOPE_KINDS))):
-        theirs = getattr(ledger, name, None)
-        if theirs is not None:
-            assert {str(x) for x in theirs} == ours, name
+    eval_hook = _import_backend("backend.eval_hook")
+    assert lg.LOSS_RUN_SLUG in {v for k, v in vars(slugs).items() if k.endswith("_SLUG")}
+    for mod in (headers, ledger):
+        assert {k.lower(): str(v) for k, v in mod.STATUS_MAP.items()} == lg.STATUS_MAP, mod.__name__
+    assert set(ledger.ROLES) == set(lg.ROLES)
+    assert set(ledger.SCOPE_KINDS) == set(lg.SCOPE_KINDS)
+    assert tuple(ledger.MONEY) == lg.METRICS
+    assert set(headers.COLUMNS) == set(lg.COLUMNS)
+    assert ledger.TOLERANCE_CENTS == lg.TOLERANCE_CENTS
+    assert set(eval_hook._LOSS_WARNINGS) == {lg.WARN_INCURRED, lg.WARN_REPEATED}
+    for message, kind in (("Ashgrove 2025 prints no totals: nothing to reconcile", lg.NOTICE_NO_TOTALS),
+                          ("No valuation date found in a.csv", lg.NOTICE_NO_VALUATION)):
+        assert eval_hook.loss_notice_kind(message) == kind, message
 
 
-def _ledger_inputs(case, lr_docs):
-    """build_ledger(rows, documents, totals, decisions) inputs from the truth (ASSUMED shapes, attribute
-    access as on ORM rows; reconcile here if lane A's types differ)."""
+def _location(ln, doc):
+    """The backend's printed location string (O2): ``p<page>:y<y>`` for a PDF line, ``s<sheet>:r<row>`` for a
+    sheet row (sheet = workbook index; a CSV is sheet 0)."""
+    loc = ln["location"]
+    if loc.get("page") is not None:
+        return f"p{loc['page']}:y{int(ln['line_id'].split('#')[1])}"
+    names = [s["name"] for s in doc.get("sheets") or []]
+    return f"s{names.index(loc['sheet']) if loc['sheet'] in names else 0}:r{loc['row']}"
+
+
+def _ledger_inputs(case, lr_docs, ledger):
+    """build_ledger(rows, documents, totals, decisions) inputs from the truth, as backend/loss_runs/report.py
+    builds them from the database: one LedgerRow per truth line (id -> line_id), one LedgerTotal per printed
+    total (id -> total_id)."""
+    from backend.loss_runs import normalize
+
     rows, documents, totals = [], [], []
+    line_of, total_of = {}, {}
     for i, f in enumerate(case["documents"], 1):
         d = lr_docs[f]
-        documents.append(SimpleNamespace(id=i, document_id=i, fixture_id=f, carrier=d["carrier"],
-                                          valuation_date=lg.parse_date(d["valuation_date"]), filename=d["file"]))
+        documents.append(ledger.LedgerDocument(document_id=i, position=i - 1, label=d["file"], carrier=d["carrier"],
+                                               valuation_date=d["valuation_date"], letter=chr(64 + i)))
+        names = [s["name"] for s in d.get("sheets") or []]
         for ln in d["lines"]:
             loc = ln["location"]
-            rows.append(SimpleNamespace(
-                id=len(rows) + 1, document_id=i, line_id=ln["line_id"], carrier=d["carrier"],
-                claim_number_raw=ln["claim_number"], claim_key=ln["claim_key"],
-                policy_number=ln["policy_number"], policy_year=ln["policy_year"], line=ln["line"],
-                claimant=ln["claimant"], date_of_loss=lg.parse_date(ln["date_of_loss"]), status_raw=ln["status_raw"],
-                status=ln["status"], **{m: ln[m] for m in lg.METRICS},
-                incurred_computed=ln["incurred_source"] == "computed", page_no=loc.get("page"),
-                sheet=loc.get("sheet"), source_row=loc.get("row"), verify=ln["verify"], source="extracted"))
+            rid = len(rows) + 1
+            line_of[rid] = ln["line_id"]
+            rows.append(ledger.LedgerRow(
+                id=rid, document_id=i, location=_location(ln, d), claim_number=ln["claim_number"],
+                claim_key=normalize.claim_key(ln["claim_number"]), carrier_key=normalize.carrier_key(d["carrier"]),
+                status=ln["status"], date_of_loss=ln["date_of_loss"], policy_year=ln["policy_year"],
+                policy_number=ln["policy_number"], claimant=ln["claimant"], verify_state=ln["verify"],
+                **{m: ln[m] for m in lg.METRICS}, page_no=loc.get("page"),
+                sheet_name=loc.get("sheet") if names else None, sheet_row=loc.get("row"),
+                line_y=float(int(ln["line_id"].split("#")[1])) if loc.get("page") is not None else None))
         for t in d["printed_totals"]:
-            totals.append(SimpleNamespace(id=len(totals) + 1, document_id=i, total_id=t["total_id"], metric=t["metric"],
-                                          scope_kind=t["scope_kind"], scope_value=t["scope_value"],
-                                          amount=t["amount"], page_no=t["location"].get("page"), verify="verified"))
-    return rows, documents, totals
+            tid = len(totals) + 1
+            total_of[tid] = t["total_id"]
+            loc = t["location"]
+            detail = {"page": loc["page"], "max_y": 1e9} if t["scope_kind"] == "page_subtotal" else {}
+            totals.append(ledger.LedgerTotal(
+                id=tid, document_id=i, metric=t["metric"], scope_kind=t["scope_kind"], amount=t["amount"],
+                location=(f"p{loc['page']}:t{tid}" if loc.get("page") is not None
+                          else f"s{names.index(loc['sheet']) if loc['sheet'] in names else 0}:r{loc['row']}:{t['metric']}"),
+                scope_value=t["scope_value"], scope_detail=detail, label=t["label"], page_no=loc.get("page"),
+                sheet_name=loc.get("sheet") if names else None, sheet_row=loc.get("row"), quote=t["quote"]))
+    return rows, documents, totals, line_of, total_of
 
 
 def test_backend_build_ledger_reproduces_the_truth(lr_cases, lr_docs):
-    """The pure build_ledger (D1) over the truth rows must give the truth's roles, totals strip and check
+    """The pure build_ledger (D1) over the truth rows gives the truth's roles, totals strip and check
     verdicts (spec section 4 steps 4 to 6 with D5, L5, L6, O3)."""
-    ledger_mod = _import_backend("backend.loss_runs.ledger")
-    build = getattr(ledger_mod, "build_ledger", None)
-    if build is None:
-        pytest.skip("backend.loss_runs.ledger has no build_ledger yet")
+    ledger = _import_backend("backend.loss_runs.ledger")
     for cid, case in lr_cases.items():
-        rows, documents, totals = _ledger_inputs(case, lr_docs)
-        led = build(rows, documents, totals, [])
-        by_row = {getattr(r, "row_id", None) or getattr(r, "id", None): r for r in getattr(led, "rows", [])}
-        for row in rows:
-            got = by_row.get(row.id)
-            assert got is not None, row.line_id
-            assert str(got.role) == lg.expected_role(case, row.line_id), row.line_id
-        strip = getattr(led, "totals")
-        for k, v in case["totals"].items():
-            assert (strip[k] if isinstance(strip, dict) else getattr(strip, k)) == v, (cid, k)
-        verdicts = {getattr(c, "total_id", None) or getattr(c, "printed_total_id", None): str(c.verdict)
-                    for c in led.checks}
-        want = {i + 1: c["verdict"] for i, c in enumerate(case["checks"])}
-        assert verdicts == want or verdicts == {c["total_id"]: c["verdict"] for c in case["checks"]}, cid
-
+        rows, documents, totals, line_of, total_of = _ledger_inputs(case, lr_docs, ledger)
+        led = ledger.build_ledger(rows, documents, totals, ledger.Decisions())
+        assert set(led.rows) == set(line_of), cid
+        roles = {line_of[rid]: res.role for rid, res in led.rows.items()}
+        want = {lid: lg.expected_role(case, lid) for lid in line_of.values()}
+        assert roles == want, (cid, {k: (roles[k], want[k]) for k in want if roles[k] != want[k]})
+        strip = led.totals
+        got = {"claims": strip.claims, "open": strip.open_claims, **{m: getattr(strip, m).cents for m in lg.METRICS}}
+        assert got == case["totals"], cid
+        verdicts = {}
+        for c in led.checks:
+            if c.kind != "total":
+                continue
+            ev = next(e for e in c.evidence if e.printed_total_id is not None)
+            verdicts[total_of[ev.printed_total_id]] = (c.verdict, c.computed, c.difference)
+        assert verdicts == {c["total_id"]: (c["verdict"], c["computed"], c["difference"]) for c in case["checks"]}, cid
+        # Warnings (section 4 step 4, D5) on the lines the truth flags.
+        flags = {line_of[rid]: sorted(set(res.flags) & {lg.WARN_INCURRED, lg.WARN_REPEATED})
+                 for rid, res in led.rows.items()}
+        for f in case["documents"]:
+            for ln in lr_docs[f]["lines"]:
+                assert flags[ln["line_id"]] == sorted(ln["warnings"]), ln["line_id"]
 
 def _respond_factory(case_docs, providers, *, swap: str | None = None):
     """A fake provider answering every loss-run call from the truth (ASSUMED call roles and reply shapes,

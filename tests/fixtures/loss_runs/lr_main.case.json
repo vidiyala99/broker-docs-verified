@@ -5,7 +5,7 @@
   "synthetic": true,
   "synthetic_label": "Synthetic sample data",
   "case_id": "lr_main",
-  "workflow": "loss_run",
+  "workflow": "loss-run",
   "gate_bucket": "loss_run",
   "client_name": "Harrow Lane Bakery Group LLC",
   "description": "One loss review for Harrow Lane Bakery Group LLC: 8 files from 5 carriers (xlsx, csv, digital and scanned PDF) with every section 8 trap plus swapped columns (O1), a 3-line claim (D5) and page subtotals (D9).",
