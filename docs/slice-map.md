@@ -14,11 +14,7 @@ Evidence: `docs/reference/brokerdocs-workflows-evidence.md`, `../BrokerDocs-REA-
 | (extra) | Work queue + Activity | Workflows, Personal lines | Queue is home (`docs/specs/2026-11-02-work-queue-design.md`); raw runs live in Activity |
 | (extra) | Voice "Paper trail" + motion | everywhere | Serif for people, drawn marks, rail Silhouettes; DESIGN.md Voice/Motion |
 | (extra) | Line move (Commercial / Personal) | run header | Book tab + "Move to ..." button, book-first crumbs, Undo |
-
-## In flight: slice 4 (owner decision 2026-11-03)
-| Slice | Workflow | Rail item |
-|---|---|---|
-| 4 | COI and form filler (own layout first, no observed screen) | Certificates |
+| 4 | Checked certificates (COI, own layout) | Certificates | Every claim checked before Issue; extraction cache; live gate 0 hard fails, supported 15/15 |
 
 ## Later slices (from the evidence ranking)
 | Slice | Workflow | Rail item |

@@ -1076,51 +1076,51 @@ Conflict flags: B owns tests/fixtures/certificates and the gate file; A must not
 ## Implementation Tasks
 Synthesized from this review's findings. Each task derives from a specific finding above.
 
-- [ ] **C1 (P1, human: ~1h / CC: ~10min)** slugs: shared slugs module and certificate workflow seed
+- [x] **C1 (P1, human: ~1h / CC: ~10min)** slugs: shared slugs module and certificate workflow seed
   - Surfaced by: Architecture A1 (D4)
   - Files: backend/slugs.py, backend/db.py, backend/work_queue.py
   - Verify: backend tests; work_queue and db import one slug set
-- [ ] **C2 (P1, human: ~1.5d / CC: ~1h)** cache: key, cross-document copy, OCR stamp, off switch
+- [x] **C2 (P1, human: ~1.5d / CC: ~1h)** cache: key, cross-document copy, OCR stamp, off switch
   - Surfaced by: S2 (D3), Q3 (D8), O6 (D17), T-R1 (D9)
   - Files: backend/models.py (run_document.extraction_key, reused_from_run_id, page.ocr_key), backend/pipeline/runner.py, backend/pipeline/cache.py
   - Verify: hit/miss per key input, remap chips, DONE-only sources, BROKERDOCS_EXTRACTION_CACHE=off, hit equals live read
-- [ ] **C3 (P1, human: ~1d / CC: ~40min)** extract: cert: schema with endorsement condition, package notice
+- [x] **C3 (P1, human: ~1d / CC: ~40min)** extract: cert: schema with endorsement condition, package notice
   - Surfaced by: spec section 3, O1 (D14)
   - Files: backend/schemas.py, backend/pipeline/extract.py (fields)
   - Verify: offline extraction on fixtures; package policy contributes no facts
-- [ ] **C4 (P1, human: ~2d / CC: ~1h)** checks: certificate.build_content + coi_checks, CertificateBlock in the Block union
+- [x] **C4 (P1, human: ~2d / CC: ~1h)** checks: certificate.build_content + coi_checks, CertificateBlock in the Block union
   - Surfaced by: Q1 (D7), O1 (D14), O2 (D11), O4 (D12), prior learning brokerdocs-block-union-traversal
   - Files: backend/pipeline/certificate.py, backend/pipeline/coi_checks.py, backend/schemas.py
   - Verify: table-driven tests per claim type; passage_ids includes certificate citations
-- [ ] **C5 (P1, human: ~1d / CC: ~40min)** state: widen discrepancy_state, workflow-scoped PATCH, expected_fingerprint, Remove effects
+- [x] **C5 (P1, human: ~1d / CC: ~40min)** state: widen discrepancy_state, workflow-scoped PATCH, expected_fingerprint, Remove effects
   - Surfaced by: D1, T-R2 (D10), O5 (D15), O3 (D13)
   - Files: backend/models.py, backend/routes/runs.py
   - Verify: test_discrepancy_state.py unchanged and passing; new rows per rule
-- [ ] **C6 (P1, human: ~4h / CC: ~20min)** runner: Add document reopens certificate drafts only
+- [x] **C6 (P1, human: ~4h / CC: ~20min)** runner: Add document reopens certificate drafts only
   - Surfaced by: S1 (D2)
   - Files: backend/models.py (_RUN_TRANSITIONS guard), backend/routes/runs.py, backend/pipeline/runner.py
   - Verify: guard tests (other workflows terminal; issued never reopens); decisions carried
-- [ ] **C7 (P1, human: ~1d / CC: ~40min)** issue: holder table/API, version-checked issue, PDF bytes, bounds
+- [x] **C7 (P1, human: ~1d / CC: ~40min)** issue: holder table/API, version-checked issue, PDF bytes, bounds
   - Surfaced by: A2 (D5), A3 (D6), O7 (D16), O3 (D13 no_coverage)
   - Files: backend/models.py, backend/routes/certificates.py, backend/export_certificate.py
   - Verify: each 409, idempotency, escape and one page at max, render failure leaves no record
-- [ ] **C8 (P1, human: ~3h / CC: ~15min)** queue: certificate classification on the Certificates page; Issue certificate row action
+- [x] **C8 (P1, human: ~3h / CC: ~15min)** queue: certificate classification on the Certificates page; Issue certificate row action
   - Surfaced by: spec section 2 step 6
   - Files: backend/work_queue.py, backend/routes
   - Verify: certificate drafts absent from the main queue; present on the Certificates queue
-- [ ] **C9 (P1, human: ~3h / CC: ~20min)** regression: D9/D10 contracts and dev_seed off switch
+- [x] **C9 (P1, human: ~3h / CC: ~20min)** regression: D9/D10 contracts and dev_seed off switch
   - Surfaced by: T-R1 (D9), T-R2 (D10)
   - Files: backend/dev_seed.py, backend/tests
   - Verify: journey.spec.ts:141 unchanged and passing; eval batch never reuses
-- [ ] **C10 (P1, human: ~2d / CC: ~1h)** eval: synthetic fixtures (incl. written-contract blanket form) and gate
+- [x] **C10 (P1, human: ~2d / CC: ~1h)** eval: synthetic fixtures (incl. written-contract blanket form) and gate
   - Surfaced by: spec section 6, O1 (D14)
   - Files: tests/fixtures/certificates, tests/eval
   - Verify: offline gate; live `-k certificate`: 0 hard fails, recall >= 0.90
-- [ ] **C11 (P2, human: ~3d / CC: ~2h)** frontend: Certificates page, wizard, draft, issue (design stack)
+- [x] **C11 (P2, human: ~3d / CC: ~2h)** frontend: Certificates page, wizard, draft, issue (design stack)
   - Surfaced by: spec section 4; D5, D11, D12, D13, D15 UI handling
   - Files: frontend/src/certificates/*
   - Verify: e2e per the Test Plan; axe 0 at 1440/1024/390
-- [ ] **C12 (P2, human: ~3h / CC: ~15min)** docs: API.md, spec amendments, CLAUDE.md EXTRACTION_VERSION rule, README switch
+- [x] **C12 (P2, human: ~3h / CC: ~15min)** docs: API.md, spec amendments, CLAUDE.md EXTRACTION_VERSION rule, README switch
   - Surfaced by: D8, D9
   - Files: backend/API.md, CLAUDE.md, README
   - Verify: doc review
@@ -1128,6 +1128,27 @@ Synthesized from this review's findings. Each task derives from a specific findi
 
 ### Unresolved decisions
 None.
+
+## Amendments after build (2026-11-03)
+
+These record what shipped where it differs from or sharpens the text above.
+
+- Join (fix lane, `76d2a8f`): a document that prints endorsements becomes a policy row only if it also carries a
+  declarations-only fact (named insured, address, dates or a limit). Carrier, NAIC, producer, policy number and
+  line do not count, because endorsements print them too. Form numbers keep one edition (`extract.split_edition`);
+  the endorsements prompt defines a condition. `EXTRACTION_VERSION` is "2026-11-03.2".
+- Live gate run 2: 0 hard fails, recall 17/17, supported accuracy 15/15. Replies replayed offline in
+  `tests/eval/test_certificate_replay.py`. Field accuracy on `condition` is 0/2 by exact match only (verdicts right).
+- UI direction A "Proof and ledger" (owner pick): certificate sheet beside a check list (To resolve, Handled by you,
+  Supported folded); hovering a check boxes its line; chips swap the sheet for the cited page. Brief:
+  `frontend/CERTIFICATES-BRIEF.md`; DESIGN.md "Certificates".
+- Owner calls on the UI: certificate runs have no Chat and the left panel (Policies, Input parameters) is folded by
+  default; removed lines leave the paper and stay under Handled by you with "Put back on the certificate"; the legal
+  header and cancellation clause are plain sample wording, marked "Sample wording" on screen and on the PDF.
+- Lane choices the owner may veto: no left panel on phone for certificate runs; client optional in the wizard;
+  Override, Remove and Confirm toasts offer Undo; the "Read on <date>" marker also shows on Compare Quotes and Policy
+  Check documents reused from the cache; edited limit rows have no margin glyph.
+- Seed: run 10 issued and run 11 draft for Calloway Build Group LLC (past holder Larkspur Commons Owners Association).
 
 ### Completion summary
 - Step 0: Scope Challenge: scope accepted as-is (smaller structure, D1)

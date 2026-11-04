@@ -37,6 +37,15 @@ Scripted behaviours: a file named `compose_fail...pdf` forces the template fallb
 question containing "fail" gets "Couldn't answer"; one containing "set", "change" or "correct"
 gets a proposed edit; `BROKERDOCS_RUN_TOKEN_BUDGET=52000` forces budget exhaustion.
 
+`seed` also adds Policy Check runs, a failed proposal (run 9) and two certificate runs for
+Calloway Build Group LLC (run 10 issued, run 11 a draft with open, overridden and sign-off checks).
+
+Extraction cache: a document read once (same file bytes, same fields, prompts, models and
+`EXTRACTION_VERSION`) is reused by later runs and shows "Read on <date>". Set
+`BROKERDOCS_EXTRACTION_CACHE=off` to always read live (debugging, evals). The seed reads with the
+cache off, so seeded documents never serve an e2e upload; reseed before every e2e pass, because a
+rerun on a used database reuses its own earlier reads and the reading mark never shows.
+
 To use the real model instead, start `python -m backend.main` with `OPENAI_API_KEY` set in the
 environment (see `backend/API.md`).
 
