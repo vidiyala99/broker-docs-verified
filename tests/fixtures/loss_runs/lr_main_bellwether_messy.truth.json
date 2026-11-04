@@ -1,0 +1,694 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "fixture_id": "lr_main_bellwether_messy",
+  "case_id": "lr_main",
+  "file": "lr_main_bellwether_messy.xlsx",
+  "format": "xlsx",
+  "layout": "messy",
+  "gate_bucket": "loss_run",
+  "description": "Messy workbook: three year sheets and a Notes sheet; title rows, merged title and header cells, unfamiliar column names, a repeated header row, subtotal rows, a formula with no stored value.",
+  "carrier": "Bellwether Casualty Company",
+  "valuation_date": "2025-03-31",
+  "page_count": null,
+  "size_bytes": 19498,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": []
+  },
+  "columns": {
+    "Clm Ref": "claim_number",
+    "Pol No": "policy_number",
+    "Cov": "line",
+    "Injured / Claimant": "claimant",
+    "Loss Dt": "date_of_loss",
+    "Stat": "status",
+    "Indemnity Pd": "paid",
+    "O/S Rsv": "reserve",
+    "Tot Incurred": "incurred"
+  },
+  "sheets": [
+    {
+      "name": "2022",
+      "has_claims_table": true,
+      "header_row": 5,
+      "columns": {
+        "Clm Ref": "claim_number",
+        "Pol No": "policy_number",
+        "Cov": "line",
+        "Injured / Claimant": "claimant",
+        "Loss Dt": "date_of_loss",
+        "Stat": "status",
+        "Indemnity Pd": "paid",
+        "O/S Rsv": "reserve",
+        "Tot Incurred": "incurred"
+      },
+      "data_rows": 3,
+      "repeated_header_rows": []
+    },
+    {
+      "name": "2023",
+      "has_claims_table": true,
+      "header_row": 5,
+      "columns": {
+        "Clm Ref": "claim_number",
+        "Pol No": "policy_number",
+        "Cov": "line",
+        "Injured / Claimant": "claimant",
+        "Loss Dt": "date_of_loss",
+        "Stat": "status",
+        "Indemnity Pd": "paid",
+        "O/S Rsv": "reserve",
+        "Tot Incurred": "incurred"
+      },
+      "data_rows": 4,
+      "repeated_header_rows": []
+    },
+    {
+      "name": "2024",
+      "has_claims_table": true,
+      "header_row": 5,
+      "columns": {
+        "Clm Ref": "claim_number",
+        "Pol No": "policy_number",
+        "Cov": "line",
+        "Injured / Claimant": "claimant",
+        "Loss Dt": "date_of_loss",
+        "Stat": "status",
+        "Indemnity Pd": "paid",
+        "O/S Rsv": "reserve",
+        "Tot Incurred": "incurred"
+      },
+      "data_rows": 4,
+      "repeated_header_rows": [
+        9
+      ]
+    },
+    {
+      "name": "Notes",
+      "has_claims_table": false,
+      "header_row": null,
+      "columns": {},
+      "data_rows": 0
+    }
+  ],
+  "facts": {
+    "lr:carrier": {
+      "value": "Bellwether Casualty Company",
+      "printed": "Bellwether Casualty Company",
+      "location": {
+        "sheet": "2022",
+        "row": 1
+      },
+      "page": null,
+      "quote": "Bellwether Casualty Company"
+    },
+    "lr:valuation_date": {
+      "value": "2025-03-31",
+      "printed": "03/31/2025",
+      "location": {
+        "sheet": "2022",
+        "row": 3
+      },
+      "page": null,
+      "quote": "Valuation date: 03/31/2025"
+    }
+  },
+  "exercises": [
+    "messy_xlsx",
+    "title_rows",
+    "merged_header",
+    "unfamiliar_headers",
+    "subtotal_rows",
+    "repeated_header_row",
+    "three_year_sheets",
+    "sheet_without_claims_table",
+    "formula_not_calculated",
+    "incurred_includes_expense",
+    "text_dates"
+  ],
+  "lines": [
+    {
+      "line_id": "lr_main_bellwether_messy#1",
+      "location": {
+        "sheet": "2022",
+        "row": 7
+      },
+      "claim_number": "BW-22-031",
+      "claim_key": "BW-22-031",
+      "policy_number": "BCC 22 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Abernethy, Clove",
+      "date_of_loss": "2022-02-11",
+      "status_raw": "C",
+      "status": "closed",
+      "paid": 4412000,
+      "reserve": 0,
+      "incurred": 4787000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [
+        "incurred_not_paid_plus_reserve"
+      ],
+      "printed": {
+        "claim_number": "BW-22-031",
+        "date_of_loss": "2/11/2022",
+        "status": "C",
+        "paid": "44120.00",
+        "reserve": "0.00",
+        "incurred": "47870.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-22-031 | BCC 22 77310 | GL | Abernethy, Clove | 2/11/2022 | C | 44120.00 | 0.00 | 47870.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#2",
+      "location": {
+        "sheet": "2022",
+        "row": 8
+      },
+      "claim_number": "BW-22-047",
+      "claim_key": "BW-22-047",
+      "policy_number": "BCC 22 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Strand, Ottilie",
+      "date_of_loss": "2022-06-30",
+      "status_raw": "C",
+      "status": "closed",
+      "paid": 297560,
+      "reserve": 0,
+      "incurred": 297560,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-22-047",
+        "date_of_loss": "6/30/2022",
+        "status": "C",
+        "paid": "2975.60",
+        "reserve": "0.00",
+        "incurred": "2975.60",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-22-047 | BCC 22 77310 | GL | Strand, Ottilie | 6/30/2022 | C | 2975.60 | 0.00 | 2975.60"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#3",
+      "location": {
+        "sheet": "2022",
+        "row": 9
+      },
+      "claim_number": "BW-22-052",
+      "claim_key": "BW-22-052",
+      "policy_number": "BCC 22 77310",
+      "policy_year": null,
+      "line": "PR",
+      "feature": null,
+      "claimant": "Mortimer Cold Storage",
+      "date_of_loss": "2022-09-07",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 1540000,
+      "reserve": 0,
+      "incurred": 1540000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-22-052",
+        "date_of_loss": "9/7/2022",
+        "status": "Closed",
+        "paid": "15400.00",
+        "reserve": "0.00",
+        "incurred": "15400.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-22-052 | BCC 22 77310 | PR | Mortimer Cold Storage | 9/7/2022 | Closed | 15400.00 | 0.00 | 15400.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#4",
+      "location": {
+        "sheet": "2023",
+        "row": 7
+      },
+      "claim_number": "BW-23-104",
+      "claim_key": "BW-23-104",
+      "policy_number": "BCC 23 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Galloway, Ines",
+      "date_of_loss": "2023-01-23",
+      "status_raw": "O",
+      "status": "open",
+      "paid": 800000,
+      "reserve": 1700000,
+      "incurred": 2500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-23-104",
+        "date_of_loss": "1/23/2023",
+        "status": "O",
+        "paid": "8000.00",
+        "reserve": "17000.00",
+        "incurred": "25000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-23-104 | BCC 23 77310 | GL | Galloway, Ines | 1/23/2023 | O | 8000.00 | 17000.00 | 25000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#5",
+      "location": {
+        "sheet": "2023",
+        "row": 8
+      },
+      "claim_number": "BW-23-111",
+      "claim_key": "BW-23-111",
+      "policy_number": "BCC 23 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Ferrante, Silas",
+      "date_of_loss": "2023-04-04",
+      "status_raw": "O",
+      "status": "open",
+      "paid": 115000,
+      "reserve": 685000,
+      "incurred": 800000,
+      "incurred_source": "computed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "formula not calculated",
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-23-111",
+        "date_of_loss": "4/4/2023",
+        "status": "O",
+        "paid": "1150.00",
+        "reserve": "6850.00",
+        "incurred": "=G8+H8",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-23-111 | BCC 23 77310 | GL | Ferrante, Silas | 4/4/2023 | O | 1150.00 | 6850.00 | =G8+H8"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#6",
+      "location": {
+        "sheet": "2023",
+        "row": 9
+      },
+      "claim_number": "BW-23-118",
+      "claim_key": "BW-23-118",
+      "policy_number": "BCC 23 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Lindqvist, Rory",
+      "date_of_loss": "2023-08-15",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 945000,
+      "reserve": 1555000,
+      "incurred": 2500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-23-118",
+        "date_of_loss": "8/15/2023",
+        "status": "Open",
+        "paid": "9450.00",
+        "reserve": "15550.00",
+        "incurred": "25000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-23-118 | BCC 23 77310 | GL | Lindqvist, Rory | 8/15/2023 | Open | 9450.00 | 15550.00 | 25000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#7",
+      "location": {
+        "sheet": "2023",
+        "row": 10
+      },
+      "claim_number": "BW-23-125",
+      "claim_key": "BW-23-125",
+      "policy_number": "BCC 23 77310",
+      "policy_year": null,
+      "line": "PR",
+      "feature": null,
+      "claimant": "Corbeau Bakery Supply",
+      "date_of_loss": "2023-12-01",
+      "status_raw": "C",
+      "status": "closed",
+      "paid": 421033,
+      "reserve": 0,
+      "incurred": 421033,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-23-125",
+        "date_of_loss": "12/1/2023",
+        "status": "C",
+        "paid": "4210.33",
+        "reserve": "0.00",
+        "incurred": "4210.33",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-23-125 | BCC 23 77310 | PR | Corbeau Bakery Supply | 12/1/2023 | C | 4210.33 | 0.00 | 4210.33"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#8",
+      "location": {
+        "sheet": "2024",
+        "row": 7
+      },
+      "claim_number": "BW-24-201",
+      "claim_key": "BW-24-201",
+      "policy_number": "BCC 24 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Nakashima, Ruth",
+      "date_of_loss": "2024-02-19",
+      "status_raw": "O",
+      "status": "open",
+      "paid": 300000,
+      "reserve": 2700000,
+      "incurred": 3000000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-24-201",
+        "date_of_loss": "2/19/2024",
+        "status": "O",
+        "paid": "3000.00",
+        "reserve": "27000.00",
+        "incurred": "30000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-24-201 | BCC 24 77310 | GL | Nakashima, Ruth | 2/19/2024 | O | 3000.00 | 27000.00 | 30000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#9",
+      "location": {
+        "sheet": "2024",
+        "row": 8
+      },
+      "claim_number": "100457",
+      "claim_key": "100457",
+      "policy_number": "BCC 24 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Pemberton, Hale",
+      "date_of_loss": "2024-03-03",
+      "status_raw": "O",
+      "status": "open",
+      "paid": 65000,
+      "reserve": 435000,
+      "incurred": 500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "100457",
+        "date_of_loss": "3/3/2024",
+        "status": "O",
+        "paid": "650.00",
+        "reserve": "4350.00",
+        "incurred": "5000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "100457 | BCC 24 77310 | GL | Pemberton, Hale | 3/3/2024 | O | 650.00 | 4350.00 | 5000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#10",
+      "location": {
+        "sheet": "2024",
+        "row": 10
+      },
+      "claim_number": "BW-24-213",
+      "claim_key": "BW-24-213",
+      "policy_number": "BCC 24 77310",
+      "policy_year": null,
+      "line": "GL",
+      "feature": null,
+      "claimant": "Quill, Agatha",
+      "date_of_loss": "2024-07-09",
+      "status_raw": "RO",
+      "status": "reopened",
+      "paid": 1100000,
+      "reserve": 900000,
+      "incurred": 2000000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-24-213",
+        "date_of_loss": "7/9/2024",
+        "status": "RO",
+        "paid": "11000.00",
+        "reserve": "9000.00",
+        "incurred": "20000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-24-213 | BCC 24 77310 | GL | Quill, Agatha | 7/9/2024 | RO | 11000.00 | 9000.00 | 20000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_messy#11",
+      "location": {
+        "sheet": "2024",
+        "row": 11
+      },
+      "claim_number": "BW-24-220",
+      "claim_key": "BW-24-220",
+      "policy_number": "BCC 24 77310",
+      "policy_year": null,
+      "line": "PR",
+      "feature": null,
+      "claimant": "Ridley Flour Mills",
+      "date_of_loss": "2024-10-28",
+      "status_raw": "C",
+      "status": "closed",
+      "paid": 2731590,
+      "reserve": 0,
+      "incurred": 2731590,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-24-220",
+        "date_of_loss": "10/28/2024",
+        "status": "C",
+        "paid": "27315.90",
+        "reserve": "0.00",
+        "incurred": "27315.90",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-24-220 | BCC 24 77310 | PR | Ridley Flour Mills | 10/28/2024 | C | 27315.90 | 0.00 | 27315.90"
+    }
+  ],
+  "printed_totals": [
+    {
+      "total_id": "lr_main_bellwether_messy!1",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 22 77310",
+      "amount": 6249560,
+      "printed": "62495.60",
+      "location": {
+        "sheet": "2022",
+        "row": 10
+      },
+      "quote": "Subtotal policy BCC 22 77310 | 62495.60 | 0.00 | 66245.60",
+      "label": "Subtotal policy BCC 22 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!2",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 22 77310",
+      "amount": 0,
+      "printed": "0.00",
+      "location": {
+        "sheet": "2022",
+        "row": 10
+      },
+      "quote": "Subtotal policy BCC 22 77310 | 62495.60 | 0.00 | 66245.60",
+      "label": "Subtotal policy BCC 22 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!3",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 22 77310",
+      "amount": 6624560,
+      "printed": "66245.60",
+      "location": {
+        "sheet": "2022",
+        "row": 10
+      },
+      "quote": "Subtotal policy BCC 22 77310 | 62495.60 | 0.00 | 66245.60",
+      "label": "Subtotal policy BCC 22 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!4",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 23 77310",
+      "amount": 2281033,
+      "printed": "22810.33",
+      "location": {
+        "sheet": "2023",
+        "row": 11
+      },
+      "quote": "Subtotal policy BCC 23 77310 | 22810.33 | 39400.00 | 62210.33",
+      "label": "Subtotal policy BCC 23 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!5",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 23 77310",
+      "amount": 3940000,
+      "printed": "39400.00",
+      "location": {
+        "sheet": "2023",
+        "row": 11
+      },
+      "quote": "Subtotal policy BCC 23 77310 | 22810.33 | 39400.00 | 62210.33",
+      "label": "Subtotal policy BCC 23 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!6",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 23 77310",
+      "amount": 6221033,
+      "printed": "62210.33",
+      "location": {
+        "sheet": "2023",
+        "row": 11
+      },
+      "quote": "Subtotal policy BCC 23 77310 | 22810.33 | 39400.00 | 62210.33",
+      "label": "Subtotal policy BCC 23 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!7",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 24 77310",
+      "amount": 4196590,
+      "printed": "41965.90",
+      "location": {
+        "sheet": "2024",
+        "row": 12
+      },
+      "quote": "Subtotal policy BCC 24 77310 | 41965.90 | 40350.00 | 82315.90",
+      "label": "Subtotal policy BCC 24 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!8",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 24 77310",
+      "amount": 4035000,
+      "printed": "40350.00",
+      "location": {
+        "sheet": "2024",
+        "row": 12
+      },
+      "quote": "Subtotal policy BCC 24 77310 | 41965.90 | 40350.00 | 82315.90",
+      "label": "Subtotal policy BCC 24 77310",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!9",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 24 77310",
+      "amount": 8231590,
+      "printed": "82315.90",
+      "location": {
+        "sheet": "2024",
+        "row": 12
+      },
+      "quote": "Subtotal policy BCC 24 77310 | 41965.90 | 40350.00 | 82315.90",
+      "label": "Subtotal policy BCC 24 77310",
+      "planted_difference": 0,
+      "note": ""
+    }
+  ],
+  "decoys": [],
+  "injection": null,
+  "scan_transcript": null
+}

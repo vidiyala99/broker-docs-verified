@@ -1,0 +1,5 @@
+# Loss-run fixtures are byte-exact (sha256 in manifest.json); never convert line endings or encodings.
+*.pdf binary
+*.xlsx binary
+*.csv binary
+*.json text eol=lf

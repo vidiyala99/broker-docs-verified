@@ -1,0 +1,761 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "fixture_id": "lr_main_ashgrove_clean",
+  "case_id": "lr_main",
+  "file": "lr_main_ashgrove_clean.xlsx",
+  "format": "xlsx",
+  "layout": "clean",
+  "gate_bucket": "loss_run",
+  "description": "Clean workbook: one sheet, header on row 6, date cells, a total row per policy year and a grand total.",
+  "carrier": "Ashgrove Mutual Insurance Company",
+  "valuation_date": "2025-06-30",
+  "page_count": null,
+  "size_bytes": 13751,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": []
+  },
+  "columns": {
+    "Claim Number": "claim_number",
+    "Policy Number": "policy_number",
+    "Policy Year": "policy_year",
+    "Line of Business": "line",
+    "Claimant": "claimant",
+    "Date of Loss": "date_of_loss",
+    "Status": "status",
+    "Paid": "paid",
+    "Reserve": "reserve",
+    "Incurred": "incurred",
+    "Recovery": "recovery",
+    "Deductible": "deductible"
+  },
+  "sheets": [
+    {
+      "name": "Loss Run",
+      "has_claims_table": true,
+      "header_row": 6,
+      "columns": {
+        "Claim Number": "claim_number",
+        "Policy Number": "policy_number",
+        "Policy Year": "policy_year",
+        "Line of Business": "line",
+        "Claimant": "claimant",
+        "Date of Loss": "date_of_loss",
+        "Status": "status",
+        "Paid": "paid",
+        "Reserve": "reserve",
+        "Incurred": "incurred",
+        "Recovery": "recovery",
+        "Deductible": "deductible"
+      },
+      "data_rows": 11
+    }
+  ],
+  "facts": {
+    "lr:carrier": {
+      "value": "Ashgrove Mutual Insurance Company",
+      "printed": "Ashgrove Mutual Insurance Company: Loss Run",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 1
+      },
+      "page": null,
+      "quote": "Ashgrove Mutual Insurance Company: Loss Run"
+    },
+    "lr:valuation_date": {
+      "value": "2025-06-30",
+      "printed": "2025-06-30",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 4
+      },
+      "page": null,
+      "quote": "Valued as of"
+    }
+  },
+  "exercises": [
+    "clean_xlsx",
+    "leading_zero_claim_numbers",
+    "incurred_includes_expense",
+    "date_cells",
+    "same_valuation_same_amounts",
+    "same_valuation_conflict"
+  ],
+  "lines": [
+    {
+      "line_id": "lr_main_ashgrove_clean#1",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 7
+      },
+      "claim_number": "AG-0042",
+      "claim_key": "AG-0042",
+      "policy_number": "AMI-GL-22-4471",
+      "policy_year": 2022,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Brannock, Ilse",
+      "date_of_loss": "2022-03-14",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 1825000,
+      "reserve": 0,
+      "incurred": 1825000,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-0042",
+        "date_of_loss": "2022-03-14",
+        "status": "Closed",
+        "paid": "18250.00",
+        "reserve": "0.00",
+        "incurred": "18250.00",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-0042 | AMI-GL-22-4471 | 2022 | General Liability | Brannock, Ilse | 2022-03-14 | Closed | 18250.00 | 0.00 | 18250.00 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#2",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 8
+      },
+      "claim_number": "AG-042",
+      "claim_key": "AG-042",
+      "policy_number": "AMI-GL-22-4471",
+      "policy_year": 2022,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Quist, Harlan",
+      "date_of_loss": "2022-08-02",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 240000,
+      "reserve": 760000,
+      "incurred": 1000000,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-042",
+        "date_of_loss": "2022-08-02",
+        "status": "Open",
+        "paid": "2400.00",
+        "reserve": "7600.00",
+        "incurred": "10000.00",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-042 | AMI-GL-22-4471 | 2022 | General Liability | Quist, Harlan | 2022-08-02 | Open | 2400.00 | 7600.00 | 10000.00 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#3",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 9
+      },
+      "claim_number": "AG-2214",
+      "claim_key": "AG-2214",
+      "policy_number": "AMI-GL-22-4471",
+      "policy_year": 2022,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Fenwright, Odile",
+      "date_of_loss": "2022-11-21",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 631522,
+      "reserve": 0,
+      "incurred": 631522,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2214",
+        "date_of_loss": "2022-11-21",
+        "status": "Closed",
+        "paid": "6315.22",
+        "reserve": "0.00",
+        "incurred": "6315.22",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2214 | AMI-GL-22-4471 | 2022 | General Liability | Fenwright, Odile | 2022-11-21 | Closed | 6315.22 | 0.00 | 6315.22 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#4",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 11
+      },
+      "claim_number": "AG-2301",
+      "claim_key": "AG-2301",
+      "policy_number": "AMI-GL-23-4471",
+      "policy_year": 2023,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Marchetti, Lune",
+      "date_of_loss": "2023-02-09",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 512540,
+      "reserve": 1487460,
+      "incurred": 2000000,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2301",
+        "date_of_loss": "2023-02-09",
+        "status": "Open",
+        "paid": "5125.40",
+        "reserve": "14874.60",
+        "incurred": "20000.00",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2301 | AMI-GL-23-4471 | 2023 | General Liability | Marchetti, Lune | 2023-02-09 | Open | 5125.40 | 14874.60 | 20000.00 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#5",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 12
+      },
+      "claim_number": "AG-2307",
+      "claim_key": "AG-2307",
+      "policy_number": "AMI-GL-23-4471",
+      "policy_year": 2023,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Okonjo, Pell",
+      "date_of_loss": "2023-05-30",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 3100000,
+      "reserve": 4400000,
+      "incurred": 7500000,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2307",
+        "date_of_loss": "2023-05-30",
+        "status": "Open",
+        "paid": "31000.00",
+        "reserve": "44000.00",
+        "incurred": "75000.00",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2307 | AMI-GL-23-4471 | 2023 | General Liability | Okonjo, Pell | 2023-05-30 | Open | 31000.00 | 44000.00 | 75000.00 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#6",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 13
+      },
+      "claim_number": "AG-2310",
+      "claim_key": "AG-2310",
+      "policy_number": "AMI-GL-23-4471",
+      "policy_year": 2023,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Varga, Tamsin",
+      "date_of_loss": "2023-07-18",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 980000,
+      "reserve": 320000,
+      "incurred": 1445000,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [
+        "incurred_not_paid_plus_reserve"
+      ],
+      "printed": {
+        "claim_number": "AG-2310",
+        "date_of_loss": "2023-07-18",
+        "status": "Closed",
+        "paid": "9800.00",
+        "reserve": "3200.00",
+        "incurred": "14450.00",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2310 | AMI-GL-23-4471 | 2023 | General Liability | Varga, Tamsin | 2023-07-18 | Closed | 9800.00 | 3200.00 | 14450.00 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#7",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 14
+      },
+      "claim_number": "AG-2318",
+      "claim_key": "AG-2318",
+      "policy_number": "AMI-AU-23-0912",
+      "policy_year": 2023,
+      "line": "Auto Liability",
+      "feature": null,
+      "claimant": "Delacroix Rentals (vehicle)",
+      "date_of_loss": "2023-10-04",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 2294010,
+      "reserve": 0,
+      "incurred": 2294010,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 50000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2318",
+        "date_of_loss": "2023-10-04",
+        "status": "Closed",
+        "paid": "22940.10",
+        "reserve": "0.00",
+        "incurred": "22940.10",
+        "recovery": "0.00",
+        "deductible": "500.00"
+      },
+      "quote": "AG-2318 | AMI-AU-23-0912 | 2023 | Auto Liability | Delacroix Rentals (vehicle) | 2023-10-04 | Closed | 22940.10 | 0.00 | 22940.10 | 0.00 | 500.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#8",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 16
+      },
+      "claim_number": "AG-2402",
+      "claim_key": "AG-2402",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Iyer, Bastian",
+      "date_of_loss": "2024-01-16",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 125000,
+      "reserve": 2375000,
+      "incurred": 2500000,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2402",
+        "date_of_loss": "2024-01-16",
+        "status": "Open",
+        "paid": "1250.00",
+        "reserve": "23750.00",
+        "incurred": "25000.00",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2402 | AMI-GL-24-4471 | 2024 | General Liability | Iyer, Bastian | 2024-01-16 | Open | 1250.00 | 23750.00 | 25000.00 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#9",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 17
+      },
+      "claim_number": "AG-2405",
+      "claim_key": "AG-2405",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Sallow, Prue",
+      "date_of_loss": "2024-04-03",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 388075,
+      "reserve": 0,
+      "incurred": 388075,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2405",
+        "date_of_loss": "2024-04-03",
+        "status": "Closed",
+        "paid": "3880.75",
+        "reserve": "0.00",
+        "incurred": "3880.75",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2405 | AMI-GL-24-4471 | 2024 | General Liability | Sallow, Prue | 2024-04-03 | Closed | 3880.75 | 0.00 | 3880.75 | 0.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#10",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 18
+      },
+      "claim_number": "AG-2411",
+      "claim_key": "AG-2411",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Kerridge, Amos",
+      "date_of_loss": "2024-06-27",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 4120000,
+      "reserve": 1880000,
+      "incurred": 6000000,
+      "incurred_source": "printed",
+      "recovery": 250000,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2411",
+        "date_of_loss": "2024-06-27",
+        "status": "Open",
+        "paid": "41200.00",
+        "reserve": "18800.00",
+        "incurred": "60000.00",
+        "recovery": "2500.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2411 | AMI-GL-24-4471 | 2024 | General Liability | Kerridge, Amos | 2024-06-27 | Open | 41200.00 | 18800.00 | 60000.00 | 2500.00 | 1000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_clean#11",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 19
+      },
+      "claim_number": "AG-2419",
+      "claim_key": "AG-2419",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Tolliver, Wren",
+      "date_of_loss": "2024-09-12",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 0,
+      "reserve": 1200000,
+      "incurred": 1200000,
+      "incurred_source": "printed",
+      "recovery": 0,
+      "deductible": 100000,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2419",
+        "date_of_loss": "2024-09-12",
+        "status": "Open",
+        "paid": "0.00",
+        "reserve": "12000.00",
+        "incurred": "12000.00",
+        "recovery": "0.00",
+        "deductible": "1000.00"
+      },
+      "quote": "AG-2419 | AMI-GL-24-4471 | 2024 | General Liability | Tolliver, Wren | 2024-09-12 | Open | 0.00 | 12000.00 | 12000.00 | 0.00 | 1000.00"
+    }
+  ],
+  "printed_totals": [
+    {
+      "total_id": "lr_main_ashgrove_clean!1",
+      "metric": "paid",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "amount": 2696522,
+      "printed": "26965.22",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 10
+      },
+      "quote": "Total 2022 | 26965.22 | 7600.00 | 34565.22 | 0.00",
+      "label": "Total 2022",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!2",
+      "metric": "reserve",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "amount": 760000,
+      "printed": "7600.00",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 10
+      },
+      "quote": "Total 2022 | 26965.22 | 7600.00 | 34565.22 | 0.00",
+      "label": "Total 2022",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!3",
+      "metric": "incurred",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "amount": 3456522,
+      "printed": "34565.22",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 10
+      },
+      "quote": "Total 2022 | 26965.22 | 7600.00 | 34565.22 | 0.00",
+      "label": "Total 2022",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!4",
+      "metric": "recovery",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "amount": 0,
+      "printed": "0.00",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 10
+      },
+      "quote": "Total 2022 | 26965.22 | 7600.00 | 34565.22 | 0.00",
+      "label": "Total 2022",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!5",
+      "metric": "paid",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "amount": 6886550,
+      "printed": "68865.50",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 15
+      },
+      "quote": "Total 2023 | 68865.50 | 62074.60 | 132390.10 | 0.00",
+      "label": "Total 2023",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!6",
+      "metric": "reserve",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "amount": 6207460,
+      "printed": "62074.60",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 15
+      },
+      "quote": "Total 2023 | 68865.50 | 62074.60 | 132390.10 | 0.00",
+      "label": "Total 2023",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!7",
+      "metric": "incurred",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "amount": 13239010,
+      "printed": "132390.10",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 15
+      },
+      "quote": "Total 2023 | 68865.50 | 62074.60 | 132390.10 | 0.00",
+      "label": "Total 2023",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!8",
+      "metric": "recovery",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "amount": 0,
+      "printed": "0.00",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 15
+      },
+      "quote": "Total 2023 | 68865.50 | 62074.60 | 132390.10 | 0.00",
+      "label": "Total 2023",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!9",
+      "metric": "paid",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "amount": 4633075,
+      "printed": "46330.75",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 20
+      },
+      "quote": "Total 2024 | 46330.75 | 54550.00 | 100880.75 | 2500.00",
+      "label": "Total 2024",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!10",
+      "metric": "reserve",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "amount": 5455000,
+      "printed": "54550.00",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 20
+      },
+      "quote": "Total 2024 | 46330.75 | 54550.00 | 100880.75 | 2500.00",
+      "label": "Total 2024",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!11",
+      "metric": "incurred",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "amount": 10088075,
+      "printed": "100880.75",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 20
+      },
+      "quote": "Total 2024 | 46330.75 | 54550.00 | 100880.75 | 2500.00",
+      "label": "Total 2024",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!12",
+      "metric": "recovery",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "amount": 250000,
+      "printed": "2500.00",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 20
+      },
+      "quote": "Total 2024 | 46330.75 | 54550.00 | 100880.75 | 2500.00",
+      "label": "Total 2024",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!13",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 14216147,
+      "printed": "142161.47",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 21
+      },
+      "quote": "Grand Total | 142161.47 | 124224.60 | 267836.07 | 2500.00",
+      "label": "Grand Total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!14",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 12422460,
+      "printed": "124224.60",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 21
+      },
+      "quote": "Grand Total | 142161.47 | 124224.60 | 267836.07 | 2500.00",
+      "label": "Grand Total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!15",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 26783607,
+      "printed": "267836.07",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 21
+      },
+      "quote": "Grand Total | 142161.47 | 124224.60 | 267836.07 | 2500.00",
+      "label": "Grand Total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!16",
+      "metric": "recovery",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 250000,
+      "printed": "2500.00",
+      "location": {
+        "sheet": "Loss Run",
+        "row": 21
+      },
+      "quote": "Grand Total | 142161.47 | 124224.60 | 267836.07 | 2500.00",
+      "label": "Grand Total",
+      "planted_difference": 0,
+      "note": ""
+    }
+  ],
+  "decoys": [],
+  "injection": null,
+  "scan_transcript": null
+}

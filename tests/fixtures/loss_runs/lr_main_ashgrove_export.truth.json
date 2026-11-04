@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "fixture_id": "lr_main_ashgrove_export",
+  "case_id": "lr_main",
+  "file": "lr_main_ashgrove_export.csv",
+  "format": "csv",
+  "layout": "csv_utf8_bom",
+  "gate_bucket": "loss_run",
+  "description": "CSV export, UTF-8 with BOM, comma-delimited, two title lines above the header; prints no totals.",
+  "carrier": "Ashgrove Mutual Insurance Company",
+  "valuation_date": "2025-06-30",
+  "page_count": null,
+  "size_bytes": 989,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": []
+  },
+  "columns": {
+    "Claim #": "claim_number",
+    "Policy #": "policy_number",
+    "Pol Yr": "policy_year",
+    "Coverage": "line",
+    "Claimant Name": "claimant",
+    "Loss Date": "date_of_loss",
+    "Claim Status": "status",
+    "Total Paid": "paid",
+    "Outstanding Reserve": "reserve",
+    "Total Incurred": "incurred"
+  },
+  "sheets": [
+    {
+      "name": null,
+      "has_claims_table": true,
+      "header_row": 4,
+      "columns": {
+        "Claim #": "claim_number",
+        "Policy #": "policy_number",
+        "Pol Yr": "policy_year",
+        "Coverage": "line",
+        "Claimant Name": "claimant",
+        "Loss Date": "date_of_loss",
+        "Claim Status": "status",
+        "Total Paid": "paid",
+        "Outstanding Reserve": "reserve",
+        "Total Incurred": "incurred"
+      },
+      "data_rows": 6,
+      "delimiter": ",",
+      "encoding": "utf-8-sig"
+    }
+  ],
+  "facts": {
+    "lr:carrier": {
+      "value": "Ashgrove Mutual Insurance Company",
+      "printed": "Ashgrove Mutual Insurance Company",
+      "location": {
+        "sheet": null,
+        "row": 1
+      },
+      "page": null,
+      "quote": "Ashgrove Mutual Insurance Company"
+    },
+    "lr:valuation_date": {
+      "value": "2025-06-30",
+      "printed": "06/30/2025",
+      "location": {
+        "sheet": null,
+        "row": 1
+      },
+      "page": null,
+      "quote": "Valued as of 06/30/2025"
+    }
+  },
+  "exercises": [
+    "csv_utf8_bom",
+    "negative_paid_parentheses",
+    "mixed_status_spellings",
+    "claim_key_case_whitespace",
+    "no_printed_totals",
+    "same_valuation_same_amounts",
+    "same_valuation_conflict"
+  ],
+  "lines": [
+    {
+      "line_id": "lr_main_ashgrove_export#1",
+      "location": {
+        "sheet": null,
+        "row": 5
+      },
+      "claim_number": "ag-2301 ",
+      "claim_key": "AG-2301",
+      "policy_number": "AMI-GL-23-4471",
+      "policy_year": 2023,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Marchetti, L.",
+      "date_of_loss": "2023-02-09",
+      "status_raw": "O",
+      "status": "open",
+      "paid": 512540,
+      "reserve": 1487460,
+      "incurred": 2000000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "ag-2301 ",
+        "date_of_loss": "2023-02-09",
+        "status": "O",
+        "paid": "5,125.40",
+        "reserve": "14,874.60",
+        "incurred": "20,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "ag-2301 ,AMI-GL-23-4471,2023,General Liability,Marchetti, L.,2023-02-09,O,5,125.40,14,874.60,20,000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_export#2",
+      "location": {
+        "sheet": null,
+        "row": 6
+      },
+      "claim_number": "AG-2307",
+      "claim_key": "AG-2307",
+      "policy_number": "AMI-GL-23-4471",
+      "policy_year": 2023,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Okonjo, P.",
+      "date_of_loss": "2023-05-30",
+      "status_raw": "Opened",
+      "status": "open",
+      "paid": 3100000,
+      "reserve": 5250000,
+      "incurred": 8350000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2307",
+        "date_of_loss": "2023-05-30",
+        "status": "Opened",
+        "paid": "31,000.00",
+        "reserve": "52,500.00",
+        "incurred": "83,500.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "AG-2307,AMI-GL-23-4471,2023,General Liability,Okonjo, P.,2023-05-30,Opened,31,000.00,52,500.00,83,500.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_export#3",
+      "location": {
+        "sheet": null,
+        "row": 7
+      },
+      "claim_number": "AG-2421",
+      "claim_key": "AG-2421",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Haldane, Corin",
+      "date_of_loss": "2024-10-08",
+      "status_raw": "C",
+      "status": "closed",
+      "paid": 331015,
+      "reserve": 0,
+      "incurred": 331015,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2421",
+        "date_of_loss": "2024-10-08",
+        "status": "C",
+        "paid": "3,310.15",
+        "reserve": "0.00",
+        "incurred": "3,310.15",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "AG-2421,AMI-GL-24-4471,2024,General Liability,Haldane, Corin,2024-10-08,C,3,310.15,0.00,3,310.15"
+    },
+    {
+      "line_id": "lr_main_ashgrove_export#4",
+      "location": {
+        "sheet": null,
+        "row": 8
+      },
+      "claim_number": "AG-2426",
+      "claim_key": "AG-2426",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Pryce, Mabel",
+      "date_of_loss": "2024-11-19",
+      "status_raw": "Re-opened",
+      "status": "reopened",
+      "paid": 1200000,
+      "reserve": 600000,
+      "incurred": 1800000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2426",
+        "date_of_loss": "2024-11-19",
+        "status": "Re-opened",
+        "paid": "12,000.00",
+        "reserve": "6,000.00",
+        "incurred": "18,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "AG-2426,AMI-GL-24-4471,2024,General Liability,Pryce, Mabel,2024-11-19,Re-opened,12,000.00,6,000.00,18,000.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_export#5",
+      "location": {
+        "sheet": null,
+        "row": 9
+      },
+      "claim_number": "AG-2433",
+      "claim_key": "AG-2433",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Ostrander, Jude",
+      "date_of_loss": "2024-12-02",
+      "status_raw": "O",
+      "status": "open",
+      "paid": -120000,
+      "reserve": 400000,
+      "incurred": 280000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2433",
+        "date_of_loss": "2024-12-02",
+        "status": "O",
+        "paid": "(1,200.00)",
+        "reserve": "4,000.00",
+        "incurred": "2,800.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "AG-2433,AMI-GL-24-4471,2024,General Liability,Ostrander, Jude,2024-12-02,O,(1,200.00),4,000.00,2,800.00"
+    },
+    {
+      "line_id": "lr_main_ashgrove_export#6",
+      "location": {
+        "sheet": null,
+        "row": 10
+      },
+      "claim_number": "AG-2440",
+      "claim_key": "AG-2440",
+      "policy_number": "AMI-GL-24-4471",
+      "policy_year": 2024,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Wexley, Nan",
+      "date_of_loss": "2025-02-14",
+      "status_raw": "Opened",
+      "status": "open",
+      "paid": 75000,
+      "reserve": 925000,
+      "incurred": 1000000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "AG-2440",
+        "date_of_loss": "2025-02-14",
+        "status": "Opened",
+        "paid": "750.00",
+        "reserve": "9,250.00",
+        "incurred": "10,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "AG-2440,AMI-GL-24-4471,2024,General Liability,Wexley, Nan,2025-02-14,Opened,750.00,9,250.00,10,000.00"
+    }
+  ],
+  "printed_totals": [],
+  "decoys": [],
+  "injection": null,
+  "scan_transcript": null
+}

@@ -1,0 +1,1047 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "case_id": "lr_main",
+  "workflow": "loss_run",
+  "gate_bucket": "loss_run",
+  "client_name": "Harrow Lane Bakery Group LLC",
+  "description": "One loss review for Harrow Lane Bakery Group LLC: 8 files from 5 carriers (xlsx, csv, digital and scanned PDF) with every section 8 trap plus swapped columns (O1), a 3-line claim (D5) and page subtotals (D9).",
+  "documents": [
+    "lr_main_ashgrove_clean",
+    "lr_main_ashgrove_export",
+    "lr_main_bellwether_messy",
+    "lr_main_bellwether_extract",
+    "lr_main_driftwood_2024",
+    "lr_main_driftwood_2025",
+    "lr_main_elmstead_wrapped",
+    "lr_main_fairhaven_scan"
+  ],
+  "exercises": [
+    "claim_key_case_whitespace",
+    "clean_xlsx",
+    "csv_cp1252_semicolon",
+    "csv_utf8_bom",
+    "date_cells",
+    "formula_not_calculated",
+    "incurred_includes_expense",
+    "injection_canary",
+    "latest_valuation_counted",
+    "leading_zero_claim_numbers",
+    "merged_header",
+    "messy_xlsx",
+    "mixed_status_spellings",
+    "negative_paid_parentheses",
+    "no_printed_totals",
+    "no_valuation_date",
+    "older_valuation_superseded",
+    "page_subtotals",
+    "pdf_layout_a",
+    "pdf_layout_b",
+    "policy_number_totals",
+    "printed_total_mismatch",
+    "reopened_status",
+    "repeated_header_row",
+    "repeated_line",
+    "rows_unverified_scan",
+    "same_claim_number_two_carriers",
+    "same_valuation_conflict",
+    "same_valuation_same_amounts",
+    "scanned_pdf",
+    "sheet_without_claims_table",
+    "subtotal_rows",
+    "superseded_by_dated_file",
+    "swapped_columns",
+    "text_dates",
+    "three_line_claim",
+    "three_year_sheets",
+    "title_rows",
+    "tolerance_within_one_dollar",
+    "unfamiliar_headers",
+    "unknown_status_spelling",
+    "wrapped_claimants",
+    "zero_as_dash"
+  ],
+  "line_count": 77,
+  "roles": {
+    "lr_main_ashgrove_clean#5": "conflicting",
+    "lr_main_ashgrove_export#1": "superseded",
+    "lr_main_ashgrove_export#2": "conflicting",
+    "lr_main_bellwether_extract#1": "superseded",
+    "lr_main_driftwood_2024#4": "superseded",
+    "lr_main_driftwood_2024#5": "superseded",
+    "lr_main_driftwood_2024#6": "superseded",
+    "lr_main_driftwood_2024#7": "superseded",
+    "lr_main_driftwood_2024#8": "superseded",
+    "lr_main_driftwood_2024#9": "superseded"
+  },
+  "claim_count": 65,
+  "claims": [
+    {
+      "carrier": "Ashgrove Mutual Insurance Company",
+      "claim_key": "AG-2301",
+      "documents": [
+        "lr_main_ashgrove_clean",
+        "lr_main_ashgrove_export"
+      ],
+      "state": "duplicate_same_valuation",
+      "counted_document": "lr_main_ashgrove_clean",
+      "tie_documents": [
+        "lr_main_ashgrove_clean",
+        "lr_main_ashgrove_export"
+      ],
+      "roles": {
+        "lr_main_ashgrove_clean": "counted",
+        "lr_main_ashgrove_export": "superseded"
+      },
+      "lines": {
+        "lr_main_ashgrove_clean": 1,
+        "lr_main_ashgrove_export": 1
+      },
+      "document_sums": {
+        "lr_main_ashgrove_clean": {
+          "paid": 512540,
+          "reserve": 1487460,
+          "incurred": 2000000,
+          "recovery": 0,
+          "deductible": 100000
+        },
+        "lr_main_ashgrove_export": {
+          "paid": 512540,
+          "reserve": 1487460,
+          "incurred": 2000000,
+          "recovery": null,
+          "deductible": null
+        }
+      }
+    },
+    {
+      "carrier": "Ashgrove Mutual Insurance Company",
+      "claim_key": "AG-2307",
+      "documents": [
+        "lr_main_ashgrove_clean",
+        "lr_main_ashgrove_export"
+      ],
+      "state": "conflicting",
+      "counted_document": null,
+      "tie_documents": [],
+      "roles": {
+        "lr_main_ashgrove_clean": "conflicting",
+        "lr_main_ashgrove_export": "conflicting"
+      },
+      "lines": {
+        "lr_main_ashgrove_clean": 1,
+        "lr_main_ashgrove_export": 1
+      },
+      "document_sums": {
+        "lr_main_ashgrove_clean": {
+          "paid": 3100000,
+          "reserve": 4400000,
+          "incurred": 7500000,
+          "recovery": 0,
+          "deductible": 100000
+        },
+        "lr_main_ashgrove_export": {
+          "paid": 3100000,
+          "reserve": 5250000,
+          "incurred": 8350000,
+          "recovery": null,
+          "deductible": null
+        }
+      }
+    },
+    {
+      "carrier": "Bellwether Casualty Company",
+      "claim_key": "BW-23-118",
+      "documents": [
+        "lr_main_bellwether_messy",
+        "lr_main_bellwether_extract"
+      ],
+      "state": "counted",
+      "counted_document": "lr_main_bellwether_messy",
+      "tie_documents": [],
+      "roles": {
+        "lr_main_bellwether_messy": "counted",
+        "lr_main_bellwether_extract": "superseded"
+      },
+      "lines": {
+        "lr_main_bellwether_messy": 1,
+        "lr_main_bellwether_extract": 1
+      },
+      "document_sums": {
+        "lr_main_bellwether_messy": {
+          "paid": 945000,
+          "reserve": 1555000,
+          "incurred": 2500000,
+          "recovery": null,
+          "deductible": null
+        },
+        "lr_main_bellwether_extract": {
+          "paid": 600000,
+          "reserve": 1900000,
+          "incurred": 2500000,
+          "recovery": null,
+          "deductible": null
+        }
+      }
+    },
+    {
+      "carrier": "Driftwood Specialty Insurance Company",
+      "claim_key": "DS-24-0101",
+      "documents": [
+        "lr_main_driftwood_2024",
+        "lr_main_driftwood_2025"
+      ],
+      "state": "counted",
+      "counted_document": "lr_main_driftwood_2025",
+      "tie_documents": [],
+      "roles": {
+        "lr_main_driftwood_2024": "superseded",
+        "lr_main_driftwood_2025": "counted"
+      },
+      "lines": {
+        "lr_main_driftwood_2024": 3,
+        "lr_main_driftwood_2025": 3
+      },
+      "document_sums": {
+        "lr_main_driftwood_2024": {
+          "paid": 1223000,
+          "reserve": 3325000,
+          "incurred": 4548000,
+          "recovery": null,
+          "deductible": null
+        },
+        "lr_main_driftwood_2025": {
+          "paid": 2448000,
+          "reserve": 2600000,
+          "incurred": 5048000,
+          "recovery": null,
+          "deductible": null
+        }
+      }
+    },
+    {
+      "carrier": "Driftwood Specialty Insurance Company",
+      "claim_key": "DS-24-0118",
+      "documents": [
+        "lr_main_driftwood_2024",
+        "lr_main_driftwood_2025"
+      ],
+      "state": "counted",
+      "counted_document": "lr_main_driftwood_2025",
+      "tie_documents": [],
+      "roles": {
+        "lr_main_driftwood_2024": "superseded",
+        "lr_main_driftwood_2025": "counted"
+      },
+      "lines": {
+        "lr_main_driftwood_2024": 1,
+        "lr_main_driftwood_2025": 1
+      },
+      "document_sums": {
+        "lr_main_driftwood_2024": {
+          "paid": 600000,
+          "reserve": 900000,
+          "incurred": 1500000,
+          "recovery": null,
+          "deductible": null
+        },
+        "lr_main_driftwood_2025": {
+          "paid": 1325000,
+          "reserve": 0,
+          "incurred": 1325000,
+          "recovery": null,
+          "deductible": null
+        }
+      }
+    },
+    {
+      "carrier": "Driftwood Specialty Insurance Company",
+      "claim_key": "DS-24-0125",
+      "documents": [
+        "lr_main_driftwood_2024",
+        "lr_main_driftwood_2025"
+      ],
+      "state": "counted",
+      "counted_document": "lr_main_driftwood_2025",
+      "tie_documents": [],
+      "roles": {
+        "lr_main_driftwood_2024": "superseded",
+        "lr_main_driftwood_2025": "counted"
+      },
+      "lines": {
+        "lr_main_driftwood_2024": 1,
+        "lr_main_driftwood_2025": 1
+      },
+      "document_sums": {
+        "lr_main_driftwood_2024": {
+          "paid": 50000,
+          "reserve": 2450000,
+          "incurred": 2500000,
+          "recovery": null,
+          "deductible": null
+        },
+        "lr_main_driftwood_2025": {
+          "paid": 275000,
+          "reserve": 2725000,
+          "incurred": 3000000,
+          "recovery": null,
+          "deductible": null
+        }
+      }
+    },
+    {
+      "carrier": "Driftwood Specialty Insurance Company",
+      "claim_key": "DS-24-0139",
+      "documents": [
+        "lr_main_driftwood_2024",
+        "lr_main_driftwood_2025"
+      ],
+      "state": "counted",
+      "counted_document": "lr_main_driftwood_2025",
+      "tie_documents": [],
+      "roles": {
+        "lr_main_driftwood_2024": "superseded",
+        "lr_main_driftwood_2025": "counted"
+      },
+      "lines": {
+        "lr_main_driftwood_2024": 1,
+        "lr_main_driftwood_2025": 1
+      },
+      "document_sums": {
+        "lr_main_driftwood_2024": {
+          "paid": 333333,
+          "reserve": 0,
+          "incurred": 333333,
+          "recovery": null,
+          "deductible": null
+        },
+        "lr_main_driftwood_2025": {
+          "paid": 333333,
+          "reserve": 0,
+          "incurred": 333333,
+          "recovery": null,
+          "deductible": null
+        }
+      }
+    }
+  ],
+  "totals": {
+    "claims": 55,
+    "open": 32,
+    "paid": 49038288,
+    "reserve": 36137460,
+    "incurred": 85789748,
+    "recovery": 250000,
+    "deductible": 5450000
+  },
+  "checks": [
+    {
+      "total_id": "lr_main_ashgrove_clean!1",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "paid",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "printed": 2696522,
+      "computed": 2696522,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Total 2022"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!2",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "reserve",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "printed": 760000,
+      "computed": 760000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Total 2022"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!3",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "incurred",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "printed": 3456522,
+      "computed": 3456522,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Total 2022"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!4",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "recovery",
+      "scope_kind": "policy_year",
+      "scope_value": "2022",
+      "printed": 0,
+      "computed": 0,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Total 2022"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!5",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "paid",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "printed": 6886550,
+      "computed": 6886550,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2023"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!6",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "reserve",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "printed": 6207460,
+      "computed": 6207460,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2023"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!7",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "incurred",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "printed": 13239010,
+      "computed": 13239010,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2023"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!8",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "recovery",
+      "scope_kind": "policy_year",
+      "scope_value": "2023",
+      "printed": 0,
+      "computed": 0,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2023"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!9",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "paid",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "printed": 4633075,
+      "computed": 4633075,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2024"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!10",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "reserve",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "printed": 5455000,
+      "computed": 5455000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2024"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!11",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "incurred",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "printed": 10088075,
+      "computed": 10088075,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2024"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!12",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "recovery",
+      "scope_kind": "policy_year",
+      "scope_value": "2024",
+      "printed": 250000,
+      "computed": 250000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Total 2024"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!13",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 14216147,
+      "computed": 14216147,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 11,
+      "label": "Grand Total"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!14",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 12422460,
+      "computed": 12422460,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 11,
+      "label": "Grand Total"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!15",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 26783607,
+      "computed": 26783607,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 11,
+      "label": "Grand Total"
+    },
+    {
+      "total_id": "lr_main_ashgrove_clean!16",
+      "fixture_id": "lr_main_ashgrove_clean",
+      "metric": "recovery",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 250000,
+      "computed": 250000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 11,
+      "label": "Grand Total"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!1",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 22 77310",
+      "printed": 6249560,
+      "computed": 6249560,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Subtotal policy BCC 22 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!2",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 22 77310",
+      "printed": 0,
+      "computed": 0,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Subtotal policy BCC 22 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!3",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 22 77310",
+      "printed": 6624560,
+      "computed": 6624560,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Subtotal policy BCC 22 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!4",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 23 77310",
+      "printed": 2281033,
+      "computed": 2281033,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Subtotal policy BCC 23 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!5",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 23 77310",
+      "printed": 3940000,
+      "computed": 3940000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Subtotal policy BCC 23 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!6",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 23 77310",
+      "printed": 6221033,
+      "computed": 6221033,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Subtotal policy BCC 23 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!7",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 24 77310",
+      "printed": 4196590,
+      "computed": 4196590,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Subtotal policy BCC 24 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!8",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 24 77310",
+      "printed": 4035000,
+      "computed": 4035000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Subtotal policy BCC 24 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_messy!9",
+      "fixture_id": "lr_main_bellwether_messy",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "BCC 24 77310",
+      "printed": 8231590,
+      "computed": 8231590,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Subtotal policy BCC 24 77310"
+    },
+    {
+      "total_id": "lr_main_bellwether_extract!1",
+      "fixture_id": "lr_main_bellwether_extract",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 6745000,
+      "computed": 6745000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 5,
+      "label": "TOTAL"
+    },
+    {
+      "total_id": "lr_main_bellwether_extract!2",
+      "fixture_id": "lr_main_bellwether_extract",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 2945000,
+      "computed": 2945000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 5,
+      "label": "TOTAL"
+    },
+    {
+      "total_id": "lr_main_bellwether_extract!3",
+      "fixture_id": "lr_main_bellwether_extract",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 9690000,
+      "computed": 9690000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 5,
+      "label": "TOTAL"
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!1",
+      "fixture_id": "lr_main_driftwood_2024",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2301",
+      "printed": 1563548,
+      "computed": 1563548,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Policy DSI-GL-2301 total"
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!2",
+      "fixture_id": "lr_main_driftwood_2024",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2301",
+      "printed": 350000,
+      "computed": 350000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Policy DSI-GL-2301 total"
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!3",
+      "fixture_id": "lr_main_driftwood_2024",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2301",
+      "printed": 1913548,
+      "computed": 1913548,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 3,
+      "label": "Policy DSI-GL-2301 total"
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!4",
+      "fixture_id": "lr_main_driftwood_2024",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2401",
+      "printed": 2206333,
+      "computed": 2206333,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 6,
+      "label": "Policy DSI-GL-2401 total"
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!5",
+      "fixture_id": "lr_main_driftwood_2024",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2401",
+      "printed": 6675000,
+      "computed": 6675000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 6,
+      "label": "Policy DSI-GL-2401 total"
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!6",
+      "fixture_id": "lr_main_driftwood_2024",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2401",
+      "printed": 8881333,
+      "computed": 8881333,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 6,
+      "label": "Policy DSI-GL-2401 total"
+    },
+    {
+      "total_id": "lr_main_driftwood_2025!1",
+      "fixture_id": "lr_main_driftwood_2025",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 6156333,
+      "computed": 5741333,
+      "difference": 415000,
+      "verdict": "off",
+      "lines_in_scope": 9,
+      "label": "Total, all policies"
+    },
+    {
+      "total_id": "lr_main_driftwood_2025!2",
+      "fixture_id": "lr_main_driftwood_2025",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 10090000,
+      "computed": 9265000,
+      "difference": 825000,
+      "verdict": "off",
+      "lines_in_scope": 9,
+      "label": "Total, all policies"
+    },
+    {
+      "total_id": "lr_main_driftwood_2025!3",
+      "fixture_id": "lr_main_driftwood_2025",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 16246333,
+      "computed": 15006333,
+      "difference": 1240000,
+      "verdict": "off",
+      "lines_in_scope": 9,
+      "label": "Total, all policies"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!1",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "paid",
+      "scope_kind": "page_subtotal",
+      "scope_value": "1",
+      "printed": 5174550,
+      "computed": 5174550,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 7,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!2",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "reserve",
+      "scope_kind": "page_subtotal",
+      "scope_value": "1",
+      "printed": 2965000,
+      "computed": 2965000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 7,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!3",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "incurred",
+      "scope_kind": "page_subtotal",
+      "scope_value": "1",
+      "printed": 8139550,
+      "computed": 8139550,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 7,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!4",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "paid",
+      "scope_kind": "page_subtotal",
+      "scope_value": "2",
+      "printed": 4054512,
+      "computed": 4054512,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 7,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!5",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "reserve",
+      "scope_kind": "page_subtotal",
+      "scope_value": "2",
+      "printed": 1820000,
+      "computed": 1820000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 7,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!6",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "incurred",
+      "scope_kind": "page_subtotal",
+      "scope_value": "2",
+      "printed": 5968512,
+      "computed": 5968512,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 7,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!7",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "paid",
+      "scope_kind": "page_subtotal",
+      "scope_value": "3",
+      "printed": 1145000,
+      "computed": 1145000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!8",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "reserve",
+      "scope_kind": "page_subtotal",
+      "scope_value": "3",
+      "printed": 3455000,
+      "computed": 3455000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!9",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "incurred",
+      "scope_kind": "page_subtotal",
+      "scope_value": "3",
+      "printed": 4600000,
+      "computed": 4600000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 4,
+      "label": "Page subtotal"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!10",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 10374062,
+      "computed": 10374062,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 18,
+      "label": "Report total"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!11",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 8240000,
+      "computed": 8240000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 18,
+      "label": "Report total"
+    },
+    {
+      "total_id": "lr_main_elmstead_wrapped!12",
+      "fixture_id": "lr_main_elmstead_wrapped",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 18708062,
+      "computed": 18708062,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 18,
+      "label": "Report total"
+    },
+    {
+      "total_id": "lr_main_fairhaven_scan!1",
+      "fixture_id": "lr_main_fairhaven_scan",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 6143765,
+      "computed": 6143765,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 8,
+      "label": "Total"
+    },
+    {
+      "total_id": "lr_main_fairhaven_scan!2",
+      "fixture_id": "lr_main_fairhaven_scan",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 2665000,
+      "computed": 2665000,
+      "difference": 0,
+      "verdict": "matches",
+      "lines_in_scope": 8,
+      "label": "Total"
+    },
+    {
+      "total_id": "lr_main_fairhaven_scan!3",
+      "fixture_id": "lr_main_fairhaven_scan",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "printed": 8808805,
+      "computed": 8808765,
+      "difference": 40,
+      "verdict": "matches",
+      "lines_in_scope": 8,
+      "label": "Total"
+    }
+  ],
+  "notices": [
+    {
+      "kind": "no_printed_totals",
+      "fixture_id": "lr_main_ashgrove_export",
+      "sheet": null
+    },
+    {
+      "kind": "no_claims_table",
+      "fixture_id": "lr_main_bellwether_messy",
+      "sheet": "Notes"
+    },
+    {
+      "kind": "rows_not_verified",
+      "fixture_id": "lr_main_bellwether_messy",
+      "sheet": null,
+      "rows": 1
+    },
+    {
+      "kind": "no_valuation_date",
+      "fixture_id": "lr_main_bellwether_extract",
+      "sheet": null
+    },
+    {
+      "kind": "rows_not_verified",
+      "fixture_id": "lr_main_fairhaven_scan",
+      "sheet": null,
+      "rows": 8
+    }
+  ]
+}

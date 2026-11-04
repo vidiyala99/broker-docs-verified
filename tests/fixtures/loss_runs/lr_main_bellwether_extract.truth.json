@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "fixture_id": "lr_main_bellwether_extract",
+  "case_id": "lr_main",
+  "file": "lr_main_bellwether_extract.csv",
+  "format": "csv",
+  "layout": "csv_cp1252_semicolon",
+  "gate_bucket": "loss_run",
+  "description": "CSV extract, cp1252, semicolon-delimited, no valuation date; a TOTAL line at the end.",
+  "carrier": "Bellwether Casualty Company",
+  "valuation_date": null,
+  "page_count": null,
+  "size_bytes": 790,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": []
+  },
+  "columns": {
+    "Claim No": "claim_number",
+    "Policy": "policy_number",
+    "Line of Business": "line",
+    "Claimant": "claimant",
+    "Date of Loss": "date_of_loss",
+    "Status": "status",
+    "Paid": "paid",
+    "Reserve": "reserve",
+    "Incurred": "incurred"
+  },
+  "sheets": [
+    {
+      "name": null,
+      "has_claims_table": true,
+      "header_row": 2,
+      "columns": {
+        "Claim No": "claim_number",
+        "Policy": "policy_number",
+        "Line of Business": "line",
+        "Claimant": "claimant",
+        "Date of Loss": "date_of_loss",
+        "Status": "status",
+        "Paid": "paid",
+        "Reserve": "reserve",
+        "Incurred": "incurred"
+      },
+      "data_rows": 5,
+      "delimiter": ";",
+      "encoding": "cp1252"
+    }
+  ],
+  "facts": {
+    "lr:carrier": {
+      "value": "Bellwether Casualty Company",
+      "printed": "Bellwether Casualty Company",
+      "location": {
+        "sheet": null,
+        "row": 1
+      },
+      "page": null,
+      "quote": "Bellwether Casualty Company"
+    },
+    "lr:valuation_date": null
+  },
+  "exercises": [
+    "csv_cp1252_semicolon",
+    "no_valuation_date",
+    "unknown_status_spelling",
+    "superseded_by_dated_file"
+  ],
+  "lines": [
+    {
+      "line_id": "lr_main_bellwether_extract#1",
+      "location": {
+        "sheet": null,
+        "row": 3
+      },
+      "claim_number": "BW-23-118",
+      "claim_key": "BW-23-118",
+      "policy_number": "BCC 23 77310",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Lindqvist, Rory",
+      "date_of_loss": "2023-08-15",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 600000,
+      "reserve": 1900000,
+      "incurred": 2500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-23-118",
+        "date_of_loss": "15 Aug 2023",
+        "status": "Open",
+        "paid": "6000.00",
+        "reserve": "19000.00",
+        "incurred": "25000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-23-118;BCC 23 77310;General Liability;Lindqvist, Rory;15 Aug 2023;Open;6000.00;19000.00;25000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_extract#2",
+      "location": {
+        "sheet": null,
+        "row": 4
+      },
+      "claim_number": "BW-21-008",
+      "claim_key": "BW-21-008",
+      "policy_number": "BCC 21 77310",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Ashby, Fenella",
+      "date_of_loss": "2021-03-02",
+      "status_raw": "Pending Review",
+      "status": "unknown",
+      "paid": 180000,
+      "reserve": 320000,
+      "incurred": 500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-21-008",
+        "date_of_loss": "2 Mar 2021",
+        "status": "Pending Review",
+        "paid": "1800.00",
+        "reserve": "3200.00",
+        "incurred": "5000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-21-008;BCC 21 77310;General Liability;Ashby, Fenella;2 Mar 2021;Pending Review;1800.00;3200.00;5000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_extract#3",
+      "location": {
+        "sheet": null,
+        "row": 5
+      },
+      "claim_number": "BW-21-015",
+      "claim_key": "BW-21-015",
+      "policy_number": "BCC 21 77310",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Trevelyan, Moss",
+      "date_of_loss": "2021-06-17",
+      "status_raw": "RO",
+      "status": "reopened",
+      "paid": 750000,
+      "reserve": 250000,
+      "incurred": 1000000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-21-015",
+        "date_of_loss": "17 Jun 2021",
+        "status": "RO",
+        "paid": "7500.00",
+        "reserve": "2500.00",
+        "incurred": "10000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-21-015;BCC 21 77310;General Liability;Trevelyan, Moss;17 Jun 2021;RO;7500.00;2500.00;10000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_extract#4",
+      "location": {
+        "sheet": null,
+        "row": 6
+      },
+      "claim_number": "BW-21-019",
+      "claim_key": "BW-21-019",
+      "policy_number": "BCC 21 77310",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": null,
+      "claimant": "Désirée Okafor",
+      "date_of_loss": "2021-09-08",
+      "status_raw": "Reopen",
+      "status": "reopened",
+      "paid": 1225000,
+      "reserve": 475000,
+      "incurred": 1700000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-21-019",
+        "date_of_loss": "8 Sep 2021",
+        "status": "Reopen",
+        "paid": "12250.00",
+        "reserve": "4750.00",
+        "incurred": "17000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-21-019;BCC 21 77310;General Liability;Désirée Okafor;8 Sep 2021;Reopen;12250.00;4750.00;17000.00"
+    },
+    {
+      "line_id": "lr_main_bellwether_extract#5",
+      "location": {
+        "sheet": null,
+        "row": 7
+      },
+      "claim_number": "BW-21-022",
+      "claim_key": "BW-21-022",
+      "policy_number": "BCC 21 77310",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Hollis Feed & Grain",
+      "date_of_loss": "2021-11-30",
+      "status_raw": "C",
+      "status": "closed",
+      "paid": 3990000,
+      "reserve": 0,
+      "incurred": 3990000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "BW-21-022",
+        "date_of_loss": "30 Nov 2021",
+        "status": "C",
+        "paid": "39900.00",
+        "reserve": "0.00",
+        "incurred": "39900.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "BW-21-022;BCC 21 77310;Property;Hollis Feed & Grain;30 Nov 2021;C;39900.00;0.00;39900.00"
+    }
+  ],
+  "printed_totals": [
+    {
+      "total_id": "lr_main_bellwether_extract!1",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 6745000,
+      "printed": "67450.00",
+      "location": {
+        "sheet": null,
+        "row": 8
+      },
+      "quote": "TOTAL;;;;;;67450.00;29450.00;96900.00",
+      "label": "TOTAL",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_extract!2",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 2945000,
+      "printed": "29450.00",
+      "location": {
+        "sheet": null,
+        "row": 8
+      },
+      "quote": "TOTAL;;;;;;67450.00;29450.00;96900.00",
+      "label": "TOTAL",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_bellwether_extract!3",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 9690000,
+      "printed": "96900.00",
+      "location": {
+        "sheet": null,
+        "row": 8
+      },
+      "quote": "TOTAL;;;;;;67450.00;29450.00;96900.00",
+      "label": "TOTAL",
+      "planted_difference": 0,
+      "note": ""
+    }
+  ],
+  "decoys": [],
+  "injection": null,
+  "scan_transcript": null
+}

@@ -1,0 +1,10 @@
+﻿Ashgrove Mutual Insurance Company,Loss run export,Valued as of 06/30/2025
+"Synthetic sample data: loss run for software testing. Every carrier, insured, claimant and claim number is invented."
+
+Claim #,Policy #,Pol Yr,Coverage,Claimant Name,Loss Date,Claim Status,Total Paid,Outstanding Reserve,Total Incurred
+"ag-2301 ",AMI-GL-23-4471,2023,General Liability,"Marchetti, L.",2023-02-09,O,"5,125.40","14,874.60","20,000.00"
+AG-2307,AMI-GL-23-4471,2023,General Liability,"Okonjo, P.",2023-05-30,Opened,"31,000.00","52,500.00","83,500.00"
+AG-2421,AMI-GL-24-4471,2024,General Liability,"Haldane, Corin",2024-10-08,C,"3,310.15",0.00,"3,310.15"
+AG-2426,AMI-GL-24-4471,2024,General Liability,"Pryce, Mabel",2024-11-19,Re-opened,"12,000.00","6,000.00","18,000.00"
+AG-2433,AMI-GL-24-4471,2024,General Liability,"Ostrander, Jude",2024-12-02,O,"(1,200.00)","4,000.00","2,800.00"
+AG-2440,AMI-GL-24-4471,2024,General Liability,"Wexley, Nan",2025-02-14,Opened,750.00,"9,250.00","10,000.00"

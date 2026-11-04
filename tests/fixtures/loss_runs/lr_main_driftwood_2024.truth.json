@@ -1,0 +1,482 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "fixture_id": "lr_main_driftwood_2024",
+  "case_id": "lr_main",
+  "file": "lr_main_driftwood_2024.pdf",
+  "format": "pdf",
+  "layout": "pdf_layout_a",
+  "gate_bucket": "loss_run",
+  "description": "Digital PDF, layout A (Paid, Reserve, Incurred), grouped by policy with a total per policy; one claim on three feature lines; a negative paid printed in parentheses.",
+  "carrier": "Driftwood Specialty Insurance Company",
+  "valuation_date": "2024-12-31",
+  "page_count": 2,
+  "size_bytes": 19304,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": []
+  },
+  "columns": {
+    "Claim No": "claim_number",
+    "Feature": "feature",
+    "Claimant": "claimant",
+    "Loss Date": "date_of_loss",
+    "Status": "status",
+    "Paid": "paid",
+    "Reserve": "reserve",
+    "Incurred": "incurred"
+  },
+  "sheets": null,
+  "facts": {
+    "lr:carrier": {
+      "value": "Driftwood Specialty Insurance Company",
+      "printed": "Driftwood Specialty Insurance Company",
+      "location": {
+        "page": 1
+      },
+      "page": 1,
+      "quote": "Driftwood Specialty Insurance Company"
+    },
+    "lr:valuation_date": {
+      "value": "2024-12-31",
+      "printed": "12/31/2024",
+      "location": {
+        "page": 1
+      },
+      "page": 1,
+      "quote": "Valued as of 12/31/2024"
+    }
+  },
+  "exercises": [
+    "pdf_layout_a",
+    "three_line_claim",
+    "negative_paid_parentheses",
+    "older_valuation_superseded",
+    "policy_number_totals"
+  ],
+  "lines": [
+    {
+      "line_id": "lr_main_driftwood_2024#1",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "DS-23-0410",
+      "claim_key": "DS-23-0410",
+      "policy_number": "DSI-GL-2301",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "BI",
+      "claimant": "Ambrose, Kit",
+      "date_of_loss": "2023-03-06",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 1277500,
+      "reserve": 0,
+      "incurred": 1277500,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-23-0410",
+        "date_of_loss": "03/06/2023",
+        "status": "Closed",
+        "paid": "12,775.00",
+        "reserve": "0.00",
+        "incurred": "12,775.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-23-0410 BI Ambrose, Kit 03/06/2023 Closed 12,775.00 0.00 12,775.00"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#2",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "DS-23-0433",
+      "claim_key": "DS-23-0433",
+      "policy_number": "DSI-GL-2301",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "PD",
+      "claimant": "Wolcott, Dara",
+      "date_of_loss": "2023-06-21",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": -120000,
+      "reserve": 350000,
+      "incurred": 230000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-23-0433",
+        "date_of_loss": "06/21/2023",
+        "status": "Open",
+        "paid": "(1,200.00)",
+        "reserve": "3,500.00",
+        "incurred": "2,300.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-23-0433 PD Wolcott, Dara 06/21/2023 Open (1,200.00) 3,500.00 2,300.00"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#3",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "DS-23-0457",
+      "claim_key": "DS-23-0457",
+      "policy_number": "DSI-GL-2301",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "PD",
+      "claimant": "Fairbrother, Lio",
+      "date_of_loss": "2023-11-02",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 406048,
+      "reserve": 0,
+      "incurred": 406048,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-23-0457",
+        "date_of_loss": "11/02/2023",
+        "status": "Closed",
+        "paid": "4,060.48",
+        "reserve": "0.00",
+        "incurred": "4,060.48",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-23-0457 PD Fairbrother, Lio 11/02/2023 Closed 4,060.48 0.00 4,060.48"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#4",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "DS-24-0101",
+      "claim_key": "DS-24-0101",
+      "policy_number": "DSI-GL-2401",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "BI",
+      "claimant": "Castellan, Juno",
+      "date_of_loss": "2024-01-29",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 850000,
+      "reserve": 3150000,
+      "incurred": 4000000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-24-0101",
+        "date_of_loss": "01/29/2024",
+        "status": "Open",
+        "paid": "8,500.00",
+        "reserve": "31,500.00",
+        "incurred": "40,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-24-0101 BI Castellan, Juno 01/29/2024 Open 8,500.00 31,500.00 40,000.00"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#5",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "DS-24-0101",
+      "claim_key": "DS-24-0101",
+      "policy_number": "DSI-GL-2401",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "PD",
+      "claimant": "Castellan, Juno",
+      "date_of_loss": "2024-01-29",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 225000,
+      "reserve": 175000,
+      "incurred": 400000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-24-0101",
+        "date_of_loss": "01/29/2024",
+        "status": "Open",
+        "paid": "2,250.00",
+        "reserve": "1,750.00",
+        "incurred": "4,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-24-0101 PD Castellan, Juno 01/29/2024 Open 2,250.00 1,750.00 4,000.00"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#6",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "DS-24-0101",
+      "claim_key": "DS-24-0101",
+      "policy_number": "DSI-GL-2401",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "Med",
+      "claimant": "Castellan, Juno",
+      "date_of_loss": "2024-01-29",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 148000,
+      "reserve": 0,
+      "incurred": 148000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-24-0101",
+        "date_of_loss": "01/29/2024",
+        "status": "Closed",
+        "paid": "1,480.00",
+        "reserve": "0.00",
+        "incurred": "1,480.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-24-0101 Med Castellan, Juno 01/29/2024 Closed 1,480.00 0.00 1,480.00"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#7",
+      "location": {
+        "page": 2
+      },
+      "claim_number": "DS-24-0118",
+      "claim_key": "DS-24-0118",
+      "policy_number": "DSI-GL-2401",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "BI",
+      "claimant": "Beaumont, Sel",
+      "date_of_loss": "2024-04-11",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 600000,
+      "reserve": 900000,
+      "incurred": 1500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-24-0118",
+        "date_of_loss": "04/11/2024",
+        "status": "Open",
+        "paid": "6,000.00",
+        "reserve": "9,000.00",
+        "incurred": "15,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-24-0118 BI Beaumont, Sel 04/11/2024 Open 6,000.00 9,000.00 15,000.00"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#8",
+      "location": {
+        "page": 2
+      },
+      "claim_number": "DS-24-0125",
+      "claim_key": "DS-24-0125",
+      "policy_number": "DSI-GL-2401",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "BI",
+      "claimant": "Underhill, Pax",
+      "date_of_loss": "2024-07-02",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 50000,
+      "reserve": 2450000,
+      "incurred": 2500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-24-0125",
+        "date_of_loss": "07/02/2024",
+        "status": "Open",
+        "paid": "500.00",
+        "reserve": "24,500.00",
+        "incurred": "25,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-24-0125 BI Underhill, Pax 07/02/2024 Open 500.00 24,500.00 25,000.00"
+    },
+    {
+      "line_id": "lr_main_driftwood_2024#9",
+      "location": {
+        "page": 2
+      },
+      "claim_number": "DS-24-0139",
+      "claim_key": "DS-24-0139",
+      "policy_number": "DSI-GL-2401",
+      "policy_year": null,
+      "line": "General Liability",
+      "feature": "PD",
+      "claimant": "Greaves, Tilda",
+      "date_of_loss": "2024-09-25",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 333333,
+      "reserve": 0,
+      "incurred": 333333,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "verified",
+      "unverified_reason": null,
+      "warnings": [],
+      "printed": {
+        "claim_number": "DS-24-0139",
+        "date_of_loss": "09/25/2024",
+        "status": "Closed",
+        "paid": "3,333.33",
+        "reserve": "0.00",
+        "incurred": "3,333.33",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "DS-24-0139 PD Greaves, Tilda 09/25/2024 Closed 3,333.33 0.00 3,333.33"
+    }
+  ],
+  "printed_totals": [
+    {
+      "total_id": "lr_main_driftwood_2024!1",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2301",
+      "amount": 1563548,
+      "printed": "15,635.48",
+      "location": {
+        "page": 1
+      },
+      "quote": "Policy DSI-GL-2301 total 15,635.48 3,500.00 19,135.48",
+      "label": "Policy DSI-GL-2301 total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!2",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2301",
+      "amount": 350000,
+      "printed": "3,500.00",
+      "location": {
+        "page": 1
+      },
+      "quote": "Policy DSI-GL-2301 total 15,635.48 3,500.00 19,135.48",
+      "label": "Policy DSI-GL-2301 total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!3",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2301",
+      "amount": 1913548,
+      "printed": "19,135.48",
+      "location": {
+        "page": 1
+      },
+      "quote": "Policy DSI-GL-2301 total 15,635.48 3,500.00 19,135.48",
+      "label": "Policy DSI-GL-2301 total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!4",
+      "metric": "paid",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2401",
+      "amount": 2206333,
+      "printed": "22,063.33",
+      "location": {
+        "page": 2
+      },
+      "quote": "Policy DSI-GL-2401 total 22,063.33 66,750.00 88,813.33",
+      "label": "Policy DSI-GL-2401 total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!5",
+      "metric": "reserve",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2401",
+      "amount": 6675000,
+      "printed": "66,750.00",
+      "location": {
+        "page": 2
+      },
+      "quote": "Policy DSI-GL-2401 total 22,063.33 66,750.00 88,813.33",
+      "label": "Policy DSI-GL-2401 total",
+      "planted_difference": 0,
+      "note": ""
+    },
+    {
+      "total_id": "lr_main_driftwood_2024!6",
+      "metric": "incurred",
+      "scope_kind": "policy_number",
+      "scope_value": "DSI-GL-2401",
+      "amount": 8881333,
+      "printed": "88,813.33",
+      "location": {
+        "page": 2
+      },
+      "quote": "Policy DSI-GL-2401 total 22,063.33 66,750.00 88,813.33",
+      "label": "Policy DSI-GL-2401 total",
+      "planted_difference": 0,
+      "note": ""
+    }
+  ],
+  "decoys": [],
+  "injection": null,
+  "scan_transcript": null
+}

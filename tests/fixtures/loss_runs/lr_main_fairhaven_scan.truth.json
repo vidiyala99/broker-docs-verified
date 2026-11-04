@@ -1,0 +1,403 @@
+{
+  "schema_version": 1,
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "fixture_id": "lr_main_fairhaven_scan",
+  "case_id": "lr_main",
+  "file": "lr_main_fairhaven_scan.pdf",
+  "format": "pdf",
+  "layout": "pdf_scanned",
+  "gate_bucket": "loss_run",
+  "description": "Scanned PDF (image only, noisy JPEG): rows read by OCR stay unverified (no word boxes, R6); the printed incurred total is 40 cents off (Matches within $1.00).",
+  "carrier": "Fairhaven Assurance Company",
+  "valuation_date": "2025-07-15",
+  "page_count": 1,
+  "size_bytes": 156657,
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [
+      1
+    ]
+  },
+  "columns": {
+    "Claim No": "claim_number",
+    "Policy": "policy_number",
+    "Description": "claimant",
+    "Loss Date": "date_of_loss",
+    "Status": "status",
+    "Paid": "paid",
+    "Reserve": "reserve",
+    "Incurred": "incurred"
+  },
+  "sheets": null,
+  "facts": {
+    "lr:carrier": {
+      "value": "Fairhaven Assurance Company",
+      "printed": "Fairhaven Assurance Company",
+      "location": {
+        "page": 1
+      },
+      "page": 1,
+      "quote": "Fairhaven Assurance Company"
+    },
+    "lr:valuation_date": {
+      "value": "2025-07-15",
+      "printed": "07/15/2025",
+      "location": {
+        "page": 1
+      },
+      "page": 1,
+      "quote": "Valued as of 07/15/2025"
+    }
+  },
+  "exercises": [
+    "scanned_pdf",
+    "rows_unverified_scan",
+    "tolerance_within_one_dollar"
+  ],
+  "lines": [
+    {
+      "line_id": "lr_main_fairhaven_scan#1",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0012",
+      "claim_key": "FH-24-0012",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Store 3 roof leak",
+      "date_of_loss": "2024-02-02",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 842000,
+      "reserve": 0,
+      "incurred": 842000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0012",
+        "date_of_loss": "02/02/2024",
+        "status": "Closed",
+        "paid": "$8,420.00",
+        "reserve": "0.00",
+        "incurred": "$8,420.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0012 FAC-PR-24-118 Store 3 roof leak 02/02/2024 Closed $8,420.00 0.00 $8,420.00"
+    },
+    {
+      "line_id": "lr_main_fairhaven_scan#2",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0027",
+      "claim_key": "FH-24-0027",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Oven fire, Elm Street",
+      "date_of_loss": "2024-03-18",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 3107525,
+      "reserve": 0,
+      "incurred": 3107525,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0027",
+        "date_of_loss": "03/18/2024",
+        "status": "Closed",
+        "paid": "$31,075.25",
+        "reserve": "0.00",
+        "incurred": "$31,075.25",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0027 FAC-PR-24-118 Oven fire, Elm Street 03/18/2024 Closed $31,075.25 0.00 $31,075.25"
+    },
+    {
+      "line_id": "lr_main_fairhaven_scan#3",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0031",
+      "claim_key": "FH-24-0031",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Freezer spoilage",
+      "date_of_loss": "2024-05-09",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 200000,
+      "reserve": 650000,
+      "incurred": 850000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0031",
+        "date_of_loss": "05/09/2024",
+        "status": "Open",
+        "paid": "$2,000.00",
+        "reserve": "$6,500.00",
+        "incurred": "$8,500.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0031 FAC-PR-24-118 Freezer spoilage 05/09/2024 Open $2,000.00 $6,500.00 $8,500.00"
+    },
+    {
+      "line_id": "lr_main_fairhaven_scan#4",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0044",
+      "claim_key": "FH-24-0044",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Delivery van glass",
+      "date_of_loss": "2024-06-21",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 61240,
+      "reserve": 0,
+      "incurred": 61240,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0044",
+        "date_of_loss": "06/21/2024",
+        "status": "Closed",
+        "paid": "$612.40",
+        "reserve": "0.00",
+        "incurred": "$612.40",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0044 FAC-PR-24-118 Delivery van glass 06/21/2024 Closed $612.40 0.00 $612.40"
+    },
+    {
+      "line_id": "lr_main_fairhaven_scan#5",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0058",
+      "claim_key": "FH-24-0058",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Burst pipe, warehouse",
+      "date_of_loss": "2024-08-03",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 1425000,
+      "reserve": 1075000,
+      "incurred": 2500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0058",
+        "date_of_loss": "08/03/2024",
+        "status": "Open",
+        "paid": "$14,250.00",
+        "reserve": "$10,750.00",
+        "incurred": "$25,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0058 FAC-PR-24-118 Burst pipe, warehouse 08/03/2024 Open $14,250.00 $10,750.00 $25,000.00"
+    },
+    {
+      "line_id": "lr_main_fairhaven_scan#6",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0063",
+      "claim_key": "FH-24-0063",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Signage wind damage",
+      "date_of_loss": "2024-09-29",
+      "status_raw": "Closed",
+      "status": "closed",
+      "paid": 198000,
+      "reserve": 0,
+      "incurred": 198000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0063",
+        "date_of_loss": "09/29/2024",
+        "status": "Closed",
+        "paid": "$1,980.00",
+        "reserve": "0.00",
+        "incurred": "$1,980.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0063 FAC-PR-24-118 Signage wind damage 09/29/2024 Closed $1,980.00 0.00 $1,980.00"
+    },
+    {
+      "line_id": "lr_main_fairhaven_scan#7",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0071",
+      "claim_key": "FH-24-0071",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Break-in, Store 1",
+      "date_of_loss": "2024-11-12",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 310000,
+      "reserve": 190000,
+      "incurred": 500000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0071",
+        "date_of_loss": "11/12/2024",
+        "status": "Open",
+        "paid": "$3,100.00",
+        "reserve": "$1,900.00",
+        "incurred": "$5,000.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0071 FAC-PR-24-118 Break-in, Store 1 11/12/2024 Open $3,100.00 $1,900.00 $5,000.00"
+    },
+    {
+      "line_id": "lr_main_fairhaven_scan#8",
+      "location": {
+        "page": 1
+      },
+      "claim_number": "FH-24-0079",
+      "claim_key": "FH-24-0079",
+      "policy_number": "FAC-PR-24-118",
+      "policy_year": null,
+      "line": "Property",
+      "feature": null,
+      "claimant": "Power surge, mixers",
+      "date_of_loss": "2024-12-30",
+      "status_raw": "Open",
+      "status": "open",
+      "paid": 0,
+      "reserve": 750000,
+      "incurred": 750000,
+      "incurred_source": "printed",
+      "recovery": null,
+      "deductible": null,
+      "verify": "unverified",
+      "unverified_reason": "scan",
+      "warnings": [],
+      "printed": {
+        "claim_number": "FH-24-0079",
+        "date_of_loss": "12/30/2024",
+        "status": "Open",
+        "paid": "0.00",
+        "reserve": "$7,500.00",
+        "incurred": "$7,500.00",
+        "recovery": null,
+        "deductible": null
+      },
+      "quote": "FH-24-0079 FAC-PR-24-118 Power surge, mixers 12/30/2024 Open 0.00 $7,500.00 $7,500.00"
+    }
+  ],
+  "printed_totals": [
+    {
+      "total_id": "lr_main_fairhaven_scan!1",
+      "metric": "paid",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 6143765,
+      "printed": "$61,437.65",
+      "location": {
+        "page": 1
+      },
+      "quote": "Total $61,437.65 $26,650.00 $88,088.05",
+      "label": "Total",
+      "planted_difference": 0,
+      "note": "printed incurred is 40 cents above the rows (rounding): within the $1.00 tolerance"
+    },
+    {
+      "total_id": "lr_main_fairhaven_scan!2",
+      "metric": "reserve",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 2665000,
+      "printed": "$26,650.00",
+      "location": {
+        "page": 1
+      },
+      "quote": "Total $61,437.65 $26,650.00 $88,088.05",
+      "label": "Total",
+      "planted_difference": 0,
+      "note": "printed incurred is 40 cents above the rows (rounding): within the $1.00 tolerance"
+    },
+    {
+      "total_id": "lr_main_fairhaven_scan!3",
+      "metric": "incurred",
+      "scope_kind": "all",
+      "scope_value": null,
+      "amount": 8808805,
+      "printed": "$88,088.05",
+      "location": {
+        "page": 1
+      },
+      "quote": "Total $61,437.65 $26,650.00 $88,088.05",
+      "label": "Total",
+      "planted_difference": 40,
+      "note": "printed incurred is 40 cents above the rows (rounding): within the $1.00 tolerance"
+    }
+  ],
+  "decoys": [],
+  "injection": null,
+  "scan_transcript": {
+    "1": "Fairhaven Assurance Company  Page 1 of 1\nLoss Run (scanned copy)  Valued as of 07/15/2025\nInsured: Harrow Lane Bakery Group LLC\nPolicy FAC-PR-24-118\nClaim No  Policy  Description  Loss Date  Status  Paid  Reserve  Incurred\nFH-24-0012  FAC-PR-24-118  Store 3 roof leak  02/02/2024  Closed  $8,420.00  0.00  $8,420.00\nFH-24-0027  FAC-PR-24-118  Oven fire, Elm Street  03/18/2024  Closed  $31,075.25  0.00  $31,075.25\nFH-24-0031  FAC-PR-24-118  Freezer spoilage  05/09/2024  Open  $2,000.00  $6,500.00  $8,500.00\nFH-24-0044  FAC-PR-24-118  Delivery van glass  06/21/2024  Closed  $612.40  0.00  $612.40\nFH-24-0058  FAC-PR-24-118  Burst pipe, warehouse  08/03/2024  Open  $14,250.00  $10,750.00  $25,000.00\nFH-24-0063  FAC-PR-24-118  Signage wind damage  09/29/2024  Closed  $1,980.00  0.00  $1,980.00\nFH-24-0071  FAC-PR-24-118  Break-in, Store 1  11/12/2024  Open  $3,100.00  $1,900.00  $5,000.00\nFH-24-0079  FAC-PR-24-118  Power surge, mixers  12/30/2024  Open  0.00  $7,500.00  $7,500.00\nTotal  $61,437.65  $26,650.00  $88,088.05\nSynthetic sample data: loss run for software testing. Every carrier, insured, claimant and claim number is invented."
+  }
+}
