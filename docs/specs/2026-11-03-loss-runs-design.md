@@ -1,6 +1,6 @@
 # Slice 5a: Loss runs (checked claims table)
 
-Date: 2026-11-03. Status: owner-approved design (brainstorm sections 1 to 5), spec awaiting owner review.
+Date: 2026-11-03. Status: owner-approved spec (2026-11-03 23:24).
 Next: `/plan-eng-review`, then lanes. Rail item: Analytics (goes live this slice). Insights stays for 5b.
 Evidence: `docs/reference/brokerdocs-workflows-evidence.md` section 5 (Loss Run); `docs/slice-map.md`; PRODUCT.md.
 

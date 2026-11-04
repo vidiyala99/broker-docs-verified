@@ -272,3 +272,23 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Open (unchanged): issued record shows draft prose on sign-off rows; each decision makes a new draft version; issued sheet keeps old scroll; Policy Check `_form_facts` doubled-edition bug likely (needs live Policy Check eval, paid); owner calls: real legal wording, condition matcher loosening, Proposal mark / left-panel icons.
 - Servers: backend 8000 (seed `dev-data-e2e2` in session 54b9b315 scratchpad, mutated by e2e) stops with this session. Reseed before demoing.
 - Next candidates: slice 5 (Loss Run, synthetic data) brainstorm; template library. Fresh session.
+
+## 2026-11-03 23:25: line switch merged; slice 5a (Loss runs) spec approved
+- **Line switch merged** (main `e992a19`, branch `line-switch` `d2aa441`): segmented controls are one joined track, indicator
+  slides 220ms ease-out (58% of travel at 40ms, was 2%), check glyph and label cross-fade; Policy Check wizard shows the chosen
+  book (crumbs "Personal lines > Policy check > New check" + run-header book tab without the Move button); Compare crumb
+  "Commercial > Compare Quotes". Brief `frontend/LINE-SWITCH-BRIEF.md`, shots `frontend/qa-screenshots/line-switch/`, DESIGN.md
+  "Line switch". Verified on main: full e2e 67/67 (fresh seed, `--workers=1`), tsc clean, axe 0 at 1440/1024/390.
+  Lane choices owner may veto: Compare crumb names the queue's book, not the picked line (alternative: start button names it);
+  joined track applies to Activity and Tasks filters too; rail on a preset wizard flipped to the other line keeps the old highlight.
+- **Slice 5a spec owner-approved:** `docs/specs/2026-11-03-loss-runs-design.md` (decisions L1 to L9, do not re-ask). Analytics
+  rail item = loss reviews per client; PDF + Excel; spreadsheets parsed in code (header synonyms, model only for unknown
+  headers), sheet pages rendered on demand; PDF rows by model per window, every row verified; latest valuation wins, same-date
+  different amounts = Conflicting; printed totals reconciled per document ($1 tolerance), mismatch = Needs review; limits
+  100k rows/file, 200k/review, PDF 300 pages + loss-run token budget from fixtures. 5b (Insights dashboard, renewal summary,
+  export) gets its own spec later.
+- **Next (fresh session):** `/plan-eng-review` on the slice 5a spec, then lanes A (backend), B (fixtures/gates), C (UI, design
+  stack), D (docs). Live `-k loss_run` gate needs owner approval each run.
+- **Fastino:** GLiDE skill installed (`.claude/skills/fastino-glide`, gitignored; `skills-lock.json` untracked), key in `.env`;
+  owner paused it (account `payment_overdue`); CLAUDE.md rule marked PAUSED. Do not call it until the owner resumes.
+- Servers: Vite 5173 (this session) and backend 8000 (older session, DB mutated) may still run; reseed before demoing.
