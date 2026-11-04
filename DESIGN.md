@@ -130,7 +130,7 @@ Stale section tag "May be out of date": `--color-stale-bg/fg`, glyph plus text.
   side-by-side 200ms, toast enter 250ms and exit 150ms, ceiling 300ms. The
   reference animates at 300ms [live]; we run shorter on purpose.
 - Allowed moments (voice + motion lane, 2026-11-03; line move B adds the book tab and book crumb re-file): press feedback, tooltip, toast, side-by-side panel, the sliding
-  segmented indicator (200ms `--ease-in-out`), folder-tab cross-fade and PDF tab enter/close, wizard step body,
+  segmented indicator (220ms `--ease-out`, `--dur-segment`; line switch, see "Line switch" below), folder-tab cross-fade and PDF tab enter/close, wizard step body,
   list fades on pointer filter/sort changes (opacity 0.35 to 1, 150ms, rows not remounted), disclosure height +
   opacity (`Collapse`), dialog/menu/overlay exits, queue row enter/exit, the reading line, the seal, and a 150ms
   cross-fade of `#main` on pointer route changes. Exits are faster than enters. No entrance staggers.
@@ -194,7 +194,8 @@ See `frontend/QUEUE-BRIEF.md`. No new tokens.
 See `frontend/LINE-MOVE-BRIEF.md`. No new tokens.
 - A run is filed in a book, Commercial or Personal lines, and the page always says which:
   - **Crumbs** lead with the book for every run, Commercial included: "Commercial > Policy check > client",
-    "Personal lines > Compare Quotes > client", "Commercial > Proposals > Run N". Entry screens keep their crumbs.
+    "Personal lines > Compare Quotes > client", "Commercial > Proposals > Run N". The Compare and Policy Check start
+    screens lead with a book too (line switch, below).
   - **Run header**: a book tab (the book's mark at 18px plus its name; 32px tall, `--color-canvas` fill, 3px
     `--color-text-muted` left edge like a binder divider, 4px chip radius, no border so it never reads as a button),
     then one text button that names the consequence: "Move to Commercial" / "Move to Personal lines" (link colour,
@@ -209,6 +210,25 @@ See `frontend/LINE-MOVE-BRIEF.md`. No new tokens.
   (its label flips). Reduced motion: fades only. The rail keeps highlighting the tool (D7).
 - The line choice segment (start screens) always draws its check glyph and hides it when unchecked, so both halves keep
   one width and a flip never shifts the control.
+
+## Line switch: the segmented control and the chosen book (owner-approved 2026-11-03)
+See `frontend/LINE-SWITCH-BRIEF.md`. New token: `--dur-segment` 220ms.
+- **Segmented control** (Line of business, Activity "Show", Tasks filter; `personal/personal.css`): one joined track, a
+  single 1px `--color-border-input` outline with the 6px control radius, no gap and no per-option borders; equal halves.
+  The selection is one indicator (tint fill, 1px primary border) laid over its half of the track edge. Labels are
+  `--color-text-muted`, the chosen one `--color-text`. Native radios in a fieldset (one tab stop, arrow keys), focus ring
+  on the option, 36px drawn (32px compact) with a 44px hit area.
+- **Motion**: on a pointer change the indicator slides `--dur-segment` on `--ease-out` (a third of the way in about
+  40ms, so it is seen leaving); the check glyph fades and scales in from 0.85 (220ms) and out in 120ms; label colours
+  cross-fade on the same timing. This replaces the 200ms `--ease-in-out` slide, which spent its first 80ms moving 18%
+  and read as a snap. Keyboard changes: everything instant. Reduced motion: the indicator jumps, glyph and labels fade.
+- **Phone compact** (<600px, Tasks): options size to text, so each option draws its own selection (same tint and edge)
+  and cross-fades its background; there is no sliding indicator.
+- **The chosen book on the page**: the Policy Check wizard's crumbs lead with the chosen book ("Personal lines > Policy
+  check > New check", "Commercial > Policy check > New check") and its title carries the run header's book tab without
+  the Move button. A pointer flip re-files them like a run move (tab drops in, crumb fades in); keyboard flips are
+  instant. The Compare start screen leads with its queue's book ("Commercial > Compare Quotes"); its Upload panel's
+  choice files the next comparison and does not rename the page, because the page lists that book's queue.
 
 ## Voice: "Paper trail" (owner-approved 2026-11-03, direction C)
 See `frontend/VOICE-BRIEF.md`. The product's promise is that every value traces to a page in a source document, so

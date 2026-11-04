@@ -34,7 +34,11 @@ function useRefile(ref: RefObject<HTMLElement | null>, key: unknown) {
   }, [key, ref]);
 }
 
-export function BookTab({ line, onMove }: { line: Line; onMove: (to: Line) => void }) {
+/**
+ * The run header passes `onMove` (tab + "Move to ..." button). Without it (line switch, LINE-SWITCH-BRIEF.md) the tab
+ * stands alone: the Policy Check wizard shows the book its new check will be filed in, following the Line choice.
+ */
+export function BookTab({ line, onMove }: { line: Line; onMove?: (to: Line) => void }) {
   const tab = useRef<HTMLSpanElement>(null);
   useRefile(tab, line);
   const to = otherBook(line);
@@ -44,9 +48,11 @@ export function BookTab({ line, onMove }: { line: Line; onMove: (to: Line) => vo
         <Glyph name={line} size={18} />
         <span>{BOOK_NAME[line]}</span>
       </span>
-      <button type="button" className="booktab__move" onClick={() => onMove(to)}>
-        <span>Move to {BOOK_NAME[to]}</span>
-      </button>
+      {onMove && (
+        <button type="button" className="booktab__move" onClick={() => onMove(to)}>
+          <span>Move to {BOOK_NAME[to]}</span>
+        </button>
+      )}
     </div>
   );
 }

@@ -1,5 +1,17 @@
 /* Policy Check (slice 3, T9). Tokens only; see frontend/POLICY-CHECK-BRIEF.md. */
 
+/* ------------------------------------------------------------------ wizard: title and book tab */
+
+/* Line switch (LINE-SWITCH-BRIEF.md): the title carries the book tab the run header will show, after the name like the
+   run header's client. Wraps under the title when the head is narrow. */
+.wizard__titlebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-width: 0;
+}
+
 /* ------------------------------------------------------------------ wizard: roles step */
 
 .roles {

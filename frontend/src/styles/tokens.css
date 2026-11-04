@@ -148,6 +148,7 @@
   --dur-press: 120ms;     /* button :active scale */
   --dur-fast: 150ms;      /* hover color, tooltip */
   --dur-base: 200ms;      /* tabs, accordion, side-by-side panel */
+  --dur-segment: 220ms;   /* segmented control indicator slide (--ease-out) and its glyph/label cross-fade */
   --dur-toast: 250ms;     /* toast enter; exit uses --dur-fast */
   --dur-drawer: 250ms;    /* narrow left panel overlay enter; exit uses --dur-base */
   --dur-max: 300ms;       /* ceiling for any UI transition */

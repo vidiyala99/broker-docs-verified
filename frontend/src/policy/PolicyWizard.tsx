@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Database, FilePdf, Trash, WarningCircle } from "
 import { api, ApiError, uploadFile } from "../api/client";
 import type { DocumentInfo, Line, PolicyRole, Workspace } from "../api/types";
 import { LineChoice } from "../personal/LineChoice";
+import { BookTab } from "../run/BookTab";
 import { ClientField } from "../queue/ClientField";
 import { DropZone, formatBytes } from "../launch/Upload";
 import { hueOf } from "../report/Chip";
@@ -33,11 +34,24 @@ import "./policy.css";
 const AMS_LIMITS = "JSON or CSV, up to 512 KB and 400 fields, one export per check";
 
 /** Slice 3 T9: the new Policy Check flow. Run check posts a policy-check run and opens the run view (step 3). */
-export function PolicyWizard({ workspace, viewport, line: entryLine }: { workspace: Workspace; viewport: Viewport; line: Line }) {
+export function PolicyWizard({
+  workspace,
+  viewport,
+  entryLine,
+  line,
+  onLineChange,
+}: {
+  workspace: Workspace;
+  viewport: Viewport;
+  /** Where the wizard was opened from (URL preset): Cancel goes back there. */
+  entryLine: Line;
+  /** Slice 3b T6 line choice on step 1, defaulted from the entry point (not part of the saved draft). Held by App
+   *  (line switch): the crumbs and the title's book tab follow it. */
+  line: Line;
+  onLineChange: (line: Line) => void;
+}) {
   const toast = useToast();
-  // Slice 3b T6: line choice on step 1, defaulted from the entry point (URL preset, not part of the saved draft).
-  const [line, setLine] = useState<Line>(entryLine);
-  useEffect(() => setLine(entryLine), [entryLine]);
+  const setLine = onLineChange;
   const [draft, setDraft] = useState<PcDraft>(loadPcDraft);
   const [stepError, setStepError] = useState<string | null>(null);
   const [roleErrors, setRoleErrors] = useState<Partial<Record<PolicyRole, string>>>({});
@@ -159,10 +173,15 @@ export function PolicyWizard({ workspace, viewport, line: entryLine }: { workspa
     <div className="workspace">
       <main className="pane wizard" id="main" tabIndex={-1} aria-labelledby="wizard-title">
         <header className="wizard__head">
-          <h1 id="wizard-title" className="wizard__title">
-            <WorkflowMark slug="policy-check" size={34} />
-            New policy check
-          </h1>
+          <div className="wizard__titlebar">
+            <h1 id="wizard-title" className="wizard__title">
+              <WorkflowMark slug="policy-check" size={34} />
+              New policy check
+            </h1>
+            {/* Line switch: the book this check will be filed in, as the run header will show it; follows the Line
+                choice below (drops in on a pointer flip, instant on keyboard). */}
+            <BookTab line={line} />
+          </div>
           <Stepper step={draft.step} reached={draft.reached} onGo={goTo} compact={viewport === "narrow"} steps={PC_STEPS} label="Policy check steps" />
         </header>
 
