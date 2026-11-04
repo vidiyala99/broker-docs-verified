@@ -31,6 +31,7 @@ import pytest
 
 import loss_run_gate as lg
 import loss_run_generator as lgen
+import reply_recorder as rr
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LR_DIR = lgen.FIXED_DIR
@@ -1027,24 +1028,50 @@ def test_backend_leaves_a_swapped_reply_unverified(lr_cases, lr_docs, paths):
     assert row["verify"] == "unverified"
 
 
+def _replay_run(case, paths, replies):
+    eval_hook = _import_backend("backend.eval_hook")
+    _import_backend("backend.providers")
+    p = _paths_for(case, paths)
+    out = eval_hook.run_eval_batch([p[f] for f in case["documents"]], workflow=case["workflow"],
+                                   parameters=lg.adapter_parameters(case), provider=rr.replay_provider(replies))
+    return out, p
+
+
+def test_recorder_round_trip_replays_a_run_exactly(lr_cases, lr_docs, paths):
+    """Record a fake-model run keyed by request fingerprint, then replay it in a second run: every request
+    of the second run must find its reply (keys are stable across runs despite concurrent windows) and the
+    output must match. This is what makes a recorded live run replayable offline."""
+    providers = _import_backend("backend.providers")
+    eval_hook = _import_backend("backend.eval_hook")
+    case = lr_cases["lr_main"]
+    p = _paths_for(case, paths)
+    store: dict[str, list[dict]] = {}
+    fake = providers.FakeProvider(_respond_factory([lr_docs[f] for f in case["documents"]], providers))
+    first = eval_hook.run_eval_batch([p[f] for f in case["documents"]], workflow=case["workflow"],
+                                     parameters=lg.adapter_parameters(case), provider=rr.record_into(fake, store))
+    assert store, "the run made no model call to record"
+    second, _ = _replay_run(case, paths, json.loads(json.dumps(store)))  # through JSON, like a file
+    def rows(out):  # documents finish concurrently, so row order varies between any two runs
+        return sorted(json.dumps(r, sort_keys=True, default=str) for r in out["loss_run"]["rows"])
+
+    assert rows(second) == rows(first)
+    m, rep = _gate(lg.score_loss_run_case(case, lr_docs, second, p))
+    assert rep.passed, lg.format_loss_run_report(m, rep)
+
+
 def test_recorded_live_replies_replay(lr_cases, lr_docs, paths):
     """Replays ``recorded/loss_run_live_*.json`` (every model reply of an approved live run) offline, like
     test_certificate_replay. Skips until the first live run is recorded."""
     recorded = sorted(RECORDED_DIR.glob("loss_run_live_*.json"))
     if not recorded:
         pytest.skip("no recorded live loss_run run yet (tests/eval/recorded/loss_run_live_<date>.json)")
-    eval_hook = _import_backend("backend.eval_hook")
-    providers = _import_backend("backend.providers")
     data = json.loads(recorded[-1].read_text(encoding="utf-8"))
+    assert data.get("format") == rr.FORMAT, recorded[-1]
     for cid, rec in data["cases"].items():
         case = lr_cases[cid]
-        replies = iter(rec["replies"])  # in call order (the recorder keeps the order of the live run)
-        p = _paths_for(case, paths)
-        out = eval_hook.run_eval_batch([p[f] for f in case["documents"]], workflow=case["workflow"],
-                                       parameters=lg.adapter_parameters(case),
-                                       provider=providers.FakeProvider(lambda req: copy.deepcopy(next(replies))))
+        out, p = _replay_run(case, paths, rec["replies"])
         m, rep = _gate(lg.score_loss_run_case(case, lr_docs, out, p))
-        assert rep.passed, lg.format_loss_run_report(m, rep)
+        assert rep.passed, f"{recorded[-1].name} {cid}\n" + lg.format_loss_run_report(m, rep)
 
 
 # ---------------------------------------------------------------------------
@@ -1067,6 +1094,20 @@ def test_live_loss_run_gates(lr_cases, lr_docs, tmp_path, capsys):
         adapter = load_adapter()
     except AdapterUnavailable as exc:
         pytest.skip(f"eval adapter unavailable: {exc}")
+    record = os.environ.get("BROKERDOCS_EVAL_RECORD") == "1"
+    recorded: dict[str, dict[str, list[dict]]] = {}
+    if record:
+        case_of = {frozenset(str(LR_DIR / lr_docs[f]["file"]) for f in c["documents"]): cid
+                   for cid, c in lr_cases.items()}
+        live_adapter = adapter
+
+        def adapter(paths_, **kw):  # noqa: F811  records every reply of this case
+            store = recorded.setdefault(case_of[frozenset(paths_)], {})
+            prov = rr.recording_provider(store)
+            try:
+                return live_adapter(paths_, provider=prov, **kw)
+            finally:
+                rr.close_provider(prov)
     try:
         metrics, gates = lg.run_loss_run_suite(adapter, LR_DIR, lr_cases, lr_docs)
     except NotImplementedError as exc:
@@ -1080,5 +1121,16 @@ def test_live_loss_run_gates(lr_cases, lr_docs, tmp_path, capsys):
     target.write_text(json.dumps(lg.loss_run_report_dict(metrics, gates), indent=2, default=str), encoding="utf-8")
     with capsys.disabled():
         print("\n" + report + f"\nreport: {target}")
+        if record:
+            import datetime
+
+            from backend.pipeline.cache import EXTRACTION_VERSION
+
+            day = datetime.date.today().isoformat()
+            n = len(list(RECORDED_DIR.glob(f"loss_run_live_{day}*.json")))
+            out = RECORDED_DIR / f"loss_run_live_{day}{'' if n == 0 else chr(ord('a') + n)}.json"
+            rr.write_recording(out, recorded, {"extraction_version": EXTRACTION_VERSION, "passed": gates.passed,
+                                               "synthetic": "Synthetic sample data (tests/fixtures/loss_runs)"})
+            print(f"recorded: {out} ({sum(len(v) for r in recorded.values() for v in r.values())} replies)")
     assert gates.passed, "loss_run gate failed:\n" + report
     assert len(metrics.hard_fails) == 0
