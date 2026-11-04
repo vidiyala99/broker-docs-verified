@@ -17,11 +17,24 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend import models
-from backend.schemas import CERTIFICATE_FIELDS, POLICY_CHECK_FIELDS, FactField, OutlineBlock, SectionPlanItem
-from backend.slugs import CERTIFICATE_SLUG, COMPARE_QUOTES_SLUG, POLICY_CHECK_SLUG, PROPOSAL_BUILDER_SLUG
+from backend.schemas import (
+    CERTIFICATE_FIELDS,
+    LOSS_RUN_FIELDS,
+    POLICY_CHECK_FIELDS,
+    FactField,
+    OutlineBlock,
+    SectionPlanItem,
+)
+from backend.slugs import (
+    CERTIFICATE_SLUG,
+    COMPARE_QUOTES_SLUG,
+    LOSS_RUN_SLUG,
+    POLICY_CHECK_SLUG,
+    PROPOSAL_BUILDER_SLUG,
+)
 
 # Re-exported for the modules that read db.*_SLUG; the one definition is backend/slugs.py (D4).
-__all__ = ["CERTIFICATE_SLUG", "COMPARE_QUOTES_SLUG", "POLICY_CHECK_SLUG", "PROPOSAL_BUILDER_SLUG"]
+__all__ = ["CERTIFICATE_SLUG", "COMPARE_QUOTES_SLUG", "LOSS_RUN_SLUG", "POLICY_CHECK_SLUG", "PROPOSAL_BUILDER_SLUG"]
 
 DEFAULT_WORKSPACE_ID = 1
 
@@ -149,6 +162,32 @@ def _certificate_schema_gaps(insp, names: set[str]) -> list[str]:
     for table in ("holder", "certificate_issue"):
         if table not in names:
             missing.append(f"the {table} table")
+    return missing + _loss_run_schema_gaps(insp, names)
+
+
+# Slice 5a: the loss-run tables are new (create_all adds them to an older database), but a database made by an
+# earlier build of them must carry every column the ledger writes and the indexes the paged claims API uses.
+LOSS_RUN_COLUMNS = {
+    "claim_row": ("location", "carrier_key", "role", "counted", "group_key", "eff_paid", "eff_reserve",
+                  "eff_incurred", "eff_recovery", "eff_deductible", "claim_paid", "claim_reserve", "claim_incurred",
+                  "claim_open", "claim_date", "decision", "decision_id", "decision_stale", "role_reason", "flags"),
+    "claim_decision": ("row_key", "kind", "amounts", "basis", "active", "replaced_id"),
+    "printed_total": ("metric", "scope_kind", "scope_detail", "location", "verify_state"),
+    "loss_window": ("first_page", "last_page", "status"),
+}
+LOSS_RUN_INDEXES = {"claim_row": ("ix_claim_row_run_role", "ix_claim_row_run_claim_key", "ix_claim_row_run_group",
+                                  "ix_claim_row_run_claim_incurred", "ix_claim_row_run_claim_date")}
+
+
+def _loss_run_schema_gaps(insp, names: set[str]) -> list[str]:
+    missing = []
+    for table, columns in LOSS_RUN_COLUMNS.items():
+        if table not in names:
+            continue  # create_all adds it
+        have = {c["name"] for c in insp.get_columns(table)}
+        missing += [f"the {table}.{c} column" for c in columns if c not in have]
+        indexes = {i.get("name") for i in insp.get_indexes(table)}
+        missing += [f"the {table} index {i}" for i in LOSS_RUN_INDEXES.get(table, ()) if i not in indexes]
     return missing
 
 
@@ -179,7 +218,7 @@ def seed(session: Session) -> None:
     if session.get(models.Workspace, DEFAULT_WORKSPACE_ID) is None:
         session.add(models.Workspace(id=DEFAULT_WORKSPACE_ID, name="Local workspace"))
         session.flush()
-    for spec in (COMPARE_QUOTES, PROPOSAL_BUILDER, POLICY_CHECK, CERTIFICATE):
+    for spec in (COMPARE_QUOTES, PROPOSAL_BUILDER, POLICY_CHECK, CERTIFICATE, LOSS_RUN):
         _upsert(session, models.Workflow, spec, workspace_id=DEFAULT_WORKSPACE_ID)
     for spec in PROPOSAL_TEMPLATES:
         _upsert(session, models.ProposalTemplate, spec, workspace_id=DEFAULT_WORKSPACE_ID)
@@ -397,6 +436,35 @@ CERTIFICATE: dict = {
                         guidance="Each claim the certificate makes, checked against the policies.").model_dump(),
     ],
     "fact_schema": [f.model_dump() for f in CERTIFICATE_FIELDS],
+}
+
+
+# --------------------------------------------------------------------- Loss run seed (slice 5a)
+#
+# One slot, 1 to 8 loss-run files: PDFs and spreadsheets (.xlsx, .csv). PDF document facts come from the lr: fact
+# pass (LOSS_RUN_FIELDS); claim rows and printed totals from loss_runs.pdf_rows (PDF) or loss_runs.sheets (code).
+# COMPOSING builds the review in code (loss_runs.report): no compose call.
+
+SPREADSHEET_TYPES = "text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+LOSS_RUN: dict = {
+    "slug": LOSS_RUN_SLUG,
+    "name": "Loss Review",
+    "category": "Analytics",
+    "input_slots": [
+        {"key": "loss_runs", "label": "Loss runs", "accepts": f"application/pdf,{SPREADSHEET_TYPES}",
+         "min": 1, "max": 8},
+    ],
+    "instructions": (
+        "Read an insurance carrier's loss run: the carrier, the insured and the date the amounts are valued as of. "
+        "Report only values stated in the document, each with the page and an exact quote."
+    ),
+    "section_plan": [
+        SectionPlanItem(id="totals", number="1", title="Totals").model_dump(),
+        SectionPlanItem(id="checks", number="2", title="Checks",
+                        guidance="Printed totals reconciled, conflicting claims, unverified rows.").model_dump(),
+    ],
+    "fact_schema": [f.model_dump() for f in LOSS_RUN_FIELDS],
 }
 
 

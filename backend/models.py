@@ -23,6 +23,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -44,6 +45,7 @@ from backend.schemas import (
     ClaimBlock,
     DiscrepancyBlock,
     EvidenceState,
+    LossCheckBlock,
     RunDocumentStatus,
     RunStatus,
     Severity,
@@ -500,6 +502,173 @@ class CertificateIssue(Base):
     pdf_sha256: Mapped[str] = mapped_column(String(64))
 
 
+# --------------------------------------------------------------------- loss runs (slice 5a)
+#
+# Ownership (eng review D1/D4/D8/D9/D10):
+#   claim_row       extracted values only (replaced per document on a re-read) plus broker-added rows
+#                   (source added, never replaced); role, effective amounts and claim totals are DERIVED
+#                   columns written only by loss_runs.report from build_ledger, for SQL paging and filters
+#   claim_decision  the broker's row decisions (edit, confirm, leave_out), keyed by printed location + claim key
+#   printed_total   every total the carrier printed, with its scope and citation
+#   loss_window     which PDF page windows of a document were read (Retry resumes the rest, D11)
+# Conflict picks and accepted gaps live in discrepancy_state (LossCheckBlock items).
+
+CLAIM_ROW_SOURCES = ("extracted", "added")
+CLAIM_ROLES = ("counted", "superseded", "conflicting", "left_out")
+CLAIM_DECISION_KINDS = ("edit", "confirm", "leave_out")
+VERIFY_STATES = ("verified", "unverified")
+MONEY_FIELDS = ("paid", "reserve", "incurred", "recovery", "deductible")
+TOTAL_METRICS = (*MONEY_FIELDS, "claim_count")
+TOTAL_SCOPES = ("all", "policy_year", "policy_number", "carrier", "page_subtotal", "sheet")
+MAX_CLAIMANT_CHARS = 200
+MAX_CLAIM_NUMBER_CHARS = 60
+MAX_LOSS_NOTE_CHARS = 1000
+
+
+class ClaimRow(Base):
+    """One claim line of a loss run (spec section 3, D4, D8, D10). Money in integer cents."""
+
+    __tablename__ = "claim_row"
+    __table_args__ = (
+        CheckConstraint("source IN ('extracted', 'added')", name="ck_claim_row_source"),
+        CheckConstraint("role IN ('counted', 'superseded', 'conflicting', 'left_out')", name="ck_claim_row_role"),
+        CheckConstraint("verify_state IN ('verified', 'unverified')", name="ck_claim_row_verify"),
+        Index("ix_claim_row_run_document", "run_id", "document_id"),
+        Index("ix_claim_row_run_role", "run_id", "role"),
+        Index("ix_claim_row_run_claim_key", "run_id", "claim_key"),
+        Index("ix_claim_row_run_group", "run_id", "group_key"),
+        Index("ix_claim_row_run_claim_incurred", "run_id", "claim_incurred"),
+        Index("ix_claim_row_run_claim_date", "run_id", "claim_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"))
+    document_id: Mapped[int | None] = mapped_column(ForeignKey("document.id"), nullable=True)
+    source: Mapped[str] = mapped_column(String(20), default="extracted")
+    # Printed location (O2): "p3:y245" (PDF page, the claim number's line), "s0:r17" (sheet index, row),
+    # "added:<hex>" for a broker-added row. Unique per (run, document, location) for extracted rows.
+    location: Mapped[str] = mapped_column(String(80))
+    page_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sheet_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sheet_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    line_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    claim_number: Mapped[str] = mapped_column(String(MAX_CLAIM_NUMBER_CHARS))  # as printed
+    claim_key: Mapped[str] = mapped_column(String(MAX_CLAIM_NUMBER_CHARS))  # case and whitespace only
+    carrier: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    carrier_key: Mapped[str] = mapped_column(String(200), default="")
+    policy_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    line_of_business: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    policy_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    claimant: Mapped[str | None] = mapped_column(String(MAX_CLAIMANT_CHARS), nullable=True)
+    date_of_loss: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ISO
+    status_raw: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="unknown")  # open | closed | reopened | unknown
+    paid: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    reserve: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    incurred: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    recovery: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    deductible: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cells: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # field -> "C17" (sheet rows)
+    rects: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    verify_state: Mapped[str] = mapped_column(String(20), default="unverified")
+    verify_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    warnings: Mapped[list[Any]] = mapped_column(JSON, default=list)  # extraction warnings
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)  # broker note on an added row
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # ---- derived by build_ledger (loss_runs.report writes them on every build; never read as input)
+    role: Mapped[str] = mapped_column(String(20), default="counted")
+    counted: Mapped[bool] = mapped_column(Boolean, default=False)  # in the totals
+    group_key: Mapped[str] = mapped_column(String(300), default="")
+    eff_paid: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    eff_reserve: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    eff_incurred: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    eff_recovery: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    eff_deductible: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    claim_paid: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    claim_reserve: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    claim_incurred: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    claim_open: Mapped[bool] = mapped_column(Boolean, default=False)
+    claim_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    decision: Mapped[str | None] = mapped_column(String(20), nullable=True)  # edited | confirmed | left_out
+    decision_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    decision_stale: Mapped[bool] = mapped_column(Boolean, default=False)
+    role_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    flags: Mapped[list[Any]] = mapped_column(JSON, default=list)  # derived warnings (repeated_line, ...)
+
+
+class ClaimDecision(Base):
+    """A broker decision on one claim row (D4 as amended by O2): keyed by `row_key` = "<document id>:<location>|<claim
+    key>" ("added:<hex>|<key>" for an added row), never by the row id, so it survives a re-read. `basis` holds the
+    extracted values the decision was made on; a re-read that changes them leaves the decision unapplied and the row
+    shows "Changed since you resolved it". Undo deletes the active decision and reactivates the one it replaced."""
+
+    __tablename__ = "claim_decision"
+    __table_args__ = (
+        CheckConstraint("kind IN ('edit', 'confirm', 'leave_out')", name="ck_claim_decision_kind"),
+        Index("ix_claim_decision_run_key", "run_id", "row_key"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), index=True)
+    row_key: Mapped[str] = mapped_column(String(300))
+    kind: Mapped[str] = mapped_column(String(20))
+    amounts: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # edit: field -> cents (or null)
+    basis: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # extracted values at decision time
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    replaced_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PrintedTotal(Base):
+    """A total the carrier printed (O3/D9): metric, scope, amount in cents (a count for claim_count), citation."""
+
+    __tablename__ = "printed_total"
+    __table_args__ = (Index("ix_printed_total_run_document", "run_id", "document_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"))
+    document_id: Mapped[int] = mapped_column(ForeignKey("document.id"))
+    metric: Mapped[str] = mapped_column(String(20))
+    scope_kind: Mapped[str] = mapped_column(String(20))
+    scope_value: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    scope_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # page_subtotal: page/max_y or rows
+    label: Mapped[str] = mapped_column(String(300), default="")
+    amount: Mapped[int] = mapped_column(BigInteger)
+    location: Mapped[str] = mapped_column(String(80))  # "p4:y700" or "s0:r41"
+    page_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sheet_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sheet_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    line_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cells: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    rects: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    verify_state: Mapped[str] = mapped_column(String(20), default="unverified")
+    verify_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+LOSS_WINDOW_STATUSES = ("done", "cut_off", "stopped")
+
+
+class LossWindow(Base):
+    """One PDF page window of a loss-run row read (R2, O5/D11): done, cut_off (a one-page reply still cut off) or
+    stopped (budget). Pages covered by a done window are read; Retry reads only the others."""
+
+    __tablename__ = "loss_window"
+    __table_args__ = (Index("ix_loss_window_run_document", "run_id", "document_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"))
+    document_id: Mapped[int] = mapped_column(ForeignKey("document.id"))
+    first_page: Mapped[int] = mapped_column(Integer)
+    last_page: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20))
+    error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Feedback(Base):
     """Thumbs up/down on one artifact version (spec section 4 step 5)."""
 
@@ -784,7 +953,15 @@ def claim_blocks(content: ArtifactContent) -> list[ClaimBlock]:
     return [b for _, b in content.iter_blocks() if isinstance(b, ClaimBlock)]
 
 
-def item_fingerprint(block: DiscrepancyBlock | ClaimBlock) -> str:
+def loss_check_blocks(content: ArtifactContent, *, broker_only: bool = False) -> list[LossCheckBlock]:
+    """Slice 5a: the loss review's checks; `broker_only` keeps those decided in discrepancy_state."""
+    return [b for _, b in content.iter_blocks()
+            if isinstance(b, LossCheckBlock) and (not broker_only or b.decided_by == "broker")]
+
+
+def item_fingerprint(block: DiscrepancyBlock | ClaimBlock | LossCheckBlock) -> str:
+    if isinstance(block, LossCheckBlock):
+        return block.fingerprint  # computed by loss_runs.ledger over what the check compares
     return claim_fingerprint(block) if isinstance(block, ClaimBlock) else discrepancy_fingerprint(block)
 
 
@@ -805,7 +982,8 @@ def reconciled_status(row: DiscrepancyState | None, fp: str) -> str:
 def reconcile_discrepancy_states(session: Session, run_id: int, content: ArtifactContent) -> None:
     """Bring the run's decisions in line with `content`, its current version (see DiscrepancyState).
     A content without discrepancies or certificate claims (Compare, Proposal) touches nothing."""
-    blocks: list[DiscrepancyBlock | ClaimBlock] = [*discrepancy_blocks(content), *claim_blocks(content)]
+    blocks: list[DiscrepancyBlock | ClaimBlock | LossCheckBlock] = [
+        *discrepancy_blocks(content), *claim_blocks(content), *loss_check_blocks(content, broker_only=True)]
     if not blocks:
         return
     rows = {r.item_id: r for r in session.scalars(select(DiscrepancyState).where(DiscrepancyState.run_id == run_id))}
