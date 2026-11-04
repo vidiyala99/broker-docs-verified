@@ -200,7 +200,7 @@ async def read_rows(provider: Provider, budget, pages: Sequence[Any], *, documen
     async def call(w: Win) -> dict[str, Any]:
         msgs = build_messages([by_no[n] for n in w.pages if n in by_no], first=w.first, last=w.last,
                               page_count=count, document_name=document_name)
-        res = await provider.complete_json(role=CallRole.EXTRACT, messages=msgs, schema=schema, budget=budget,
+        res = await provider.complete_json(role=CallRole.LOSS_ROWS, messages=msgs, schema=schema, budget=budget,
                                            label=f"{label}:p{w.first}-{w.last}", max_output_tokens=max_output_tokens)
         return res.data
 
@@ -293,6 +293,7 @@ class PageIndex:
     lines: list[Line]
     columns: dict[str, tuple[float, float]]  # our column -> header x span
     header_y: float | None
+    ocr_text: str = ""  # a scanned page's model transcription (no word positions)
 
     @property
     def has_words(self) -> bool:
@@ -341,7 +342,7 @@ def _header_columns(lines: Sequence[Line]) -> tuple[dict[str, tuple[float, float
 def index_page(page: Any) -> PageIndex:
     lines = page_lines(getattr(page, "words", None))
     columns, header_y = _header_columns(lines)
-    return PageIndex(int(page.page_no), lines, columns, header_y)
+    return PageIndex(int(page.page_no), lines, columns, header_y, getattr(page, "ocr_text", None) or "")
 
 
 def _find_claim(index: PageIndex, key: str) -> list[tuple[int, list[Word]]]:
@@ -570,6 +571,10 @@ def _verify_totals(data: dict[str, Any] | None, window: Win, indexes: dict[int, 
                     break
         elif index is not None:
             reason = "scanned page: no word positions to check"
+            if _in_ocr_text(index.ocr_text, label_words, metric, amount):
+                # A total on a scan is read from the transcription: reconciled, shown as scan-read. Rows on scans
+                # stay unverified (R6): only the broker can confirm them.
+                state, reason = "scan_read", "read from a scanned page (no word positions)"
         kind = raw.get("scope_kind") or "all"
         value = _text(raw.get("scope_value"), 200)
         detail: dict[str, Any] = {}
@@ -585,6 +590,20 @@ def _verify_totals(data: dict[str, Any] | None, window: Win, indexes: dict[int, 
                     "quote": _text(raw.get("quote"), 500), "rects": rects, "verify_state": state,
                     "verify_reason": reason})
     return out
+
+
+def _in_ocr_text(text: str, label_words: set[str], metric: str, amount: int) -> bool:
+    for line in text.splitlines():
+        low = line.lower()
+        if "total" not in low or (label_words and not label_words <= set(re.findall(r"[a-z0-9]+", low))):
+            continue
+        for tok in line.split():
+            if metric == "claim_count":
+                if tok.replace(",", "").isdigit() and int(tok.replace(",", "")) == amount:
+                    return True
+            elif normalize.money_or_none(tok) == amount:
+                return True
+    return False
 
 
 def verify_read(read: RowsRead, pages: Sequence[Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

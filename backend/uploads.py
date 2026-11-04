@@ -161,9 +161,35 @@ def load_original(stored_name: str) -> bytes:
     return _target(stored_name, _ORIGINAL_SUFFIX).read_bytes()
 
 
+# Slice 5a: a spreadsheet loss run keeps its original (<uuid>.orig) and its parsed rows (<uuid>.rows.jsonl, R5); it
+# has no stored PDF: its sheet pages are rendered on demand (routes/documents.py sheet-pages).
+SHEET_CACHE_SUFFIX = ".rows.jsonl"
+
+
+def sheet_cache_path(stored_name: str) -> Path:
+    return _target(stored_name, SHEET_CACHE_SUFFIX)
+
+
+def store_sheet_cache(book, stored_name: str) -> dict:
+    """Write the parsed rows beside the original; returns the layout (sheets, pages, mapped headers)."""
+    from backend.loss_runs import sheets  # noqa: PLC0415
+
+    return sheets.write_cache(book, sheet_cache_path(stored_name))
+
+
+def sheet_meta(stored_name: str) -> dict | None:
+    """The layout line of a spreadsheet's parsed-rows cache, or None when it is missing."""
+    from backend.loss_runs import sheets  # noqa: PLC0415
+
+    try:
+        return sheets.read_meta(sheet_cache_path(stored_name))
+    except (OSError, ValueError):
+        return None
+
+
 def remove_stored(stored_name: str) -> None:
     if re.fullmatch(r"[0-9a-f]{32}", stored_name or ""):
-        for suffix in ("", _ORIGINAL_SUFFIX):
+        for suffix in ("", _ORIGINAL_SUFFIX, SHEET_CACHE_SUFFIX):
             try:
                 (files_dir() / f"{stored_name}{suffix}").unlink()
             except FileNotFoundError:

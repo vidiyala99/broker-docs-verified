@@ -33,6 +33,8 @@ DEFAULT_MODELS: dict[CallRole, str] = {
     CallRole.COMPOSE: "gpt-5.5",
     CallRole.CHAT: "gpt-5.5",
     CallRole.SUGGEST: "gpt-5.4-nano",
+    CallRole.LOSS_ROWS: "gpt-5.4-mini",
+    CallRole.LOSS_HEADERS: "gpt-5.4-mini",
 }
 
 # Reserved output per call (M4). Reasoning tokens count as output, so these are generous.
@@ -42,6 +44,8 @@ DEFAULT_MAX_OUTPUT_TOKENS: dict[CallRole, int] = {
     CallRole.COMPOSE: 16_000,
     CallRole.CHAT: 4_000,
     CallRole.SUGGEST: 1_000,
+    CallRole.LOSS_ROWS: 8_000,  # one 2-page window's rows (about 60); a cut-off reply is split (R2)
+    CallRole.LOSS_HEADERS: 1_500,
 }
 
 DEFAULT_TIMEOUTS_S: dict[CallRole, float] = {
@@ -50,6 +54,8 @@ DEFAULT_TIMEOUTS_S: dict[CallRole, float] = {
     CallRole.COMPOSE: 180.0,
     CallRole.CHAT: 90.0,
     CallRole.SUGGEST: 30.0,
+    CallRole.LOSS_ROWS: 120.0,
+    CallRole.LOSS_HEADERS: 60.0,
 }
 
 # UNCONFIRMED stand-in prices, not read from a current price list. Replace before
@@ -76,6 +82,8 @@ DEFAULT_EXPECTED_OUTPUT_TOKENS: dict[CallRole, int] = {
     CallRole.COMPOSE: 8_000,
     CallRole.CHAT: 1_000,
     CallRole.SUGGEST: 300,
+    CallRole.LOSS_ROWS: 3_000,
+    CallRole.LOSS_HEADERS: 300,
 }
 
 RUN_TOKEN_BUDGET = 1_500_000  # T14 (D3 had 600k)
@@ -92,6 +100,13 @@ RUN_TOKEN_BUDGET = 1_500_000  # T14 (D3 had 600k)
 # 500k covers that with headroom and still lets three such documents share one
 # 1.5M run.
 DOCUMENT_TOKEN_BUDGET = 500_000
+# Slice 5a loss runs (L8, R2, O5). PROVISIONAL until the T7 fixture measurements set them [re-measure before the
+# gate]. A loss-run PDF is read twice: the lr: fact pass (15-page windows) and the row pass (2-page windows, about
+# one call per page). Estimate for the ~120-page fixture: 119 row windows x (about 2.5k input + 3k output) plus the
+# fact pass (9 windows x about 18k) = about 820k; 1.2M per document leaves headroom, and a Retry after a budget stop
+# gets a fresh allowance of this size for each document it reads (O5/D11).
+LOSS_DOCUMENT_TOKEN_BUDGET = 1_200_000
+LOSS_RUN_TOKEN_BUDGET = 4_000_000
 MAX_CONCURRENCY = 4  # M6
 RETRY_DELAYS_S = (1.0, 2.0, 4.0)  # M8: 3 retries at 1/2/4 seconds
 SCHEMA_RETRIES = 1  # spec section 6: one retry
@@ -110,6 +125,8 @@ class ProviderConfig:
     default_context_window: int = DEFAULT_CONTEXT_WINDOW
     run_token_budget: int = RUN_TOKEN_BUDGET
     document_token_budget: int = DOCUMENT_TOKEN_BUDGET
+    loss_document_token_budget: int = LOSS_DOCUMENT_TOKEN_BUDGET
+    loss_run_token_budget: int = LOSS_RUN_TOKEN_BUDGET
     max_concurrency: int = MAX_CONCURRENCY
     retry_delays_s: tuple[float, ...] = RETRY_DELAYS_S
     schema_retries: int = SCHEMA_RETRIES

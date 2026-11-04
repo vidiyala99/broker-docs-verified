@@ -19,11 +19,10 @@ from typing import Any
 
 # ---------------------------------------------------------------- status (data)
 
-STATUS_MAP: dict[str, str] = {
-    "o": "open", "open": "open", "opened": "open", "op": "open", "pending": "open", "active": "open",
-    "c": "closed", "closed": "closed", "cl": "closed", "close": "closed", "clsd": "closed", "final": "closed",
-    "reopened": "reopened", "reopen": "reopened", "ro": "reopened", "r": "reopened", "re open": "reopened",
-    "re opened": "reopened", "reo": "reopened",
+STATUS_MAP: dict[str, str] = {  # spec section 4 step 4, exactly: any other spelling stays raw, status unknown
+    "o": "open", "open": "open", "opened": "open",
+    "c": "closed", "closed": "closed",
+    "re-opened": "reopened", "reopened": "reopened", "reopen": "reopened", "ro": "reopened",
 }
 OPEN_STATUSES = frozenset({"open", "reopened"})
 
@@ -32,10 +31,7 @@ def normalize_status(raw: Any) -> str:
     """open | closed | reopened | unknown (an unknown spelling keeps its raw text, shown)."""
     if raw is None:
         return "unknown"
-    key = re.sub(r"[^a-z]+", " ", str(raw).lower()).strip()
-    if key in STATUS_MAP:
-        return STATUS_MAP[key]
-    return STATUS_MAP.get(key.replace(" ", ""), "unknown")
+    return STATUS_MAP.get(" ".join(str(raw).split()).lower(), "unknown")
 
 
 # ---------------------------------------------------------------- keys

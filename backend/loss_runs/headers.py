@@ -15,6 +15,8 @@ import hashlib
 import json
 import re
 
+from backend.loss_runs.normalize import STATUS_MAP  # noqa: F401 - re-exported: the status map is data too
+
 # Our columns, in display order. Money columns are in integer cents.
 COLUMNS: dict[str, str] = {
     "claim_number": "Claim number",

@@ -49,6 +49,9 @@ from backend.schemas import (
 )
 
 MONEY = ("paid", "reserve", "incurred", "recovery", "deductible")
+ROLES = ("counted", "superseded", "conflicting", "left_out")
+SCOPE_KINDS = ("all", "policy_year", "policy_number", "carrier", "page_subtotal", "sheet")
+STATUS_MAP = normalize.STATUS_MAP
 TOLERANCE_CENTS = 100  # L6: a difference of $1.00 or less matches
 METRIC_LABELS = {"paid": "paid", "reserve": "reserve", "incurred": "incurred", "recovery": "recoveries",
                  "deductible": "deductible", "claim_count": "claim count"}
@@ -224,6 +227,13 @@ def fingerprint(payload: Any) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _same_amounts(a: tuple, b: tuple) -> bool:
+    """Two files' sums of one claim agree on every amount BOTH print (a file without a recovery column says
+    nothing about recoveries), and they share at least one."""
+    shared = [(x, y) for x, y in zip(a, b, strict=True) if x is not None and y is not None]
+    return bool(shared) and all(x == y for x, y in shared)
+
+
 def effective_status(state: CheckState | None, fp: str) -> tuple[str, bool]:
     """(status, changed since resolved) a check gets for fingerprint `fp` (models.reconciled_status rules)."""
     if state is None:
@@ -386,7 +396,7 @@ def build_ledger(rows: Sequence[LedgerRow], documents: Sequence[LedgerDocument],
                                              else f"Superseded by {top_label}")
         if len(tops) < 2:
             continue
-        if len({sums_of(per_doc[d]) for d in tops}) == 1:
+        if all(_same_amounts(sums_of(per_doc[tops[0]]), sums_of(per_doc[d])) for d in tops[1:]):
             for d in tops[1:]:
                 for x in per_doc[d]:
                     results[x.id].role = "superseded"
@@ -425,7 +435,9 @@ def build_ledger(rows: Sequence[LedgerRow], documents: Sequence[LedgerDocument],
         totals_by_doc[t.document_id].append(t)
     for doc in sorted(documents, key=lambda d: d.position):
         doc_totals = totals_by_doc.get(doc.document_id, [])
-        own = [r for r in rows_by_doc.get(doc.document_id, []) if not left_out(r) and trusted(r)]
+        # Lane choice (shared with the eval lane): a printed total is checked against every line the document
+        # prints in scope, verified or not (only a broker leave-out removes one); unverified rows stay out of totals.
+        own = [r for r in rows_by_doc.get(doc.document_id, []) if not left_out(r)]
         if not doc.fully_read:
             if doc_totals:
                 notices.append(f"{doc.label} was not fully read, so its printed totals are not reconciled.")
@@ -437,7 +449,7 @@ def build_ledger(rows: Sequence[LedgerRow], documents: Sequence[LedgerDocument],
                 notices.append(f"{doc.label} prints no totals: nothing to reconcile.")
             continue
         for t in doc_totals:
-            if t.verify_state != "verified":
+            if t.verify_state not in ("verified", "scan_read"):
                 notices.append(f"A printed total in {doc.label} ({t.label or METRIC_LABELS.get(t.metric, t.metric)}) "
                                "could not be verified, so it is not reconciled.")
                 continue
@@ -507,7 +519,7 @@ def build_ledger(rows: Sequence[LedgerRow], documents: Sequence[LedgerDocument],
         if doc.status == "done" and not doc.valuation_date and rows_by_doc.get(doc.document_id):
             notices.append(f"No valuation date found in {doc.label}: its claims count, but never replace another "
                            "file's.")
-        notices.extend(doc.notices)
+        notices.extend(f"{doc.label}: {n}" for n in doc.notices)
     if orphans:
         notices.append(f"{len(orphans)} of your decision{'s' if len(orphans) != 1 else ''} no longer match a row "
                        "after the file was read again.")

@@ -89,6 +89,9 @@ _STATES = {EvidenceState.VERIFIED: "verified", EvidenceState.SCAN_READ: "scan_re
 PROPOSAL_SLUG = "proposal-builder"
 POLICY_SLUG = db.POLICY_CHECK_SLUG
 CERTIFICATE_SLUG = db.CERTIFICATE_SLUG
+LOSS_RUN_SLUG = db.LOSS_RUN_SLUG
+LOSS_RUN_ALIAS = "loss_run"
+_SHEET_SUFFIXES = (".xlsx", ".csv")
 POLICY_ROLES = ("expiring", "quote", "renewal", "ams")
 _AMS_SUFFIXES = (".json", ".csv")
 PROPOSAL_TEMPLATE_TABLE = "proposal_template"
@@ -114,7 +117,9 @@ def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
         raise ValueError(f"{len(paths)} documents; one run takes at most "
                          f"{DEFAULT_LIMITS.max_documents_per_run} (D3)")
     slug = workflow or db.COMPARE_QUOTES_SLUG
-    known = (db.COMPARE_QUOTES_SLUG, PROPOSAL_SLUG, POLICY_SLUG, CERTIFICATE_SLUG)
+    if slug == LOSS_RUN_ALIAS:
+        slug = LOSS_RUN_SLUG  # the eval gate's spelling (tests/eval/loss_run_gate.py)
+    known = (db.COMPARE_QUOTES_SLUG, PROPOSAL_SLUG, POLICY_SLUG, CERTIFICATE_SLUG, LOSS_RUN_SLUG)
     if slug not in known:
         raise ValueError(f"unknown eval workflow {slug!r}; known: {', '.join(known)}")
     role_of: dict[str, str] | None = None
@@ -226,6 +231,7 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
     proposal = slug == PROPOSAL_SLUG
     policy = slug == POLICY_SLUG
     cert = slug == CERTIFICATE_SLUG
+    loss = slug == LOSS_RUN_SLUG
     client_name: str | None = None
     engine = db.make_engine("sqlite://")
     try:
@@ -245,6 +251,9 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 run_params, warnings = proposal_parameters(s, parameters, template)
             if cert:
                 run_params, client_name = certificate_parameters(parameters)
+            if loss:
+                raw_client = (parameters or {}).get("client_name")
+                client_name = (" ".join(str(raw_client).split())[:120] or None) if raw_client else None
             for path in paths:
                 try:
                     data = Path(path).read_bytes()
@@ -260,6 +269,15 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                         documents[path] = _failed(str(exc.code))
                         continue
                     kind, pdf, page_count = "ams", rendered.pdf, rendered.page_count
+                if loss and Path(path).suffix.lower() in _SHEET_SUFFIXES:
+                    # Same checks as the spreadsheet upload route (R7): a refused file never reaches the run.
+                    from backend.loss_runs import sheets
+                    try:
+                        book = sheets.parse_workbook(data, Path(path).name)
+                    except sheets.SheetError as exc:
+                        documents[path] = _failed(str(exc.code))
+                        continue
+                    kind, pdf, page_count = "spreadsheet", b"", sheets.layout(book)["page_count"]
                 doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=Path(path).name,
                                       stored_name=uuid.uuid4().hex, size_bytes=len(data),
                                       sha256=hashlib.sha256(data).hexdigest(), kind=kind,
@@ -267,7 +285,7 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 s.add(doc)
                 s.flush()
                 blobs[doc.id] = pdf
-                if kind == "ams":
+                if kind in ("ams", "spreadsheet"):
                     originals[doc.id] = data
                 order.append((path, doc.id))
         if not order:
@@ -279,6 +297,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 out["policy_check"] = _empty_policy_block(slug, role_of, ["no readable document: no run"])
             if cert:
                 out["certificate"] = _empty_certificate_block(["no readable document: no run"])
+            if loss:
+                out["loss_run"] = _empty_loss_block(documents, ["no readable document: no run"])
             return out
 
         def load(ref: DocumentRef) -> bytes:
@@ -303,7 +323,7 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                         documents.setdefault(path, _failed("not_run"))
                     out["policy_check"] = _empty_policy_block(slug, role_of, [f"run not created: {exc}"])
                     return out
-            elif cert:
+            elif cert or loss:
                 run_id, _ = manager.submit(workflow_id, [doc_id for _, doc_id in order], run_params,
                                            client_name=client_name)
             else:
@@ -339,6 +359,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 out["policy_check"] = _policy_block(s, run, slug, order, role_of)
             if cert:
                 out["certificate"] = _certificate_block(s, run, order)
+            if loss:
+                out["loss_run"] = _loss_block(s, run, order, documents)
         return out
     finally:
         engine.dispose()
@@ -540,6 +562,109 @@ def _certificate_block(s: Any, run: models.Run, order: list[tuple[str, int]]) ->
         if str(rd.status) == "failed":
             block["notices"].append({"kind": "document_not_read", "message": rd.error or "Not read",
                                      "document": path_by_doc.get(rd.document_id)})
+    return block
+
+
+# --------------------------------------------------------------------- loss runs (slice 5a)
+#
+# Contract: tests/eval/loss_run_gate.py (eval lane T7). `run_eval_batch(paths, workflow="loss_run" | "loss-run",
+# parameters={"client_name": ...})` adds a ``loss_run`` block: documents (status, failure_reason, carrier,
+# valuation_date, input_tokens), every extracted claim row (all roles; an eval run has no broker decisions) with
+# effective amounts (O4) and its printed location {"page": n} or {"sheet": name, "row": n} (a CSV has sheet null),
+# the totals strip, the printed-total checks, and notices with a kind the gate scores.
+
+_LOSS_WARNINGS = ("incurred_not_paid_plus_reserve", "repeated_line")
+
+
+def _empty_loss_block(documents: Mapping[str, Any], warnings: list[str]) -> dict[str, Any]:
+    return {"workflow": LOSS_RUN_ALIAS, "run_status": None, "warnings": list(warnings),
+            "documents": {p: {"status": d.get("status"), "failure_reason": d.get("failure_reason"), "carrier": None,
+                              "valuation_date": None, "input_tokens": None} for p, d in documents.items()},
+            "rows": [], "totals": {"claims": 0, "open": 0, "paid": 0, "reserve": 0, "incurred": 0, "recovery": 0,
+                                   "deductible": 0},
+            "checks": [], "notices": []}
+
+
+def loss_notice_kind(message: str) -> str:
+    """The gate's notice kind for one report notice."""
+    if "prints no totals" in message:
+        return "no_printed_totals"
+    if "No valuation date found" in message:
+        return "no_valuation_date"
+    if "No claims table found" in message:
+        return "no_claims_table"
+    if "not verified" in message:
+        return "rows_not_verified"
+    if "not fully read" in message or "not read" in message:
+        return "document_not_read"
+    return "info"
+
+
+def _loss_block(s: Any, run: models.Run, order: list[tuple[str, int]], documents: Mapping[str, Any]) -> dict[str, Any]:
+    import re
+
+    from backend.loss_runs import report as loss_report
+    from backend.loss_runs.normalize import to_iso_date
+    from backend.schemas import LossCheckBlock, LossTotalsBlock
+
+    path_by_doc = {doc_id: path for path, doc_id in order}
+    by_label = {Path(path).name: path for path, _ in order}
+    block = _empty_loss_block(documents, [])
+    block["run_status"] = str(run.status)
+    facts = loss_report.document_facts(s, run.id)
+    tokens: dict[int, int] = {}
+    for doc_id, t in s.execute(select(models.ModelCall.document_id, models.ModelCall.tokens_in)
+                               .where(models.ModelCall.run_id == run.id)):
+        if doc_id is not None:
+            tokens[doc_id] = tokens.get(doc_id, 0) + int(t or 0)
+    for path, doc_id in order:
+        entry = block["documents"].setdefault(path, {})
+        f = facts.get(doc_id, {})
+        entry.update({"status": documents.get(path, {}).get("status"),
+                      "failure_reason": documents.get(path, {}).get("failure_reason"),
+                      "carrier": f.get("lr:carrier"), "valuation_date": to_iso_date(f.get("lr:valuation_date")),
+                      "input_tokens": tokens.get(doc_id, 0)})
+    if run.artifact is None or not run.artifact.versions:
+        block["warnings"].append("the run produced no artifact")
+        return block
+    csv_docs = {doc_id for path, doc_id in order if Path(path).suffix.lower() == ".csv"}
+    CR = models.ClaimRow
+    for r in s.scalars(select(CR).where(CR.run_id == run.id, CR.source == "extracted").order_by(CR.id)):
+        if r.sheet_row is not None:
+            loc = {"sheet": None if r.document_id in csv_docs else r.sheet_name, "row": r.sheet_row}
+        else:
+            loc = {"page": r.page_no}
+        flags = list(r.flags or [])
+        block["rows"].append({
+            "document": path_by_doc.get(r.document_id), "location": loc, "claim_number": r.claim_number,
+            "claim_key": r.claim_key, "carrier": r.carrier, "policy_number": r.policy_number,
+            "policy_year": r.policy_year, "line": r.line_of_business, "claimant": r.claimant,
+            "date_of_loss": r.date_of_loss, "status_raw": r.status_raw, "status": r.status,
+            "paid": r.eff_paid, "reserve": r.eff_reserve, "incurred": r.eff_incurred, "recovery": r.eff_recovery,
+            "deductible": r.eff_deductible, "incurred_computed": "incurred_computed" in flags,
+            "verify": r.verify_state, "unverified_reason": r.verify_reason, "role": r.role,
+            "warnings": [x for x in flags if x in _LOSS_WARNINGS]})
+    content = run.artifact.latest_content()
+    for _, b in content.iter_blocks():
+        if isinstance(b, LossTotalsBlock):
+            block["totals"] = {"claims": b.claims, "open": b.open_claims,
+                               **{m: getattr(b, m).cents for m in ("paid", "reserve", "incurred", "recovery",
+                                                                   "deductible")}}
+        elif isinstance(b, LossCheckBlock) and b.kind == "total":
+            block["checks"].append({"document": path_by_doc.get(b.document_id), "metric": b.metric,
+                                    "scope_kind": b.scope_kind, "scope_value": b.scope_value, "printed": b.printed,
+                                    "computed": b.computed, "difference": b.difference, "verdict": b.verdict})
+        elif isinstance(b, LossCheckBlock) and b.kind == "unverified" and b.needs_action:
+            block["notices"].append({"kind": "rows_not_verified", "document": path_by_doc.get(b.document_id),
+                                     "sheet": None, "message": b.title})
+    for n in content.notices:
+        kind = loss_notice_kind(n.message)
+        if kind == "rows_not_verified":
+            continue  # one per document, from the unverified checks above
+        doc = next((p for label, p in by_label.items() if label in n.message), None)
+        sheet = re.search(r"on sheet (.+?)\.$", n.message)
+        block["notices"].append({"kind": kind, "document": doc, "sheet": sheet.group(1) if sheet else None,
+                                 "message": n.message})
     return block
 
 
