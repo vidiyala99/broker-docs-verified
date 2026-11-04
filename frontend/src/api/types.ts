@@ -698,7 +698,7 @@ export interface LossCheck {
   type: "loss_check";
   id: string;
   kind: "total" | "conflict" | "unverified";
-  verdict: "matches" | "off" | "conflicting" | "unverified" | "handled";
+  verdict: "matches" | "off" | "needs_review" | "conflicting" | "unverified" | "handled";
   decided_by: "broker" | "rows";
   title: string;
   message: string;

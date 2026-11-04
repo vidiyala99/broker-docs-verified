@@ -1014,8 +1014,9 @@ finished_at, latest_valuation_date, claims, incurred, open_checks}]}`, newest fi
  notices: [Notice], counts, sheets: {document_id: [{sheet, index, header_row, mapped[], unmapped[]}]}}
 ```
 
-`LossCheckBlock`: `id`, `kind` (`total` | `conflict` | `unverified`), `verdict` (`matches` | `off` | `conflicting` |
-`unverified` | `handled`), `decided_by` (`broker`: decided with PATCH checks; `rows`: decided row by row), `title`,
+`LossCheckBlock`: `id`, `kind` (`total` | `conflict` | `unverified`), `verdict` (`matches` | `off` | `needs_review` (a printed
+total the code could not check: not verified on its page, scope not recognised, or rows on no printed line may fall
+in its scope; accept takes a note) | `conflicting` | `unverified` | `handled`), `decided_by` (`broker`: decided with PATCH checks; `rows`: decided row by row), `title`,
 `message`, `document_id`, `metric`, `scope_kind` (`all`, `policy_year`, `policy_number`, `carrier`,
 `page_subtotal`, `sheet`), `scope_value`, `printed`, `computed`, `difference` (printed minus computed), `filter`
 (query for `GET .../claims` that opens the rows in scope), `options` (conflict: one per file, its sums and

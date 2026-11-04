@@ -225,8 +225,49 @@ def test_notices_no_totals_partial_and_unverified_printed_total():
     assert "Travelers 2024.xlsx prints no totals: nothing to reconcile." in led.notices
     assert "Long.pdf was not fully read (pages 181 to 183). Retry reads the rest." in led.notices
     assert any("not fully read, so its printed totals are not reconciled" in n for n in led.notices)
-    led2 = build([rows[0]], totals=[total(A, "incurred", 5, verify_state="unverified", label="Grand Total")])
-    assert led2.checks == [] and any("could not be verified" in n for n in led2.notices)
+
+
+# --------------------------------------------------------------------- fail safe: Needs review, never dropped
+
+
+def test_unverified_printed_total_is_a_needs_review_check_never_dropped():
+    """Live 2026-11-04 (Driftwood 2025): a printed total that is off but could not be verified used to become a
+    notice only, so a real mismatch had no check. It must be a check, Needs review, open, acceptable with a note."""
+    r = row(A, "GL-1", 100, 0, 100)
+    t = total(A, "paid", 5_00, verify_state="unverified", label="Grand Total",
+              verify_reason="total not found on the cited page")
+    led = build([r], totals=[t])
+    [check] = led.checks
+    assert check.verdict == "needs_review" and check.needs_action and check.status == "open"
+    assert "total not found on the cited page" in check.message and led.totals.unreconciled
+    # even when the rows happen to add up, an unverified total never reads "matches"
+    t2 = total(A, "paid", 100, verify_state="unverified", label="Grand Total")
+    assert build([r], totals=[t2]).checks[0].verdict == "needs_review"
+    state = CheckState(check.id, status="resolved", fingerprint=check.fingerprint,
+                       resolved_fingerprint=check.fingerprint, note="checked on the page")
+    accepted = build([r], totals=[t], decisions=Decisions(checks={check.id: state})).checks[0]
+    assert accepted.status == "resolved" and not accepted.needs_action
+
+
+def test_unplaced_row_in_scope_makes_the_total_needs_review_and_stays_out_of_the_sum():
+    """Live 2026-11-04 (Greystone, Elmstead): rows on no printed line (a duplicate read, or a real line the code
+    cannot find) inflated a total that truly matched. They are left out of the sum, and the total says it cannot
+    tell (Needs review) instead of a confident 'off' or 'matches'."""
+    placed = row(B, "GL-1", 100, 0, 100, loc="p1:y120", page_no=1, line_y=120.0)
+    ghost = row(B, "GL-9", 40, 0, 40, loc="p1:x:GL-9:0", page_no=1, verify_state="unverified")
+    led = build([placed, ghost], docs=(B,), totals=[total(B, "paid", 100)])
+    [check] = [c for c in led.checks if c.kind == "total"]
+    assert check.verdict == "needs_review" and check.computed == 100 and "GL-9" in check.message
+    # a page subtotal of another page is not touched by the unplaced row
+    sub = total(B, "paid", 500_00, scope="page_subtotal", value="2", detail={"page": 2, "max_y": 500})
+    led = build([placed, ghost], docs=(B,), totals=[sub])
+    assert [c.verdict for c in led.checks if c.kind == "total"] == ["off"]
+    # scanned rows ("p1:u:") are not unplaced: their totals reconcile as before
+    scan = row(B, "GL-9", 40, 0, 40, loc="p1:u:GL-9:0", page_no=1, verify_state="unverified")
+    led = build([placed, scan], docs=(B,), totals=[total(B, "paid", 140)])
+    assert [c.verdict for c in led.checks if c.kind == "total"] == ["matches"]
+
+
 
 
 def test_conflict_check_id_is_stable_and_bounded():

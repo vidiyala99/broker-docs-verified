@@ -18,9 +18,11 @@ claim_row as derived columns (O4/D10) and stores `Ledger.totals` / `checks` / `n
                                 sums -> conflicting (out of totals) until the broker picks one (discrepancy_state)
     4. counted                  role counted AND (verified, or confirmed / edited by the broker, or added)
                                 left_out is only a broker choice
-    5. reconcile (L6, O3)       every verified printed total of a fully read document against THAT document's own
-                                rows (superseded and conflicting included), in its scope; |printed - computed| <=
-                                $1.00 -> Matches, else a check (accept the gap with a note, or fix rows)
+    5. reconcile (L6, O3)       every printed total of a fully read document against THAT document's own rows
+                                placed on printed lines (superseded and conflicting included), in its scope;
+                                |printed - computed| <= $1.00 -> Matches, else Off (accept the gap with a note, or
+                                fix rows). Fail safe: a total that is not verified, or whose scope may hold an
+                                unplaced row (no printed line), is Needs review: never Matches, never dropped
     6. checks                   printed totals, conflicting claims (broker-decided, fingerprinted), and one check per
                                 document for its undecided unverified rows (decided row by row)
     7. totals strip             over counted lines: claims = distinct claims, not lines (D5)
@@ -114,6 +116,12 @@ class LedgerRow:
         return {"claim_number": self.claim_number, "status": self.status, **self.amounts()}
 
     @property
+    def unplaced(self) -> bool:
+        """An extracted PDF row on no printed line of a page with word boxes ("p3:x:..."): pdf_rows could not tell a
+        duplicate read from a real line."""
+        return self.source == "extracted" and self.location.startswith("p") and ":x:" in self.location
+
+    @property
     def sheet_index(self) -> int | None:
         if self.location.startswith("s") and ":r" in self.location:
             try:
@@ -140,6 +148,7 @@ class LedgerTotal:
     sheet_row: int | None = None
     quote: str | None = None
     rects: tuple = ()
+    verify_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -448,12 +457,22 @@ def build_ledger(rows: Sequence[LedgerRow], documents: Sequence[LedgerDocument],
             if rows_by_doc.get(doc.document_id):
                 notices.append(f"{doc.label} prints no totals: nothing to reconcile.")
             continue
+        placed = [r for r in own if not r.unplaced]
+        loose = [r for r in own if r.unplaced]
         for t in doc_totals:
+            # Fail safe: a printed total the code could not verify, or one whose scope may hold a row that sits on
+            # no printed line (a duplicate read or a real line, the code cannot tell), is Needs review: never a
+            # silent "matches", never dropped.
             if t.verify_state not in ("verified", "scan_read"):
-                notices.append(f"A printed total in {doc.label} ({t.label or METRIC_LABELS.get(t.metric, t.metric)}) "
-                               "could not be verified, so it is not reconciled.")
-                continue
-            checks.append(_total_check(t, doc, [r for r in own if in_scope(r, t)], eff, decisions))
+                review = t.verify_reason or "this printed total could not be verified on its page"
+            else:
+                maybe = [r for r in loose if maybe_in_scope(r, t)]
+                review = (f"{len(maybe)} row{'s' if len(maybe) != 1 else ''} the reader returned "
+                          f"({', '.join(sorted({r.claim_number for r in maybe})[:5])}) "
+                          f"{'are' if len(maybe) != 1 else 'is'} not on any printed line, so the code cannot tell "
+                          "whether the claims add up" if maybe else None)
+            checks.append(_total_check(t, doc, [r for r in placed if in_scope(r, t)], eff, decisions,
+                                       review=review))
 
     # conflicts
     for group, tops in conflicts:
@@ -556,6 +575,13 @@ def in_scope(r: LedgerRow, t: LedgerTotal) -> bool:
     return False
 
 
+def maybe_in_scope(r: LedgerRow, t: LedgerTotal) -> bool:
+    """Could unplaced row `r` (no printed line, so no y) fall in total `t`'s scope? Its page stands in for its line."""
+    if t.scope_kind == "page_subtotal" and "page" in dict(t.scope_detail or {}):
+        return r.page_no == dict(t.scope_detail)["page"]
+    return in_scope(r, t)
+
+
 def computed_amount(rows: Sequence[LedgerRow], metric: str, eff: Mapping[int, Mapping[str, int | None]]) -> int:
     if metric == "claim_count":
         return len({r.claim_key for r in rows})
@@ -575,12 +601,14 @@ def conflict_fingerprint(group: str, options: Sequence[tuple[int, tuple]]) -> st
 
 
 def _total_check(t: LedgerTotal, doc: LedgerDocument, scoped: Sequence[LedgerRow],
-                 eff: Mapping[int, Mapping[str, int | None]], decisions: Decisions) -> LossCheckBlock:
+                 eff: Mapping[int, Mapping[str, int | None]], decisions: Decisions,
+                 review: str | None = None) -> LossCheckBlock:
+    """A printed total's check: matches, off by $X, or (`review` given: the code cannot tell) needs_review."""
     computed = computed_amount(scoped, t.metric, eff)
     diff = t.amount - computed
     tol = 0 if t.metric == "claim_count" else TOLERANCE_CENTS
-    matches = abs(diff) <= tol
-    fp = fingerprint([t.document_id, t.location, t.metric, t.amount, computed])
+    matches = abs(diff) <= tol and review is None
+    fp = fingerprint([t.document_id, t.location, t.metric, t.amount, computed] + ([review] if review else []))
     state = decisions.checks.get(total_id(t))
     status, changed = effective_status(state, fp)
     what = METRIC_LABELS.get(t.metric, t.metric)
@@ -589,7 +617,16 @@ def _total_check(t: LedgerTotal, doc: LedgerDocument, scoped: Sequence[LedgerRow
     def fmt(v: int) -> str:
         return f"{v:,}" if t.metric == "claim_count" else normalize.format_cents(v)
 
-    if matches:
+    verdict = "matches" if matches else "off"
+    if review is not None:
+        verdict = "needs_review"
+        title = f"{scope}: printed {what} {fmt(t.amount)} needs review"
+        message = (f"{doc.label} prints {what} {fmt(t.amount)} ({t.label or scope.lower()}); the claims placed on its "
+                   f"lines add up to {fmt(computed)}. Not checked automatically: {review}. Check it against the page, "
+                   "then fix or add rows, or accept it with a note.")
+        st = "resolved" if status == "resolved" else "open"
+        needs = st == "open"
+    elif matches:
         title = f"{scope}: printed {what} {fmt(t.amount)} matches"
         message = f"{doc.label} prints {fmt(t.amount)}; its claims add up to {fmt(computed)}."
         st, needs = "match", False
@@ -606,7 +643,7 @@ def _total_check(t: LedgerTotal, doc: LedgerDocument, scoped: Sequence[LedgerRow
     if t.scope_detail:
         filt["scope_detail"] = dict(t.scope_detail)
     return LossCheckBlock(
-        id=total_id(t), kind="total", verdict="matches" if matches else "off", title=title, message=message,
+        id=total_id(t), kind="total", verdict=verdict, title=title, message=message,
         document_id=t.document_id, metric=t.metric, scope_kind=t.scope_kind, scope_value=t.scope_value,
         printed=t.amount, computed=computed, difference=diff, filter=filt,
         evidence=[LossEvidence(document_id=t.document_id, page_no=t.page_no, sheet_name=t.sheet_name,

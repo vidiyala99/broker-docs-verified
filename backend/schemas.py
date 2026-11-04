@@ -903,7 +903,7 @@ class LossCheckBlock(BaseModel):
     type: Literal["loss_check"] = "loss_check"
     id: str
     kind: Literal["total", "conflict", "unverified"]
-    verdict: Literal["matches", "off", "conflicting", "unverified", "handled"]
+    verdict: Literal["matches", "off", "needs_review", "conflicting", "unverified", "handled"]
     decided_by: Literal["broker", "rows"] = "broker"
     title: str
     message: str

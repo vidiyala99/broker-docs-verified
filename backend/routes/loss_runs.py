@@ -571,8 +571,9 @@ async def decide_check(run_id: int, item_id: str, body: CheckIn, ctx: AppContext
                                                                  models.DiscrepancyState.item_id == item_id)):
             models.reconcile_discrepancy_states(s, run.id, run.artifact.latest_content())
         if body.action == "accept":
-            if block.kind != "total" or block.verdict != "off":
-                raise ApiError(422, "invalid_action", "Only a printed total that does not match can be accepted.")
+            if block.kind != "total" or block.verdict not in ("off", "needs_review"):
+                raise ApiError(422, "invalid_action",
+                               "Only a printed total that does not match or needs review can be accepted.")
             if not note:
                 raise ApiError(422, "note_required", "Say why the gap is accepted; the note is kept with the check.")
             models.update_discrepancy_state(s, run.id, item_id, status="resolved", note=note)

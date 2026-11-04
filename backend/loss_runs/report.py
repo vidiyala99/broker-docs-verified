@@ -155,7 +155,7 @@ def load(session: Session, run: models.Run) -> tuple[list[L.LedgerRow], dict[int
                             amount=t.amount, location=t.location, scope_value=t.scope_value,
                             scope_detail=t.scope_detail or {}, label=t.label, verify_state=t.verify_state,
                             page_no=t.page_no, sheet_name=t.sheet_name, sheet_row=t.sheet_row, quote=t.quote,
-                            rects=tuple(tuple(x) for x in t.rects or ()))
+                            rects=tuple(tuple(x) for x in t.rects or ()), verify_reason=t.verify_reason)
               for t in session.scalars(select(PT).where(PT.run_id == run.id).order_by(PT.id))]
     decisions = [L.RowDecision(id=d.id, key=d.row_key, kind=d.kind, amounts=d.amounts or {}, basis=d.basis or {},
                                note=d.note)

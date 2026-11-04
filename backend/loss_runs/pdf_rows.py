@@ -28,8 +28,13 @@ Verifying (code, pure; `verify_window`):
     pages without word boxes (scans) ──► unverified ("scanned page"): out of totals until the broker confirms
 
 Identity (O2): a row's location is its page and the y of its claim number's printed line ("p3:y245"); rows read
-twice by overlapping windows share a location and are kept once. A row whose line is not found gets an
-"unmatched" location (page + claim key + its order on the page).
+twice (overlapping windows, a wrapped line returned as its own row, a miscopied claim number) share a location
+and are kept once. A row whose line is not found gets an unplaced location ("p3:x:" + claim key + its order on
+the page; "p3:u:" on a scanned page); the ledger makes printed totals whose scope may hold it Needs review.
+
+Printed totals: the model's totals are checked on their printed line (an amount under another column takes that
+column's metric), and every total line on a read page is also read in code, so a total line the model skipped is
+still reconciled; a total the code cannot place or scope is Needs review, never dropped.
 """
 
 from __future__ import annotations
@@ -129,7 +134,7 @@ def build_messages(pages: Sequence[Any], *, first: int, last: int, page_count: i
 def cache_parts() -> dict[str, Any]:
     """What a cached PDF row read depends on (R8): the prompt, the window config and the verify rules."""
     return {"prompt": LOSS_ROWS_PROMPT, "note": ROWS_NOTE, "window": [WINDOW_PAGES, WINDOW_OVERLAP],
-            "verify": "band+column-1", "synonyms": headers.SYNONYMS_HASH}
+            "verify": "band+column-2+totals-in-code", "synonyms": headers.SYNONYMS_HASH}
 
 
 # --------------------------------------------------------------------- windows
@@ -475,11 +480,70 @@ def _row_values(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int], li
     return vals, amounts, problems
 
 
+def _edit_distance(a: str, b: str) -> int:
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+MISREAD_DISTANCE = 2  # a claim number the model copied with at most this many characters wrong
+
+
+def _claim_cell(index: PageIndex, line: Line) -> list[Word]:
+    """The words of `line` printed in the claim-number column (none when the page has no such header)."""
+    span = index.columns.get("claim_number")
+    if span is None:
+        return []
+    return [w for w in line.words if w.x1 >= span[0] - 1 and w.x0 <= span[1] + 1]
+
+
+def _misread_line(index: PageIndex, key: str, amounts: dict[str, int], taken: set[int]
+                  ) -> tuple[int, list[Word], RowCheck, str] | None:
+    """A claim line whose printed claim number differs from `key` by a character or two and on which every amount
+    of the row verifies (band + column): the model read this printed line with a miscopied claim number. Needs at
+    least one amount, so a row is never placed on a line by its claim number shape alone."""
+    if not amounts or not key:
+        return None
+    best = None
+    for li, line in enumerate(index.lines):
+        if li in taken or (index.header_y is not None and line.y1 <= index.header_y):
+            continue
+        cell = _claim_cell(index, line)
+        printed = normalize.claim_key("".join(w.text for w in cell))
+        if not printed or printed == key or abs(len(printed) - len(key)) > 1:
+            continue
+        dist = _edit_distance(printed, key)
+        if dist > MISREAD_DISTANCE:
+            continue
+        check = check_amounts(index, li, cell, amounts)
+        if check.verified and (best is None or dist < best[0]):
+            best = (dist, li, cell, check, printed)
+    return None if best is None else best[1:]
+
+
 def verify_window(data: dict[str, Any] | None, window: Win, indexes: dict[int, PageIndex]
                   ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """(claim rows, printed totals) of one window's reply, verified against the pages' word boxes."""
+    """(claim rows, printed totals) of one window's reply, verified against the pages' word boxes.
+
+    Each row is placed on a printed line (O2 identity = that line's location):
+      1. an unclaimed printed line of its claim number where its amounts verify;
+      2. else a line of its claim number already taken in this reply where its amounts verify: the same printed
+         line read twice (a wrapped claimant line returned as its own row, or a repeated row). It gets that line's
+         location, so `verify_read` keeps the line once (D8: a location read twice is kept once);
+      3. else the first unclaimed line of its claim number, unverified with the reason;
+      4. else (claim number printed nowhere in the window) a line whose claim number differs by a character or
+         two and where every amount verifies: unverified ("claim number printed as ..."), at that line's location,
+         so a correct read of the same line from the overlapping window replaces it;
+      5. else no printed line: an unplaced row ("p3:x:..."), unverified; printed totals whose scope it may fall
+         in are Needs review (ledger), because it may be a real line or a duplicate read.
+    Scanned pages (no word boxes) keep the "p3:u:..." location and the unverified rule (R6)."""
     rows_out: list[dict[str, Any]] = []
     taken: dict[tuple[int, str], set[int]] = {}
+    taken_lines: dict[int, set[int]] = {}
     unmatched: dict[tuple[int, str], int] = {}
     for raw in (data or {}).get("rows") or []:
         if not isinstance(raw, dict):
@@ -491,15 +555,20 @@ def verify_window(data: dict[str, Any] | None, window: Win, indexes: dict[int, P
         pages = [page] if page in window.pages else []
         pages += [p for p in window.pages if p not in pages]
         chosen = None  # (page, line index, words, check)
+        again = None  # a taken line of the same claim where the amounts verify (the same line read twice)
         fallback = None
+        found_any = False
         for p in pages:
             index = indexes.get(p)
             if index is None or not index.has_words:
                 continue
             for li, words in _find_claim(index, vals["claim_key"]):
-                if li in taken.get((p, vals["claim_key"]), set()):
-                    continue
+                found_any = True
                 check = check_amounts(index, li, words, amounts)
+                if li in taken.get((p, vals["claim_key"]), set()):
+                    if again is None and check.verified and not problems:
+                        again = (p, li, words, check)
+                    continue
                 if check.verified and not problems:
                     chosen = (p, li, words, check)
                     break
@@ -507,30 +576,137 @@ def verify_window(data: dict[str, Any] | None, window: Win, indexes: dict[int, P
                     fallback = (p, li, words, check)
             if chosen:
                 break
-        pick = chosen or fallback
+        pick = chosen or again or fallback
         if pick is not None:
             p, li, words, check = pick
             taken.setdefault((p, vals["claim_key"]), set()).add(li)
+            taken_lines.setdefault(p, set()).add(li)
+            ok = pick is not fallback
             reason = "; ".join(problems) or check.reason
             rows_out.append({**vals, "page_no": p, "line_y": round(check.line_y, 1),
                              "location": f"p{p}:y{int(round(check.line_y))}", "rects": check.rects,
-                             "verify_state": "verified" if chosen and not problems else "unverified",
-                             "verify_reason": None if chosen and not problems else (reason or "not verified")[:200]})
+                             "verify_state": "verified" if ok else "unverified",
+                             "verify_reason": None if ok else (reason or "not verified")[:200]})
             continue
+        if not found_any:
+            misread = None
+            for p in pages:
+                index = indexes.get(p)
+                if index is None or not index.has_words:
+                    continue
+                hit = _misread_line(index, vals["claim_key"], amounts, taken_lines.get(p, set()))
+                if hit is not None:
+                    misread = (p, *hit)
+                    break
+            if misread is not None:
+                p, li, words, check, printed = misread
+                taken_lines.setdefault(p, set()).add(li)
+                rows_out.append({**vals, "page_no": p, "line_y": round(check.line_y, 1),
+                                 "location": f"p{p}:y{int(round(check.line_y))}", "rects": check.rects,
+                                 "verify_state": "unverified",
+                                 "verify_reason": f"claim number printed as {printed}"[:200]})
+                continue
         p = pages[0] if pages else window.first
         index = indexes.get(p)
         k = unmatched.get((p, vals["claim_key"]), 0)
         unmatched[(p, vals["claim_key"])] = k + 1
         scanned = index is None or not index.has_words
-        rows_out.append({**vals, "page_no": p, "line_y": None, "location": f"p{p}:u:{vals['claim_key'][:40]}:{k}",
+        tag = "u" if scanned else "x"
+        rows_out.append({**vals, "page_no": p, "line_y": None,
+                         "location": f"p{p}:{tag}:{vals['claim_key'][:40]}:{k}",
                          "rects": [], "verify_state": "unverified",
                          "verify_reason": ("scanned page: no word positions to check" if scanned
                                            else "claim number not printed on the cited page")})
     return rows_out, _verify_totals(data, window, indexes)
 
 
+TOTAL_WORDS = frozenset({"total", "totals", "subtotal", "subtotals"})
+# Words a label may hold and still name the whole document ("Grand total, all policy years", "Total, all policies").
+# Kept short on purpose: a wrapped claimant line such as "Total loss" must not read as a document total.
+ALL_SCOPE_WORDS = frozenset({"grand", "total", "totals", "all", "policies", "policy", "years", "year", "claims",
+                             "overall", "and"})
+_YEAR = re.compile(r"(19|20)\d\d")
+
+
+def _claim_like(text: str) -> bool:
+    """A claim number in the claim-number column (so the line is a claim line, not a total line)."""
+    key = normalize.claim_key(text)
+    return len(key) >= 5 and any(c.isdigit() for c in key) and not _YEAR.fullmatch(key)
+
+
+@dataclass
+class TotalLine:
+    li: int
+    line: Line
+    label: str
+    words: set[str]
+    amounts: dict[str, tuple[int, Word]]  # money column -> (cents, the printed word)
+
+
+def total_lines(index: PageIndex) -> list[TotalLine]:
+    """Every printed total line of a page, read in code: a line below the header with a total word, no claim
+    number in the claim-number column, and at least one amount under a money column header (O1 columns)."""
+    out: list[TotalLine] = []
+    if not index.columns:
+        return out
+    for li, line in enumerate(index.lines):
+        if index.header_y is not None and line.y1 <= index.header_y:
+            continue
+        toks = re.findall(r"[a-z0-9]+", line.text.lower())
+        if not TOTAL_WORDS & set(toks):
+            continue
+        if any(_claim_like(w.text) for w in _claim_cell(index, line)):
+            continue
+        amounts: dict[str, tuple[int, Word]] = {}
+        label: list[str] = []
+        for w in line.words:
+            cents = normalize.money_or_none(w.text)
+            col = _column_of(w, index.columns) if cents is not None else None
+            if col is not None and col not in amounts:
+                amounts[col] = (cents, w)
+            elif col is None:
+                label.append(w.text)
+        if amounts:
+            out.append(TotalLine(li, line, " ".join(label).strip(" ,:;-"), set(toks), amounts))
+    return out
+
+
+def scope_of_label(label: str, page: int) -> tuple[str, str | None] | None:
+    """The scope a printed total's label names, by fixed rules; None when the label is not recognised (the total is
+    then Needs review, never guessed): "Page subtotal" -> the page; one year and only total words -> that policy
+    year; one policy-number-like token and only total words -> that policy; only total words -> all."""
+    toks = re.findall(r"[A-Za-z0-9]+(?:[-/.][A-Za-z0-9]+)*", label)
+    low = [t.lower() for t in toks]
+    if "page" in low:
+        return "page_subtotal", str(page)
+    years = {t for t in low if _YEAR.fullmatch(t)}
+    policies = {t for t in toks if len(t) >= 5 and any(c.isdigit() for c in t) and any(c.isalpha() for c in t)}
+    rest = {t for t in low if t not in years and t not in {p.lower() for p in policies}}
+    if not rest <= ALL_SCOPE_WORDS:
+        return None
+    if years and not policies:
+        return ("policy_year", next(iter(years))) if len(years) == 1 else None
+    if policies and not years:
+        return ("policy_number", next(iter(policies))) if len(policies) == 1 else None
+    if not years and not policies and rest & TOTAL_WORDS:
+        return "all", None
+    return None
+
+
 def _verify_totals(data: dict[str, Any] | None, window: Win, indexes: dict[int, PageIndex]) -> list[dict[str, Any]]:
-    out = []
+    """Printed totals of one window (O3/D9), never dropped silently:
+
+    * a model total is verified when its label's printed total line holds its amount under its own column; an
+      amount printed under ANOTHER money column takes that column's metric (the column header says what it is, O1);
+    * a model total that is not found stays unverified (the ledger makes it a Needs review check), unless the code
+      read the same printed line and metric itself (below), which then replaces it;
+    * every printed total line on the window's pages is also read in code (`total_lines`): each amount under a
+      money column the model did not return becomes a printed total, its scope from `scope_of_label` (unknown scope
+      -> unverified, Needs review). A model that skips total lines no longer leaves them unreconciled."""
+    out: list[dict[str, Any]] = []
+    lines_of = {p: total_lines(indexes[p]) for p in window.pages if p in indexes and indexes[p].has_words}
+    covered: set[tuple[int, int, str]] = set()  # (page, line index, metric) a model total verified
+    pending: list[tuple[dict[str, Any], tuple[int, int, str] | None]] = []  # unverified model totals + their line
     for raw in (data or {}).get("totals") or []:
         if not isinstance(raw, dict):
             continue
@@ -544,31 +720,52 @@ def _verify_totals(data: dict[str, Any] | None, window: Win, indexes: dict[int, 
         except (ValueError, normalize.MoneyError):
             amount = None
         if amount is None:
-            continue
+            continue  # nothing to reconcile; a printed money total on a digital page is still read in code below
         page = raw.get("page") if raw.get("page") in window.pages else window.first
         index = indexes.get(page)
         state, reason, rects, line_y = "unverified", "total not found on the cited page", [], None
         label_words = {t for t in re.findall(r"[a-z0-9]+", label.lower())
                        if not t.isdigit() or len(t) == 4}  # the label's words and a year, not its amount
-        if index is not None and index.has_words:
-            for line in index.lines:
-                line_words = set(re.findall(r"[a-z0-9]+", line.text.lower()))
-                if "total" not in line.text.lower() and "subtotal" not in line.text.lower():
+        found_line: tuple[int, int] | None = None
+        hit_li = None
+        search = [page, *(p for p in window.pages if p != page)] if metric != "claim_count" else [page]
+        if any(indexes.get(p) is not None and indexes[p].has_words for p in search):
+            for p in search:
+                idx = indexes.get(p)
+                if idx is None or not idx.has_words:
                     continue
-                if label_words and not label_words <= line_words:
-                    continue
-                for w in line.words:
-                    value = (int(w.text.replace(",", "")) if metric == "claim_count" and w.text.replace(",", "").isdigit()
-                             else normalize.money_or_none(w.text) if metric != "claim_count" else None)
-                    if value != amount:
+                for li, line in enumerate(idx.lines):
+                    line_words = set(re.findall(r"[a-z0-9]+", line.text.lower()))
+                    if "total" not in line.text.lower():
                         continue
-                    if metric != "claim_count" and metric in index.columns \
-                            and _column_of(w, index.columns) != metric:
+                    if label_words and not label_words <= line_words:
                         continue
-                    state, reason, rects, line_y = "verified", None, [w.rect], line.y0
-                    break
+                    if found_line is None:
+                        found_line = (p, li)
+                    for w in line.words:
+                        if metric == "claim_count":
+                            t = w.text.replace(",", "")
+                            value = int(t) if t.isdigit() else None
+                        else:
+                            value = normalize.money_or_none(w.text)
+                        if value != amount:
+                            continue
+                        got = metric
+                        if metric != "claim_count" and metric in idx.columns:
+                            col = _column_of(w, idx.columns)
+                            if col is None:
+                                continue
+                            got = col  # printed under another amount column: that column's total
+                        metric, page, hit_li = got, p, li
+                        state, reason, rects, line_y = "verified", None, [w.rect], line.y0
+                        break
+                    if state == "verified":
+                        break
                 if state == "verified":
                     break
+            if state != "verified" and found_line is not None:
+                page = found_line[0]
+                reason = "total line found, but this amount is not printed on it under its column"
         elif index is not None:
             reason = "scanned page: no word positions to check"
             if _in_ocr_text(index.ocr_text, label_words, metric, amount):
@@ -585,10 +782,35 @@ def _verify_totals(data: dict[str, Any] | None, window: Win, indexes: dict[int, 
             value = str(year) if year is not None else value
         loc = f"p{page}:y{int(round(line_y))}:{metric}" if line_y is not None else \
             f"p{page}:u:{metric}:{normalize.claim_key(label)[:30]}:{amount}"
-        out.append({"metric": metric, "scope_kind": kind, "scope_value": value, "scope_detail": detail,
-                    "label": label, "amount": amount, "location": loc, "page_no": page, "line_y": line_y,
-                    "quote": _text(raw.get("quote"), 500), "rects": rects, "verify_state": state,
-                    "verify_reason": reason})
+        item = {"metric": metric, "scope_kind": kind, "scope_value": value, "scope_detail": detail,
+                "label": label, "amount": amount, "location": loc, "page_no": page, "line_y": line_y,
+                "quote": _text(raw.get("quote"), 500), "rects": rects, "verify_state": state,
+                "verify_reason": reason, "source": "model"}
+        if state == "verified" and hit_li is not None:
+            covered.add((page, hit_li, metric))
+        if state == "unverified":
+            pending.append((item, (found_line[0], found_line[1], metric) if found_line else None))
+        else:
+            out.append(item)
+    read_in_code: set[tuple[int, int, str]] = set()
+    for p, tls in lines_of.items():
+        for tl in tls:
+            for col, (cents, w) in tl.amounts.items():
+                read_in_code.add((p, tl.li, col))
+                if (p, tl.li, col) in covered:
+                    continue
+                scope = scope_of_label(tl.label, p)
+                kind, value = scope or ("all", None)
+                out.append({"metric": col, "scope_kind": kind, "scope_value": value,
+                            "scope_detail": {"page": p, "max_y": tl.line.y0} if kind == "page_subtotal" else {},
+                            "label": (tl.label or "Total")[:300], "amount": cents,
+                            "location": f"p{p}:y{int(round(tl.line.y0))}:{col}", "page_no": p, "line_y": tl.line.y0,
+                            "quote": tl.line.text[:500], "rects": [w.rect],
+                            "verify_state": "verified" if scope else "unverified",
+                            "verify_reason": None if scope else "printed total found on the page; its scope is not "
+                                                                "recognised", "source": "page"})
+    # An unverified model total whose printed line and metric the code read itself is that same printed total.
+    out.extend(item for item, at in pending if at is None or at not in read_in_code)
     return out
 
 
@@ -607,23 +829,36 @@ def _in_ocr_text(text: str, label_words: set[str], metric: str, amount: int) -> 
 
 
 def verify_read(read: RowsRead, pages: Sequence[Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Verify every done window; rows and totals read twice (window overlaps) are kept once by location, a verified
-    reading winning over an unverified one."""
+    """Verify every done window; rows and totals read twice (window overlaps) are kept once by location (D8), a
+    verified reading winning over an unverified one. A row placed on a printed line ("p3:y245") is identified by
+    that line alone: a second reading of the line under a miscopied claim number is the same line. A total the
+    model returned wins over the same total read in code (its scope came from the model); an unverified total that
+    another window verified (same metric and amount) is the same printed total, kept once."""
     indexes = {int(p.page_no): index_page(p) for p in pages}
     rows: dict[str, dict[str, Any]] = {}
     totals: dict[str, dict[str, Any]] = {}
+
+    def rank(t: dict[str, Any]) -> int:
+        if t["verify_state"] == "unverified":
+            return 0
+        return 2 if t.get("source") == "model" else 1
+
     for outcome in sorted(read.done, key=lambda o: (o.window.first, o.window.last)):
         got_rows, got_totals = verify_window(outcome.data, outcome.window, indexes)
         for r in got_rows:
-            key = f"{r['location']}|{r['claim_key']}"
+            key = r["location"] if r["line_y"] is not None else f"{r['location']}|{r['claim_key']}"
             if key not in rows or (rows[key]["verify_state"] != "verified" and r["verify_state"] == "verified"):
                 rows[key] = r
         for t in got_totals:
-            if t["location"] not in totals or (totals[t["location"]]["verify_state"] != "verified"
-                                               and t["verify_state"] == "verified"):
+            if t["location"] not in totals or rank(t) > rank(totals[t["location"]]):
                 totals[t["location"]] = t
+    trusted = {(t["metric"], t["amount"]) for t in totals.values() if t["verify_state"] != "unverified"}
+    kept = [t for t in totals.values()
+            if t["verify_state"] != "unverified" or t["line_y"] is not None or (t["metric"], t["amount"]) not in trusted]
+    for t in kept:
+        t.pop("source", None)
     ordered = sorted(rows.values(), key=lambda r: (r["page_no"], r["line_y"] if r["line_y"] is not None else 1e9))
-    return ordered, list(totals.values())
+    return ordered, kept
 
 
 __all__ = ["LOSS_ROWS_PROMPT", "Line", "PageIndex", "RowsRead", "Win", "WindowOutcome", "build_messages", "cache_parts",

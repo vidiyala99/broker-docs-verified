@@ -47,7 +47,9 @@ from backend.pipeline import extract
 from backend.providers import CallRole, ProviderConfig
 from backend.schemas import FactField, RunDocumentStatus
 
-EXTRACTION_VERSION = "2026-11-04.1"  # .1 (slice 5a): loss-run rows, sheets and printed totals join the read
+EXTRACTION_VERSION = "2026-11-04.2"  # .1 (slice 5a): loss-run rows, sheets and printed totals join the read
+# .2: loss-run PDF verify places rows read twice / miscopied on their printed line, reads total lines in code
+#     and re-attributes a total's metric by its column (stored rows and totals from .1 would differ)
 ENV_SWITCH = "BROKERDOCS_EXTRACTION_CACHE"
 _OFF = {"off", "0", "false", "no", "disabled"}
 
