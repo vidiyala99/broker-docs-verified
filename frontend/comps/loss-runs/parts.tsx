@@ -35,7 +35,7 @@ export function QuickFilters({ on, setOn }: { on: string[]; setOn: (k: string[])
 }
 
 /* ---------- the claims table ---------- */
-export function ClaimLine({ r, first, g, open, onFold, showSource = true, muted = false }: { r: Row; first: boolean; g?: Group; open?: boolean; onFold?: () => void; showSource?: boolean; muted?: boolean }) {
+export function ClaimLine({ r, first, g, open, onFold, showSource = true, muted = false, shortChip = false }: { r: Row; first: boolean; g?: Group; open?: boolean; onFold?: () => void; showSource?: boolean; muted?: boolean; shortChip?: boolean }) {
   const states = rowStates(r);
   const out = !r.counts;
   return (
@@ -56,7 +56,7 @@ export function ClaimLine({ r, first, g, open, onFold, showSource = true, muted 
         <span className="lr-who" title={r.claimant}>{r.claimant}</span>
         {(showSource || states.length > 0) && (
           <span className="lr-states">
-            {showSource && <LChip letter={r.letter} label={r.chip} scan={r.scan} />}
+            {showSource && <LChip letter={r.letter} label={muted !== undefined && shortChip ? r.chip.replace(/^.* (p\.\d+)$/, "$1") : r.chip} scan={r.scan} />}
             {states.map((s, i) => (
               <span key={i} className={`lr-state lr-state--${s.key}`} title={s.tip}>
                 <span aria-hidden>{s.icon}</span>{s.word}
