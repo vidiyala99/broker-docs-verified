@@ -18,6 +18,8 @@ class CallRole(str, enum.Enum):
     COMPOSE = "compose"
     CHAT = "chat"
     SUGGEST = "suggest"
+    LOSS_ROWS = "loss_rows"  # slice 5a: claim rows of one 2-page loss-run window (own output cap, R2)
+    LOSS_HEADERS = "loss_headers"  # slice 5a: one sheet's unknown column headers
 
 
 @dataclass(frozen=True)

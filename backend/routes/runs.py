@@ -150,6 +150,16 @@ async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSO
                                fields=fields) from None
         if wf.slug == db.CERTIFICATE_SLUG:
             parameters = certificate_parameters(body.parameters)  # D6: bounds, 422 naming the field
+        if wf.slug == db.LOSS_RUN_SLUG:
+            from backend.loss_runs.sheets import DEFAULT_SHEET_LIMITS  # noqa: PLC0415
+            from backend.routes.loss_runs import review_row_count  # noqa: PLC0415
+
+            cap = DEFAULT_SHEET_LIMITS.max_rows_per_review
+            rows = review_row_count(s, [int(i) for i in body.document_ids])
+            if rows > cap:  # L8: 200,000 spreadsheet rows per review, refused with the reason
+                raise ApiError(422, "too_many_rows", f"These spreadsheets hold {rows:,} claim rows; one loss review "
+                                                     f"reads at most {cap:,}.", limit=cap)
+            parameters = {k: v for k, v in (body.parameters or {}).items() if k == "synthetic" and v is True}
         if source is not None:
             # M3: inside parameters, so the same documents built from two comparisons are two runs.
             parameters = {**parameters, "source_run_id": source.id}

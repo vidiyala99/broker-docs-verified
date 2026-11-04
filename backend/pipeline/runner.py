@@ -68,6 +68,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend import ams, db, models, work_queue
+from backend.loss_runs import pdf_rows, sheets
+from backend.loss_runs import report as loss_report
 from backend.pipeline import cache, certificate, compose, extract, parse, policy_check, verify, windows
 from backend.providers import CallRecord, Provider, ProviderError, RunBudget
 from backend.schemas import (
@@ -116,6 +118,19 @@ _MESSAGES = {
 def failure_message(code: str) -> str:
     """User-facing reason for a failure code (parse failures carry their own message)."""
     return _MESSAGES.get(code, "This document could not be processed.")
+
+
+def _page_ranges(pages: Iterable[int]) -> str:
+    """[3, 4, 5, 9] -> "3 to 5, 9"."""
+    ps = sorted(set(pages))
+    out: list[str] = []
+    start = None
+    for i, p in enumerate(ps):
+        start = p if start is None else start
+        if i + 1 == len(ps) or ps[i + 1] != p + 1:
+            out.append(str(p) if start == p else f"{start} to {p}")
+            start = None
+    return ", ".join(out)
 
 
 # --------------------------------------------------------------------- events
@@ -221,6 +236,15 @@ def is_certificate(run: models.Run) -> bool:
     return run.workflow is not None and run.workflow.slug == db.CERTIFICATE_SLUG
 
 
+def is_loss_run(run: models.Run) -> bool:
+    return run.workflow is not None and run.workflow.slug == db.LOSS_RUN_SLUG
+
+
+def loss_cache_parts() -> dict[str, Any]:
+    """Slice 5a (R8): what a loss-run read depends on beyond the fact pass."""
+    return {"rows": pdf_rows.cache_parts(), "sheets": sheets.cache_parts()}
+
+
 def proposal_title(client_name: str) -> str:
     return (f"Insurance Proposal for {client_name}" if client_name else "Insurance Proposal")[:200]
 
@@ -257,6 +281,7 @@ class _Plan:
     budget_limit: int
     policy_check: bool = False  # slice 3: AMS facts from code, report from the diff (no compose call)
     certificate: bool = False  # slice 4: the draft is built in code (pipeline.certificate, no compose call)
+    loss_run: bool = False  # slice 5a: rows from sheets (code) and PDF row windows; the review is built in code
     cache_key: str | None = None  # slice 4: extraction cache key (pipeline.cache); None = cache off
 
     @property
@@ -372,6 +397,8 @@ def slot_states(run: models.Run) -> dict[str, str]:
 
 
 _AMS_TYPES = ("application/json", "text/csv")
+_SHEET_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+SPREADSHEET_KIND = "spreadsheet"  # slice 5a: an uploaded .xlsx / .csv loss run (no PDF; sheet pages on demand)
 
 
 def _accepts(d: dict[str, Any]) -> tuple[bool, bool]:
@@ -380,15 +407,24 @@ def _accepts(d: dict[str, Any]) -> tuple[bool, bool]:
     return "application/pdf" in accepts, any(a in accepts for a in _AMS_TYPES)
 
 
+def _accepts_sheets(d: dict[str, Any]) -> bool:
+    return _SHEET_TYPE in [a.strip().lower() for a in str(d.get("accepts") or "").split(",")]
+
+
 def check_slot_kinds(input_slots: Sequence[Any] | None, kinds: Sequence[str], slot_keys: Sequence[str]) -> None:
     """Each document fits its slot's `accepts` (slice 3): an AMS export only in a slot that takes
-    JSON or CSV, any other document only in a slot that takes PDFs. Raises SlotError."""
+    JSON or CSV, a spreadsheet loss run (slice 5a) only in a slot that takes spreadsheets, any other
+    document only in a slot that takes PDFs. Raises SlotError."""
     defs = {d["key"]: d for d in _slot_defs(input_slots)}
     for kind, key in zip(kinds, slot_keys, strict=True):
         d = defs.get(key)
         if d is None:
             continue
         pdf_ok, ams_ok = _accepts(d)
+        if kind == SPREADSHEET_KIND:
+            if not _accepts_sheets(d):
+                raise SlotError(f"{_label(d)} takes PDF documents; a spreadsheet is read only by a loss review.")
+            continue
         if kind == "ams" and not ams_ok:
             raise SlotError(f"{_label(d)} takes PDF documents; an AMS export goes in the AMS slot.")
         if kind != "ams" and not pdf_ok:
@@ -938,14 +974,23 @@ class RunManager:
                     for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.QUEUED]
             spent = (run.tokens_in or 0) + (run.tokens_out or 0)
             plan_compose = compose_plan(run)
+            loss = is_loss_run(run)
+            limit = max(1, self._budget_limit - spent)
+            if loss:
+                # O5/D11: every document this execution reads gets a fresh loss-run allowance, so a Retry after a
+                # budget stop can finish the pages it did not read.
+                cfg = self.provider.config
+                limit = max(cfg.loss_run_token_budget - spent, cfg.loss_document_token_budget * max(1, len(todo)))
             plan = _Plan(
                 run_id=run_id,
                 compose=plan_compose,
                 todo=todo,
-                budget_limit=max(1, self._budget_limit - spent),
+                budget_limit=limit,
                 policy_check=is_policy_check(run),
                 certificate=is_certificate(run),
-                cache_key=cache.extraction_key(plan_compose.fields, plan_compose.instructions, self.provider.config),
+                loss_run=loss,
+                cache_key=cache.extraction_key(plan_compose.fields, plan_compose.instructions, self.provider.config,
+                                               extra=loss_cache_parts() if loss else None),
             )
             payload = _run_payload(run)
         self._emit(run_id, "run.status", {k: payload[k] for k in ("status", "error", "retryable")})
@@ -981,10 +1026,14 @@ class RunManager:
     async def _process_document(self, run_id: int, rd_id: int, ref: DocumentRef, plan: _Plan,
                                 budget: RunBudget) -> None:
         token = _current_document.set(ref.id)
-        budget = budget.child(self._document_budget_limit, label=f"document:{ref.id}")  # T14 ceiling
+        ceiling = self.provider.config.loss_document_token_budget if plan.loss_run else self._document_budget_limit
+        budget = budget.child(ceiling, label=f"document:{ref.id}")  # T14 ceiling (slice 5a: the loss-run cap)
         try:
             if ref.kind != "ams" and self._reuse_read(run_id, rd_id, ref, plan):
                 return  # slice 4: an earlier read of the same file was copied (pipeline.cache)
+            if plan.loss_run:
+                await self._read_loss_document(run_id, rd_id, ref, plan, budget)
+                return
             self._update_doc(run_id, rd_id, RunDocumentStatus.READING, progress="Reading pages")
             pages = await self._read_pages(run_id, rd_id, ref, budget)
             if plan.policy_check and ref.kind == "ams":
@@ -1015,7 +1064,7 @@ class RunManager:
                              reused_from_run_id=None, read_at=models.utcnow())
         except asyncio.CancelledError:
             raise
-        except ams.AmsError as exc:
+        except (ams.AmsError, sheets.SheetError) as exc:
             self._update_doc(run_id, rd_id, RunDocumentStatus.FAILED, progress=None,
                              error_code=str(exc.code), error=exc.message)
         except parse.ParseError as exc:
@@ -1032,6 +1081,116 @@ class RunManager:
                              error_code="internal_error", error=failure_message("internal_error"))
         finally:
             _current_document.reset(token)
+
+    # ------------------------------------------------------------ slice 5a: loss runs
+
+    def _done_read(self, run_id: int, rd_id: int, plan: _Plan) -> None:
+        self._update_doc(run_id, rd_id, RunDocumentStatus.DONE, progress=None, option_count=1, option_label=None,
+                         extraction_key=plan.cache_key if self.cache_enabled() else None,
+                         reused_from_run_id=None, read_at=models.utcnow())
+
+    def _load_sheet_book(self, ref: DocumentRef) -> sheets.Workbook:
+        """The parsed rows kept at upload (<uuid>.rows.jsonl), else the original parsed again (eval, old upload)."""
+        path = files_dir() / f"{ref.stored_name}{sheets.CACHE_SUFFIX}"
+        if _SAFE_NAME.match(ref.stored_name) and path.is_file():
+            return sheets.read_book(path)
+        return sheets.parse_workbook(self._load_original(ref), ref.filename)
+
+    async def _read_loss_document(self, run_id: int, rd_id: int, ref: DocumentRef, plan: _Plan, budget) -> None:
+        if ref.kind == SPREADSHEET_KIND:
+            await self._read_sheet(run_id, rd_id, ref, plan, budget)
+        else:
+            await self._read_loss_pdf(run_id, rd_id, ref, plan, budget)
+
+    async def _read_sheet(self, run_id: int, rd_id: int, ref: DocumentRef, plan: _Plan, budget) -> None:
+        """A spreadsheet loss run: rows and totals in code; one model call per sheet with unknown headers."""
+        self._update_doc(run_id, rd_id, RunDocumentStatus.READING, progress="Reading sheets")
+        book = await self._in_thread(self._load_sheet_book, ref)
+        self._update_doc(run_id, rd_id, RunDocumentStatus.EXTRACTING, progress="Mapping columns")
+        mapped, unknown = sheets.known_mappings(book)
+        model_mapped: dict[int, set[int]] = {}
+        for s in book.sheets:
+            if unknown.get(s.index):
+                got = await sheets.map_unknown_headers(self.provider, budget, s, mapped[s.index], unknown[s.index],
+                                                       label=f"headers:{ref.id}:s{s.index}",
+                                                       document_name=ref.filename)
+                mapped[s.index].update(got)
+                model_mapped[s.index] = set(got)
+        self._update_doc(run_id, rd_id, RunDocumentStatus.VERIFYING, progress="Checking rows")
+        ext = await self._in_thread(sheets.extract, book, mapped, model_mapped=model_mapped)
+        meta = await self._in_thread(sheets.layout, book)
+        with db.session_scope(self._factory) as s:
+            for old in s.scalars(select(models.Fact).where(models.Fact.run_id == run_id,
+                                                           models.Fact.document_id == ref.id)):
+                s.delete(old)
+            loss_report.replace_extracted(s, run_id, ref.id)
+            s.flush()
+            for f in ext.facts:
+                page = sheets.page_of(meta, f.sheet, f.row)
+                s.add(models.Fact(run_id=run_id, document_id=ref.id, field=f.field, value=f.value, cited_page=page,
+                                  page_no=page, quote=f.quote, matched_text=f.value, method="sheet", score=1.0,
+                                  rects=[], state=EvidenceState.VERIFIED))
+            s.add(models.Fact(run_id=run_id, document_id=ref.id, field=loss_report.READ_NOTES_FIELD,
+                              value=json.dumps({"notices": ext.notices, "mappings": ext.mappings}), rects=[],
+                              state=EvidenceState.ABSENT))
+            carrier = next((f.value for f in ext.facts if f.field == "lr:carrier"), None)
+            for r in ext.rows:
+                r["page_no"] = sheets.page_of(meta, int(r["location"][1:r["location"].index(":")]), r["sheet_row"])
+            for t in ext.totals:
+                t["page_no"] = sheets.page_of(meta, int(t["location"][1:t["location"].index(":")]), t["sheet_row"])
+            loss_report.insert_rows(s, run_id, ref.id, ext.rows, carrier)
+            loss_report.insert_totals(s, run_id, ref.id, ext.totals)
+        self._done_read(run_id, rd_id, plan)
+
+    async def _read_loss_pdf(self, run_id: int, rd_id: int, ref: DocumentRef, plan: _Plan, budget) -> None:
+        """A PDF loss run: the lr: fact pass, then claim rows per 2-page window (R2), verified in code (R6, O1).
+        Pages already read by an earlier execution are skipped (O5); a budget stop or a one-page cut-off fails the
+        document with the pages it did not read, keeping the rows it did."""
+        self._update_doc(run_id, rd_id, RunDocumentStatus.READING, progress="Reading pages")
+        pages = await self._read_pages(run_id, rd_id, ref, budget)
+        self._update_doc(run_id, rd_id, RunDocumentStatus.EXTRACTING, progress="Reading the header")
+        result = await windows.extract_document(self.provider, budget, plan.fields, pages, document_name=ref.filename,
+                                                instructions=plan.instructions, label=f"extract:{ref.id}")
+        verified = await self._in_thread(windows.verify_document, result, pages, self._verify_config)
+        self._store_facts(run_id, ref.id, verified)
+        with db.session_scope(self._factory) as s:
+            already = loss_report.read_page_set(s, run_id, ref.id)
+            if not already:  # a fresh read replaces the document's rows (D4); a resumed one keeps them
+                loss_report.replace_extracted(s, run_id, ref.id)
+                s.execute(models.LossWindow.__table__.delete().where(models.LossWindow.run_id == run_id,
+                                                                     models.LossWindow.document_id == ref.id))
+            carrier = loss_report.document_facts(s, run_id).get(ref.id, {}).get("lr:carrier")
+        unread = {p.page_no for p in pages} - already
+        read = await pdf_rows.read_rows(
+            self.provider, budget, pages, document_name=ref.filename, label=f"rows:{ref.id}", unread=unread,
+            on_progress=lambda k, n: self._update_doc(run_id, rd_id, progress=f"Reading claims {k}/{n}"))
+        self._update_doc(run_id, rd_id, RunDocumentStatus.VERIFYING, progress="Checking rows")
+        rows, totals = await self._in_thread(pdf_rows.verify_read, read, pages)
+        with db.session_scope(self._factory) as s:
+            for o in read.outcomes:
+                s.add(models.LossWindow(run_id=run_id, document_id=ref.id, first_page=o.window.first,
+                                        last_page=o.window.last, status=o.status, error_code=o.error_code))
+            have_rows, have_totals = loss_report.stored_locations(s, run_id, ref.id)
+            loss_report.insert_rows(s, run_id, ref.id, rows, carrier, skip_locations=have_rows)
+            loss_report.insert_totals(s, run_id, ref.id, totals, skip_locations=have_totals)
+            for page_no, ok in sorted({(r["page_no"], r["verify_state"] == "verified") for r in rows}):
+                models.upsert_passage(s, ref.id, page_no, verified=ok, rects=[])  # D13: the PDF viewer path
+            s.flush()
+            missing = loss_report.unread_pages(s, run_id, ref.id, len(pages))
+        if not missing:
+            self._done_read(run_id, rd_id, plan)
+            return
+        code = read.stopped_code() or "truncated"
+        ranges = _page_ranges(missing)
+        if code == "truncated":
+            message = f"Page{'s' if len(missing) != 1 else ''} {ranges} not fully read. Retry reads {'them' if len(missing) != 1 else 'it'} again."
+        elif code in ("budget_exhausted", "document_budget_exhausted"):
+            last = min(missing) - 1
+            message = (f"Stopped at page {last}: budget reached. Retry reads pages {ranges}." if last >= 1
+                       else f"Budget reached before the claims were read. Retry reads pages {ranges}.")
+        else:
+            message = f"{failure_message(code)} Pages {ranges} were not read; Retry reads them."
+        self._update_doc(run_id, rd_id, RunDocumentStatus.FAILED, progress=None, error_code=code, error=message)
 
     def cache_enabled(self) -> bool:
         return cache.enabled_from_env() if self._extraction_cache is None else bool(self._extraction_cache)
@@ -1151,10 +1310,12 @@ class RunManager:
         with db.session_scope(self._factory) as s:
             run = s.get(models.Run, run_id)
             usable = [rd for rd in run.documents if RunDocumentStatus(rd.status) == RunDocumentStatus.DONE]
+            if plan.loss_run:  # O5: a document stopped part-way keeps the rows it read; the review shows them
+                usable = [rd for rd in run.documents if loss_report.usable(s, rd)]
             # D11: a required slot without a readable document fails the run like "none
             # readable" does. A one-slot workflow (Compare Quotes, Proposal) can only reach
             # this through the first branch, so its behavior and message are unchanged.
-            unread = unread_required_slots(run) if usable else []
+            unread = unread_required_slots(run) if usable and not plan.loss_run else []
             if not usable or unread:
                 models.transition_run(run, RunStatus.FAILED)
                 reasons = sorted({rd.error for rd in run.documents if rd.error})
@@ -1179,6 +1340,8 @@ class RunManager:
                 built = self.policy_check_content(run, inp) if plan.policy_check else None
                 if plan.certificate:  # slice 4: the draft and its checks, built in code (C5)
                     built = certificate.content_for_run(s, run)
+                if plan.loss_run:  # slice 5a: totals, checks, notices from the ledger (no compose call, D2)
+                    built = loss_report.content_for_run(s, run)
         if inp is None:
             self._end(run_id, payload)
             return
@@ -1197,9 +1360,10 @@ class RunManager:
             else:
                 art = run.artifact
                 content = result.content
-                if self._merge_edits is not None and not plan.certificate:  # a certificate keeps its own edits
-                    content = self._merge_edits(art.latest_content(), content)
-                models.snapshot_version(s, art, content, note="rebuilt" if plan.certificate else f"retry, {note}")
+                if self._merge_edits is not None and not plan.certificate and not plan.loss_run:
+                    content = self._merge_edits(art.latest_content(), content)  # certificates/loss runs: own edits
+                models.snapshot_version(s, art, content,
+                                        note="rebuilt" if plan.certificate or plan.loss_run else f"retry, {note}")
             any_failed = any(RunDocumentStatus(rd.status) == RunDocumentStatus.FAILED for rd in run.documents)
             final = RunStatus.PARTIAL if any_failed or budget.exhausted else RunStatus.DONE
             models.transition_run(run, final)

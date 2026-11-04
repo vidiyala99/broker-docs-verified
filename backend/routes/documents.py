@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -15,18 +17,22 @@ from sqlalchemy import select
 from backend import db, models
 from backend.context import AppContext
 from backend.pipeline.parse import ParseError, ParseErrorCode
-from backend.pipeline.runner import DocumentRef, load_stored_bytes
+from backend.loss_runs import sheets
+from backend.pipeline.runner import DocumentRef, files_dir, load_stored_bytes
 from backend.routes.common import ApiError, get_ctx, not_found
 from backend.ams import DEFAULT_AMS_LIMITS, AmsError
 from backend.uploads import (
     PreparedAms,
     inspect_pdf,
+    load_original,
     new_stored_name,
     prepare_ams,
     remove_stored,
     safe_display_name,
+    sheet_cache_path,
     store_bytes,
     store_original,
+    store_sheet_cache,
 )
 from backend.views import document_out
 
@@ -155,6 +161,128 @@ async def upload_ams(files: list[UploadFile] = File(...), ctx: AppContext = Depe
     return {"documents": accepted, "rejected": rejected}
 
 
+SPREADSHEET_KIND = "spreadsheet"
+
+
+def _prepare_spreadsheet(data: bytes, name: str, stored: str) -> dict[str, Any]:
+    """Parse in code (caps first, R7), then keep the original and the parsed rows (R5). Raises SheetError."""
+    book = sheets.parse_workbook(data, name)
+    store_original(data, stored)
+    return store_sheet_cache(book, stored)
+
+
+@router.post("/documents/spreadsheets")
+async def upload_spreadsheets(files: list[UploadFile] = File(...), ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """Spreadsheet loss runs (.xlsx, .csv; slice 5a). Over a cap (rows, sheets, size) the file is refused with the
+    reason before anything is stored. Each accepted item carries a `spreadsheet` summary: sheets, mapped columns
+    ("Clm # -> Claim number") and unmapped headers (shown, never guessed)."""
+    limits = ctx.settings.limits
+    accepted: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    for upload in files:
+        name = safe_display_name(upload.filename)
+        stored = new_stored_name()
+        try:
+            if len(accepted) >= limits.max_documents_per_run:
+                raise _too_many_documents(limits)
+            data = await _read_capped(upload, limits.max_bytes)
+            if data is None:
+                mb = f"{limits.max_bytes / (1024 * 1024):g} MB"
+                raise sheets.SheetError("too_large", f"This file is larger than {mb}; the limit is {mb} per document.",
+                                        limit=limits.max_bytes)
+            meta = await asyncio.to_thread(_prepare_spreadsheet, data, name, stored)
+        except (ParseError, sheets.SheetError) as exc:
+            remove_stored(stored)
+            rejected.append(_reject(name, exc))
+            continue
+        finally:
+            await upload.close()
+        try:
+            with db.session_scope(ctx.factory) as s:
+                doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=name, stored_name=stored,
+                                      size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest(),
+                                      page_count=meta["page_count"], kind=SPREADSHEET_KIND)
+                s.add(doc)
+                s.flush()
+                out = document_out(doc)
+        except Exception:
+            remove_stored(stored)
+            raise
+        out["spreadsheet"] = sheets.summary(meta)
+        accepted.append(out)
+    log.info("spreadsheet upload accepted=%d rejected=%d", len(accepted), len(rejected))
+    return {"documents": accepted, "rejected": rejected}
+
+
+def _spreadsheet(s, document_id: int) -> models.Document:
+    doc = s.get(models.Document, document_id)
+    if doc is None:
+        raise not_found("document", document_id)
+    if doc.kind != SPREADSHEET_KIND:
+        raise ApiError(404, "not_a_spreadsheet", "This document is not a spreadsheet.")
+    return doc
+
+
+@dataclass(frozen=True)
+class _SheetRef:
+    stored_name: str
+    filename: str
+
+
+def _sheet_cache(doc: _SheetRef) -> Path:
+    """The parsed-rows cache, rebuilt from the kept original if it went missing."""
+    path = sheet_cache_path(doc.stored_name)
+    if not path.is_file():
+        try:
+            store_sheet_cache(sheets.parse_workbook(load_original(doc.stored_name), doc.filename), doc.stored_name)
+        except (OSError, ValueError, sheets.SheetError):
+            raise ApiError(404, "file_missing", "Couldn't open this file. It is no longer on disk.") from None
+    return path
+
+
+@router.get("/documents/{document_id}/sheets")
+async def get_sheets(document_id: int, ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """The wizard's view of an uploaded spreadsheet (same shape as the upload's `spreadsheet` summary)."""
+    with ctx.factory() as s:
+        doc = _spreadsheet(s, document_id)
+        ref = _SheetRef(doc.stored_name, doc.filename)
+        out = document_out(doc)
+    path = await asyncio.to_thread(_sheet_cache, ref)
+    meta = await asyncio.to_thread(sheets.read_meta, path)
+    return {**out, "spreadsheet": sheets.summary(meta)}
+
+
+def _render_sheet_page(stored: str, sha: str, filename: str, page_no: int, cache: Path) -> bytes:
+    target = files_dir() / "sheet-pages" / f"{sha}-{sheets.RENDER_VERSION}-{page_no}.pdf"
+    if target.is_file():
+        return target.read_bytes()
+    meta, page = sheets.read_page(cache, page_no)
+    data = sheets.render_page(meta, page, title=filename)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(target.name + ".part")
+    tmp.write_bytes(data)
+    tmp.replace(target)
+    return data
+
+
+@router.get("/documents/{document_id}/sheet-pages/{page_no}")
+async def get_sheet_page(document_id: int, page_no: int, ctx: AppContext = Depends(get_ctx)) -> Response:
+    """One sheet page of a spreadsheet, rendered on demand as a one-page PDF (R5) from the parsed rows, cached on
+    disk by sha256 + renderer version + page. A citation's highlight box comes with its chip (loss-run routes)."""
+    with ctx.factory() as s:
+        doc = _spreadsheet(s, document_id)
+        if not 1 <= page_no <= (doc.page_count or 0):
+            raise ApiError(404, "page_not_found", f"This spreadsheet has {doc.page_count or 0} sheet pages.")
+        ref = _SheetRef(doc.stored_name, doc.filename)
+        sha, filename = doc.sha256, doc.filename
+    cache_path = await asyncio.to_thread(_sheet_cache, ref)
+    try:
+        data = await asyncio.to_thread(_render_sheet_page, ref.stored_name, sha, filename, page_no, cache_path)
+    except LookupError:
+        raise ApiError(404, "page_not_found", "This sheet page does not exist.") from None
+    return Response(data, media_type="application/pdf", headers={"Cache-Control": "private, max-age=3600"})
+
+
 @router.get("/documents")
 async def list_documents(ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
     with ctx.factory() as s:
@@ -177,6 +305,9 @@ async def get_document_file(document_id: int, ctx: AppContext = Depends(get_ctx)
         doc = s.get(models.Document, document_id)
         if doc is None:
             raise not_found("document", document_id)
+        if doc.kind == SPREADSHEET_KIND:
+            raise ApiError(404, "spreadsheet", "This is a spreadsheet: open its sheet pages "
+                                               f"(/api/documents/{document_id}/sheet-pages/1).")
         ref = DocumentRef(doc.id, doc.filename, doc.stored_name)
     try:
         data = await asyncio.to_thread(load_stored_bytes, ref)

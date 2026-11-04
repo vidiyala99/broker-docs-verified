@@ -39,7 +39,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.orm import Session
 
 from backend import models
@@ -47,7 +47,7 @@ from backend.pipeline import extract
 from backend.providers import CallRole, ProviderConfig
 from backend.schemas import FactField, RunDocumentStatus
 
-EXTRACTION_VERSION = "2026-11-03.2"  # .2: endorsement form number without a doubled edition
+EXTRACTION_VERSION = "2026-11-04.1"  # .1 (slice 5a): loss-run rows, sheets and printed totals join the read
 ENV_SWITCH = "BROKERDOCS_EXTRACTION_CACHE"
 _OFF = {"off", "0", "false", "no", "disabled"}
 
@@ -67,16 +67,21 @@ def ocr_key(config: ProviderConfig) -> str:
 
 
 def extraction_key(fields: Sequence[FactField], instructions: str, config: ProviderConfig, *,
-                   version: str = EXTRACTION_VERSION) -> str:
-    """What must match before cached facts are reused (D8 + D17)."""
-    return _digest({
+                   version: str = EXTRACTION_VERSION, extra: dict | None = None) -> str:
+    """What must match before cached facts are reused (D8 + D17). `extra` (slice 5a, R8): what else the read
+    depends on, e.g. the loss-run row prompt, window config, header synonym hash and sheet parser version; None
+    keeps the key exactly as before for every other workflow."""
+    payload = {
         "fields": [f.model_dump(mode="json") for f in fields],
         "prompts": [extract.SYSTEM_PROMPT, extract.WINDOW_NOTE, extract.FORMS_NOTE, extract.ENDORSEMENTS_NOTE],
         "instructions": instructions or "",
         "extract_model": config.model_for(CallRole.EXTRACT),
         "ocr": ocr_key(config),
         "version": version,
-    })
+    }
+    if extra is not None:
+        payload["extra"] = extra
+    return _digest(payload)
 
 
 @dataclass(frozen=True)
@@ -162,6 +167,7 @@ def copy_read(session: Session, source: Source, target_rd: models.RunDocument, *
             passage_id=mapped(f.passage_id),
             extra_passage_ids=[x for x in (mapped(p) for p in f.extra_passage_ids or []) if x is not None],
             conflicts=[{**c, "passage_id": mapped(c.get("passage_id"))} for c in f.conflicts or []]))
+    _copy_loss_read(session, src_rd, target_rd, same=same)
     for step in (RunDocumentStatus.READING, RunDocumentStatus.EXTRACTING, RunDocumentStatus.VERIFYING,
                  RunDocumentStatus.DONE):
         models.transition_run_document(target_rd, step)
@@ -170,6 +176,42 @@ def copy_read(session: Session, source: Source, target_rd: models.RunDocument, *
     target_rd.reused_from_run_id = src_rd.run_id
     target_rd.read_at = src_rd.read_at
     target_rd.progress = target_rd.error = target_rd.error_code = None
+    session.flush()
+
+
+_ROW_COPY_SKIP = {"id", "run_id", "document_id", "created_at"}
+
+
+def _copy_loss_read(session: Session, src_rd: models.RunDocument, target_rd: models.RunDocument, *,
+                    same: bool) -> None:
+    """Slice 5a (O6/D12): a loss-run read also carries the document's extracted claim rows and printed totals
+    (citations stay with the target document: PDF pages get their passages); never broker decisions or added rows.
+    Roles and effective values are recomputed by the target run's ledger. A source with no loss rows (every other
+    workflow) copies nothing, so its reuse is unchanged."""
+    src_run, dst_run = src_rd.run_id, target_rd.run_id
+    src_doc, dst_doc = src_rd.document_id, target_rd.document_id
+    CR, PT = models.ClaimRow, models.PrintedTotal
+    rows = list(session.scalars(select(CR).where(CR.run_id == src_run, CR.document_id == src_doc,
+                                                  CR.source == "extracted").order_by(CR.id)))
+    totals = list(session.scalars(select(PT).where(PT.run_id == src_run, PT.document_id == src_doc).order_by(PT.id)))
+    if not rows and not totals:
+        return
+    session.execute(delete(CR).where(CR.run_id == dst_run, CR.document_id == dst_doc, CR.source == "extracted"))
+    session.execute(delete(PT).where(PT.run_id == dst_run, PT.document_id == dst_doc))
+    payload = []
+    for r in rows:
+        item = {c.key: getattr(r, c.key) for c in CR.__table__.columns if c.key not in _ROW_COPY_SKIP}
+        item.update(run_id=dst_run, document_id=dst_doc, created_at=models.utcnow(), role="counted", counted=False,
+                    group_key="", decision=None, decision_id=None, decision_stale=False, role_reason=None, flags=[])
+        payload.append(item)
+    for start in range(0, len(payload), 5000):
+        session.execute(insert(CR), payload[start:start + 5000])
+    for t in totals:
+        session.add(PT(**{c.key: getattr(t, c.key) for c in PT.__table__.columns if c.key not in _ROW_COPY_SKIP},
+                       run_id=dst_run, document_id=dst_doc))
+    if not same:
+        for page_no, verified in {(r.page_no, r.verify_state == "verified") for r in rows if r.page_no}:
+            models.upsert_passage(session, dst_doc, page_no, verified=verified, rects=[])
     session.flush()
 
 

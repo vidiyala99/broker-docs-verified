@@ -48,7 +48,14 @@ from sqlalchemy.orm import Session, aliased, selectinload
 
 from backend import models
 from backend.schemas import ArtifactContent, EvidenceState, RunStatus
-from backend.slugs import CERTIFICATE_SLUG, COMPARE_QUOTES_SLUG, POLICY_CHECK_SLUG, PROPOSAL_BUILDER_SLUG
+from backend.slugs import (
+    ALL_SLUGS,
+    CERTIFICATE_SLUG,
+    COMPARE_QUOTES_SLUG,
+    LOSS_RUN_SLUG,
+    POLICY_CHECK_SLUG,
+    PROPOSAL_BUILDER_SLUG,
+)
 
 GROUPS = ("in_progress", "needs_review", "ready", "needs_attention", "done_recently")
 WINDOW = timedelta(days=14)
@@ -69,6 +76,17 @@ BUDGET = "Extraction stopped: budget reached"
 PROPOSAL_FAILED = "Proposal didn't finish"
 RUN_ERROR = "Stopped with an error"
 _BUDGET_CODES = {"budget_exhausted", "document_budget_exhausted"}
+
+# One next action per item (PRODUCT.md principle 1): the label of each workflow's primary action. Every workflow
+# slug has one (T12 test), so a new workflow cannot reach the queue without a label.
+QUEUE_ACTIONS: dict[str, str] = {
+    COMPARE_QUOTES_SLUG: "Compare quotes",
+    PROPOSAL_BUILDER_SLUG: "Open proposal",
+    POLICY_CHECK_SLUG: "Review discrepancies",
+    CERTIFICATE_SLUG: "Issue certificate",
+    LOSS_RUN_SLUG: "Review losses",  # slice 5a
+}
+assert set(QUEUE_ACTIONS) == set(ALL_SLUGS), "every workflow slug needs a queue action label"
 
 
 # --------------------------------------------------------------------- pure part
@@ -96,6 +114,7 @@ class QueueRun:
     proposal_run_id: int | None = None
     retryable: bool = False
     carriers: tuple[str | None, ...] = ()  # per document, column order: verified carrier_name or None
+    open_checks: int | None = None  # slice 5a: a loss review's checks needing action (None without a report)
 
 
 @dataclass(frozen=True)
@@ -143,6 +162,11 @@ def summary(run: QueueRun, *, building_proposal: bool = False) -> str:
         return "Building proposal"
     if run.workflow_slug == POLICY_CHECK_SLUG:
         return "Renewal check"
+    if run.workflow_slug == LOSS_RUN_SLUG:  # slice 5a
+        if run.open_checks:
+            return f"{run.open_checks} check{'' if run.open_checks == 1 else 's'} to resolve"
+        n = run.document_count
+        return f"Loss review, {n} file{'' if n == 1 else 's'}"
     if run.workflow_slug == COMPARE_QUOTES_SLUG:
         n = run.document_count
         return f"{n} carrier{'' if n == 1 else 's'}"
@@ -179,6 +203,7 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
     if run.workflow_slug in (PROPOSAL_BUILDER_SLUG, CERTIFICATE_SLUG):  # certificates: their own page (C8)
         return None
     is_check = run.workflow_slug == POLICY_CHECK_SLUG
+    is_loss = run.workflow_slug == LOSS_RUN_SLUG
     is_compare = run.workflow_slug == COMPARE_QUOTES_SLUG
     open_total = sum(counts.values()) if counts else 0
     open_counts = dict(counts) if (is_check and run.has_report and counts is not None) else None
@@ -205,6 +230,8 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
             "proposal_run_id": run.proposal_run_id,
             # Work queue UI: "Retry proposal" on a Ready comparison whose proposal did not finish.
             "proposal_retryable": proposal.retryable if proposal is not None else None,
+            "action": QUEUE_ACTIONS.get(run.workflow_slug),
+            "open_checks": run.open_checks if is_loss else None,
         }
 
     if run.active:
@@ -216,6 +243,10 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
             return item("needs_attention", why=reasons(run))
         if is_check and run.has_report and open_total > 0:
             return item("needs_review")
+        # Slice 5a: a loss review needs review while any check, conflict or unverified row is open, and is ready
+        # when none is; Done when the broker marks it done (queue_state, like every workflow).
+        if is_loss and run.has_report:
+            return item("needs_review" if run.open_checks else "ready")
         if is_compare and run.status == str(RunStatus.DONE) and (proposal is None or not proposal.built):
             return item("ready", why=reasons(run, proposal))
     if in_window(run, now):
@@ -251,7 +282,7 @@ def extracted_client(workflow_slug: str, facts: Sequence[tuple[str, int, str]]) 
     values = [(slot, pos, " ".join(v.split())) for slot, pos, v in facts if v and v.strip()]
     if not values:
         return None
-    if workflow_slug == CERTIFICATE_SLUG:  # slice 4: the first document that names the insured
+    if workflow_slug in (CERTIFICATE_SLUG, LOSS_RUN_SLUG):  # slices 4, 5a: the first document naming the insured
         return sorted((pos, v) for _, pos, v in values)[0][1]
     if workflow_slug == POLICY_CHECK_SLUG:
         for slot in POLICY_NAME_SLOTS:
@@ -309,6 +340,8 @@ def run_client(session: Session, run: models.Run) -> tuple[str | None, str | Non
 
 def insured_field(workflow_slug: str) -> str:
     """The fact whose verified value names the client (slice 4: certificates read cert: keys)."""
+    if workflow_slug == LOSS_RUN_SLUG:
+        return "lr:named_insured"
     return "cert:named_insured" if workflow_slug == CERTIFICATE_SLUG else "named_insured"
 
 
@@ -455,7 +488,7 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
         Run.status.in_(ACTIVE),
         Proposal.status.in_(ACTIVE),
         and_(Run.queue_state == "open",
-             or_(Run.status.in_(NEEDS_ATTENTION), Workflow.slug == POLICY_CHECK_SLUG,
+             or_(Run.status.in_(NEEDS_ATTENTION), Workflow.slug.in_((POLICY_CHECK_SLUG, LOSS_RUN_SLUG)),
                  and_(Workflow.slug == COMPARE_QUOTES_SLUG, no_built_proposal))),
     )
     query = (
@@ -474,6 +507,7 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
     runs = runs[:cap]
 
     check_ids = [r.id for r in runs if r.workflow.slug == POLICY_CHECK_SLUG]
+    loss_ids = [r.id for r in runs if r.workflow.slug == LOSS_RUN_SLUG]
     proposal_ids = {r.proposal_run_id for r in runs if r.proposal_run_id is not None}
 
     proposals: dict[int, ProposalLink] = {}
@@ -490,6 +524,15 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
             .where(models.Artifact.run_id.in_(check_ids)))
         for run_id, content in rows:
             reports[run_id] = models.discrepancy_blocks(ArtifactContent.model_validate(content))
+    loss_open: dict[int, int] = {}
+    if loss_ids:  # slice 5a: the report's checks carry their computed status (needs_action)
+        for run_id, content in session.execute(
+                select(models.Artifact.run_id, models.ArtifactVersion.content)
+                .join(models.ArtifactVersion, and_(models.ArtifactVersion.artifact_id == models.Artifact.id,
+                                                   models.ArtifactVersion.version == models.Artifact.current_version))
+                .where(models.Artifact.run_id.in_(loss_ids))):
+            blocks = models.loss_check_blocks(ArtifactContent.model_validate(content))
+            loss_open[run_id] = sum(1 for b in blocks if b.needs_action)
     states: dict[int, dict[str, models.DiscrepancyState]] = defaultdict(dict)
     if reports:
         for row in session.scalars(select(models.DiscrepancyState)
@@ -504,9 +547,9 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
         for run_id, doc_id, field, value in session.execute(
                 select(models.Fact.run_id, models.Fact.document_id, models.Fact.field, models.Fact.value)
                 .where(models.Fact.run_id.in_([r.id for r in runs]),
-                       models.Fact.field.in_(("named_insured", "carrier_name")),
+                       models.Fact.field.in_(("named_insured", "carrier_name", "lr:named_insured", "lr:carrier")),
                        models.Fact.state == str(EvidenceState.VERIFIED))):
-            if field == "carrier_name":
+            if field in ("carrier_name", "lr:carrier"):
                 carrier_facts[run_id].append((doc_id, value))
             elif run_id in unnamed:
                 names[run_id].append((doc_id, value))
@@ -525,8 +568,8 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
             document_count=len(run.documents),
             failed_codes=tuple(rd.error_code for rd in run.documents
                                if str(rd.status) == "failed"),
-            has_report=run.id in reports, client=client, client_source=source,
-            proposal_run_id=run.proposal_run_id,
+            has_report=run.id in reports or run.id in loss_open, client=client, client_source=source,
+            proposal_run_id=run.proposal_run_id, open_checks=loss_open.get(run.id),
             retryable=not active and status in NEEDS_ATTENTION,
             carriers=carriers_of([pos for _, pos in where.values()],
                                  [(where[d][1], v) for d, v in carrier_facts.get(run.id, ()) if d in where]),

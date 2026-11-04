@@ -528,6 +528,20 @@ CERTIFICATE_FIELDS: list[FactField] = [
 ]
 
 
+# Slice 5a loss runs: document facts of a loss-run PDF (spreadsheets read the same keys from labelled cells in
+# code). Claim rows and printed totals are NOT facts: they have their own tables (D9).
+LOSS_RUN_FIELDS: list[FactField] = [
+    FactField(key="lr:carrier", label="Carrier", section="documents",
+              description="The insurance company whose claims this loss run lists, as printed (not the broker)."),
+    FactField(key="lr:named_insured", label="Named Insured", section="documents",
+              description="The insured (client) the loss run is for, as printed."),
+    FactField(key="lr:valuation_date", label="Valued as of", section="documents",
+              description=("The date the loss run's amounts are valued as of (printed as 'Valued as of', "
+                           "'Valuation date', 'Evaluated as of' or 'As of'), as printed. Not the run or print date "
+                           "when a valuation date is also printed; null when no valuation date is printed.")),
+]
+
+
 # --------------------------------------------------------------------- artifact content
 
 
@@ -810,9 +824,113 @@ class CertificateBlock(BaseModel):
         return found
 
 
+# --------------------------------------------------------------------- loss runs (slice 5a)
+#
+# The loss review report (D2): a totals strip and the check list, built in code by loss_runs.ledger. The claims
+# themselves are NOT in the artifact; they are paged from claim_row (GET /api/loss-runs/{id}/claims). Broker
+# decisions on a check (accept a gap, pick a conflicting value) live in discrepancy_state, keyed by the block id,
+# reopened by `fingerprint` like a Policy Check discrepancy. An "unverified rows" check is decided row by row
+# (claim_decision): its status is computed and it has no discrepancy_state row (decided_by "rows").
+
+
+class LossMetricTotal(BaseModel):
+    cents: int = 0
+    from_claims: int = 0  # counted claims that give this amount
+
+
+class LossDocumentSummary(BaseModel):
+    document_id: int
+    letter: str
+    filename: str
+    kind: str  # quote (a PDF) | spreadsheet
+    carrier: str | None = None
+    valuation_date: str | None = None  # ISO
+    status: str  # done | failed | partial | queued ...
+    rows: int = 0
+    counted_rows: int = 0
+    unverified_rows: int = 0
+    printed_totals: int = 0
+    unread_pages: list[int] = Field(default_factory=list)
+
+
+class LossTotalsBlock(BaseModel):
+    type: Literal["loss_totals"] = "loss_totals"
+    id: str = "loss-totals"
+    claims: int = 0  # distinct counted claims (carrier + claim key), not lines (D5)
+    open_claims: int = 0
+    paid: LossMetricTotal = Field(default_factory=LossMetricTotal)
+    reserve: LossMetricTotal = Field(default_factory=LossMetricTotal)
+    incurred: LossMetricTotal = Field(default_factory=LossMetricTotal)
+    recovery: LossMetricTotal = Field(default_factory=LossMetricTotal)
+    deductible: LossMetricTotal = Field(default_factory=LossMetricTotal)
+    unreconciled: bool = False  # a check is open
+    as_of: str | None = None  # latest valuation date of the review (the "Last 3 months" anchor)
+    counts: dict[str, int] = Field(default_factory=dict)  # rows, counted, superseded, conflicting, left_out, ...
+    documents: list[LossDocumentSummary] = Field(default_factory=list)
+
+
+class LossEvidence(BaseModel):
+    """Where a check's printed line is: a PDF page (rects in PDF points) or a sheet row (sheet page on demand)."""
+
+    document_id: int
+    page_no: int | None = None
+    sheet_name: str | None = None
+    sheet_row: int | None = None
+    quote: str | None = None
+    rects: list[list[float]] = Field(default_factory=list)
+    claim_row_id: int | None = None
+    printed_total_id: int | None = None
+
+
+class LossCheckOption(BaseModel):
+    """One side of a conflicting claim: a document's lines of the claim, summed (D5)."""
+
+    document_id: int
+    label: str
+    valuation_date: str | None = None
+    paid: int | None = None
+    reserve: int | None = None
+    incurred: int | None = None
+    recovery: int | None = None
+    deductible: int | None = None
+    claim_row_ids: list[int] = Field(default_factory=list)
+
+
+class LossCheckBlock(BaseModel):
+    """One check of a loss review: a printed total (matches / off by $X), a conflicting claim, or a document's
+    unverified rows."""
+
+    type: Literal["loss_check"] = "loss_check"
+    id: str
+    kind: Literal["total", "conflict", "unverified"]
+    verdict: Literal["matches", "off", "conflicting", "unverified", "handled"]
+    decided_by: Literal["broker", "rows"] = "broker"
+    title: str
+    message: str
+    document_id: int | None = None
+    metric: str | None = None
+    scope_kind: str | None = None
+    scope_value: str | None = None
+    printed: int | None = None  # cents (claim_count: a count)
+    computed: int | None = None
+    difference: int | None = None  # printed - computed
+    claim_key: str | None = None
+    carrier_key: str | None = None
+    rows: int | None = None  # unverified: rows still undecided
+    filter: dict[str, Any] = Field(default_factory=dict)  # GET /claims query that opens the rows in scope
+    evidence: list[LossEvidence] = Field(default_factory=list)
+    options: list[LossCheckOption] = Field(default_factory=list)
+    picked_document_id: int | None = None
+    fingerprint: str = ""
+    # Status as the ledger computed it (matches the discrepancy_state row after reconcile; computed for "rows").
+    status: Literal["open", "resolved", "match"] = "open"
+    needs_action: bool = False
+    changed_since_resolved: bool = False
+
+
 Block = Annotated[
     HeadingBlock | ParagraphBlock | ListBlock | TableBlock | IssueBlock | DiscrepancyBlock | ClaimBlock
-    | CertificateBlock,
+    | CertificateBlock | LossTotalsBlock | LossCheckBlock,
     Field(discriminator="type"),
 ]
 

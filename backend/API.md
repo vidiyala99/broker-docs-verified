@@ -1,4 +1,4 @@
-# BrokerDocs local API (slices 1 to 4, work queue)
+# BrokerDocs local API (slices 1 to 5a, work queue)
 
 Covers Compare Quotes (slice 1), Proposal Builder (slice 2), Policy Check (slice 3), the
 rail completion of slice 3b (run `line` for Personal lines, Tasks) and the broker work queue
@@ -964,6 +964,111 @@ document when it is another upload). Run documents (REST and SSE) carry `reused_
 live read) and `read_at` (when the facts were first read). `BROKERDOCS_EXTRACTION_CACHE=off` always reads
 live; evals and the dev seed run with it off. Bump `EXTRACTION_VERSION` when verify, merge or windows
 behaviour changes.
+
+## Loss reviews (slice 5a)
+
+Spec `docs/specs/2026-11-03-loss-runs-design.md` (the ledger R1 to R8, O1 to O7 overrides sections 1 to 8). Money is
+integer cents everywhere. All numbers come from one pure function (`backend/loss_runs/ledger.build_ledger`).
+
+### Uploading spreadsheets: `POST /api/documents/spreadsheets` (multipart)
+
+`.xlsx` and `.csv` loss runs, parsed in code at upload. Same response as `POST /api/documents`; each accepted item
+has `kind: "spreadsheet"`, `page_count` = its sheet pages (40 rows a page, header repeated), and `spreadsheet`:
+`{format, data_rows, page_count, sheets: [{name, rows, data_rows, header_row, has_claims_table, mapped: [{index,
+header, column, label, by: "synonym"}], unmapped: [{index, header}]}]}`. Refused with the reason (`rejected[].code`):
+`not_spreadsheet` (e.g. `.xls`), `empty`, `corrupt`, `encrypted`, `not_text` (CSV not UTF-8 or cp1252),
+`too_large` (file, or more than 300 MB unpacked), `too_many_sheets` (20), `too_many_rows` (100,000 claim rows per
+file), `too_many_cells`. `POST /api/documents` stays PDF-only.
+
+- `GET /api/documents/{id}/sheets`: the document plus its `spreadsheet` summary.
+- `GET /api/documents/{id}/sheet-pages/{n}`: one sheet page rendered on demand as a one-page PDF (landscape
+  792 x 612 pt), cached on disk; 404 `page_not_found` / `not_a_spreadsheet`. The row's highlight box comes with
+  the chip.
+- `GET /api/documents/{id}/file` on a spreadsheet: 404 `spreadsheet` (open its sheet pages).
+
+### Creating one: `POST /api/runs`
+
+`{"workflow": "loss-run", "document_ids": [...], "client_name": "..."}`: 1 to 8 files, PDFs and spreadsheets in
+the one slot `loss_runs`. More than 200,000 spreadsheet claim rows in the review: 422 `too_many_rows`. A
+spreadsheet in any other workflow: 400 `invalid_run`. `parameters` may carry `{"synthetic": true}` (dev seed: the
+review shows "Synthetic sample data"). The run reads each file (spreadsheet: in code, one model call per sheet with
+unknown headers; PDF: the `lr:` fact pass, then claim rows per 2-page window), then builds the review in code (no
+compose call). A PDF stopped by its budget or with a page whose reply stayed cut off fails with the pages it did
+not read (`error`: "Stopped at page 180: budget reached. Retry reads pages 181 to 240.", `error_code`
+`budget_exhausted` / `truncated`); its rows so far are in the review and the run is `partial`. Retry reads only
+the unread pages, with a fresh per-document allowance.
+
+### `GET /api/loss-runs`
+
+Analytics: `{"reviews": [{run_id, client, client_source, status, active, queue_state, files, created_at,
+finished_at, latest_valuation_date, claims, incurred, open_checks}]}`, newest first.
+
+### `GET /api/loss-runs/{run_id}`
+
+```
+{run, client, client_source, synthetic, artifact_id, version,
+ totals: LossTotalsBlock,  // claims (distinct claims, not lines), open_claims, paid|reserve|incurred|recovery|
+                           // deductible: {cents, from_claims}, unreconciled, as_of, counts, documents[]
+ checks: [LossCheckBlock + {note, updated_at, chips[]}],   // open first, then handled, then matches
+ check_counts: {to_resolve, handled, matches},
+ notices: [Notice], counts, sheets: {document_id: [{sheet, index, header_row, mapped[], unmapped[]}]}}
+```
+
+`LossCheckBlock`: `id`, `kind` (`total` | `conflict` | `unverified`), `verdict` (`matches` | `off` | `conflicting` |
+`unverified` | `handled`), `decided_by` (`broker`: decided with PATCH checks; `rows`: decided row by row), `title`,
+`message`, `document_id`, `metric`, `scope_kind` (`all`, `policy_year`, `policy_number`, `carrier`,
+`page_subtotal`, `sheet`), `scope_value`, `printed`, `computed`, `difference` (printed minus computed), `filter`
+(query for `GET .../claims` that opens the rows in scope), `options` (conflict: one per file, its sums and
+`claim_row_ids`), `picked_document_id`, `fingerprint`, `status` (`open` | `resolved` | `match`), `needs_action`,
+`changed_since_resolved`. A printed total matches within $1.00 and is checked against all of its own document's
+lines in scope (superseded included; only a leave-out removes one).
+
+Chip shape (rows and checks): `{document_id, letter, filename, kind: "page" | "sheet", label ("Travelers p.14",
+"Sheet 2024, row 17"), page_no (PDF page, or sheet page n), rects ([[x0, y0, x1, y1]] in points, top-left origin),
+page_width, page_height, url}`. Added rows have no chip.
+
+### `GET /api/loss-runs/{run_id}/claims`
+
+Query: `offset`, `limit` (1 to 200, default 50), `sort` (`claim_incurred` default, `claim_number`, `claimant`,
+`date_of_loss`, `status`, `carrier`, `paid`, `reserve`, `incurred`, `policy_year`, `document`, `role`, `row`), `dir`
+(`desc` | `asc`); quick filters (claim level, effective values): `over_100k`, `open_only`, `last_3_months` (date of
+loss within 3 months of the review's latest valuation date), `open_reserve`; `document_id`, `role`, `state`
+(`unverified` undecided, `edited`, `confirmed`, `added`, `warning`, `changed`), `claim_key`, `group_key`, `q`
+(claim number or claimant), `scope_kind` + `scope_value` + `scope_detail` (JSON, from a check's `filter`),
+`include_superseded` (default false: superseded valuations come as `history` under their claim's rows).
+
+`{run_id, total, offset, limit, sort, dir, as_of, rows: [{id, document_id, letter, filename, source (extracted |
+added), location, claim_number, claim_key, claimant, date_of_loss, status (open | closed | reopened | unknown),
+status_raw, policy_number, policy_year, line, carrier, extracted: {paid..deductible}, effective: {...}, claim:
+{paid, reserve, incurred, open, date_of_loss}, role (counted | superseded | conflicting | left_out), role_reason,
+counted, group_key, verify_state, verify_reason, decision: {id, kind: edited | confirmed | left_out} | null,
+changed_since_resolved, flags (unverified, incurred_computed, incurred_not_paid_plus_reserve, repeated_line), note,
+chip, history: [row]}]}`.
+
+### Broker actions (each answers with the review, or `{..., "review"}`; 409 `run_active` while reading)
+
+- `POST /api/loss-runs/{id}/rows/{row_id}/decision` `{"kind": "edit", "amounts": {"paid": 1200000}}` (cents, or
+  printed text like "12,000.00"; amounts only, 5a), `{"kind": "confirm", "note": "reason"}` (422 `note_required`;
+  422 `already_verified`), `{"kind": "leave_out", "note": "..."}` (note required). 201 `{decision: {id, kind,
+  amounts, note, active, replaced_id, created_at}, review}`. A decision is keyed by the row's printed location and
+  claim key, so it survives a re-read; a re-read that changes the row's values leaves it unapplied
+  (`changed_since_resolved`).
+- `DELETE /api/loss-runs/{id}/decisions/{decision_id}`: Undo; the decision it replaced comes back
+  (`{restored, review}`); 409 `not_current` for a replaced one.
+- `POST /api/loss-runs/{id}/claims` `{claim_number, document_id?, carrier?, claimant?, date_of_loss?, status?,
+  policy_number?, policy_year?, line?, paid..deductible (cents or text), note?}`: a missed claim, "Added by you";
+  with `document_id` it belongs to that file (its reconciliation and valuation date). 201 `{row, review}`.
+- `DELETE /api/loss-runs/{id}/claims/{row_id}`: Undo an added claim; 409 `extracted_row` for a read row.
+- `PATCH /api/loss-runs/{id}/checks/{item_id}` `{action: "accept", note}` (an `off` total; note required),
+  `{action: "pick", document_id}` (a conflict: the other file's lines become "Not used (you picked File B)"),
+  `{action: "reopen"}` (Undo), optional `expected_fingerprint` (409 `item_changed`); 422 `decided_by_rows` for an
+  unverified-rows check. Decisions are kept in `discrepancy_state` and reopen when the check's values change.
+
+### Queue
+
+Loss reviews are queue rows (`GET /api/queue`): `needs_review` while a check is open (`open_checks`, summary "N
+checks to resolve"), `ready` when none is, `done_recently` once marked done. Every queue item now carries `action`,
+its workflow's primary action ("Review losses" for a loss review).
 
 ## Tasks (slice 3b)
 
