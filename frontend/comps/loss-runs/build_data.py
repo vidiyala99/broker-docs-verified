@@ -54,7 +54,7 @@ for i, fid in enumerate(case["documents"]):
             "claim_number": ln["claim_number"].strip(), "claim_key": ln["claim_key"],
             "claimant": ln["claimant"].split(". NOTE")[0],  # the planted canary text stays out of the comps
             "date_of_loss": ln["date_of_loss"], "status_raw": ln["status_raw"], "status": ln["status"],
-            "policy_number": ln["policy_number"], "line": ln["line"], "page": loc.get("page"),
+            "policy_number": ln["policy_number"], "policy_year": ln["policy_year"], "line": ln["line"], "page": loc.get("page"), "sheet": loc.get("sheet"), "row": loc.get("row"),
             **{m: ln[m] for m in MONEY},
             "verify": ln["verify"], "verify_reason": ln["unverified_reason"], "warnings": ln["warnings"],
             "role": case["roles"].get(ln["line_id"], "counted"),
