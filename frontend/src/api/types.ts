@@ -606,7 +606,8 @@ export interface RunEvent {
 // Money is integer cents. The claims are paged from GET /api/loss-runs/{id}/claims, never part of the artifact.
 
 export type LossRole = "counted" | "superseded" | "conflicting" | "left_out";
-export type ClaimStatus = "open" | "closed" | "reopened" | "unknown";
+// Named LossClaimStatus: ClaimStatus is the certificate claim status (above).
+export type LossClaimStatus = "open" | "closed" | "reopened" | "unknown";
 export type LossMoney = "paid" | "reserve" | "incurred" | "recovery" | "deductible";
 export type LossAmounts = Record<LossMoney, number | null>;
 
@@ -751,7 +752,7 @@ export interface ClaimRow {
   claim_key: string;
   claimant: string | null;
   date_of_loss: string | null;
-  status: ClaimStatus;
+  status: LossClaimStatus;
   status_raw: string | null;
   policy_number: string | null;
   policy_year: number | null;
