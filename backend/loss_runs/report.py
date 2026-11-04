@@ -21,7 +21,7 @@ import json
 from collections import defaultdict
 from typing import Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import Text, cast, delete, select, update
 from sqlalchemy.orm import Session
 
 from backend import models
@@ -138,14 +138,18 @@ def _ledger_row(values: dict[str, Any]) -> L.LedgerRow:
 def load(session: Session, run: models.Run) -> tuple[list[L.LedgerRow], dict[int, tuple], list[L.LedgerDocument],
                                                      list[L.LedgerTotal], L.Decisions]:
     CR = models.ClaimRow
-    cols = [getattr(CR, c) for c in _ROW_COLUMNS] + [getattr(CR, c) for c in L.DERIVED_COLUMNS]
+    # T13: the hot path at 200,000 rows. No JSON decoding: rects are fetched afterwards for the few rows a check
+    # cites (build), and the derived flags are compared as their stored JSON text.
+    head = _ROW_COLUMNS[:-1]  # every LedgerRow field in order, without rects
+    cols = [getattr(CR, c) for c in head] + [getattr(CR, c) if c != "flags" else cast(CR.flags, Text)
+                                             for c in L.DERIVED_COLUMNS]
     rows: list[L.LedgerRow] = []
     current: dict[int, tuple] = {}
-    n = len(_ROW_COLUMNS)
+    n = len(head)
+    make = L.LedgerRow
     for rec in session.execute(select(*cols).where(CR.run_id == run.id).order_by(CR.id)):
-        values = dict(zip(_ROW_COLUMNS, rec[:n], strict=True))
-        rows.append(_ledger_row(values))
-        current[values["id"]] = tuple(rec[n:])
+        rows.append(make(*rec[:n]))
+        current[rec[0]] = tuple(rec[n:])
     PT = models.PrintedTotal
     totals = [L.LedgerTotal(id=t.id, document_id=t.document_id, metric=t.metric, scope_kind=t.scope_kind,
                             amount=t.amount, location=t.location, scope_value=t.scope_value,
@@ -178,10 +182,19 @@ def build(session: Session, run: models.Run) -> L.Ledger:
     changed = []
     for row_id, res in led.rows.items():
         new = res.derived()
-        if tuple(new[c] for c in L.DERIVED_COLUMNS) != current.get(row_id):
+        key = tuple(json.dumps(new[c]) if c == "flags" else new[c] for c in L.DERIVED_COLUMNS)
+        if key != current.get(row_id):
             changed.append({"id": row_id, **new})
     if changed:
         session.execute(update(models.ClaimRow), changed)
+    cited = {e.claim_row_id for c in led.checks for e in c.evidence if e.claim_row_id is not None}
+    if cited:
+        rects = dict(session.execute(select(models.ClaimRow.id, models.ClaimRow.rects)
+                                     .where(models.ClaimRow.id.in_(cited))).all())
+        for c in led.checks:
+            for e in c.evidence:
+                if e.claim_row_id in rects:
+                    e.rects = [list(x) for x in rects[e.claim_row_id] or []]
     session.flush()
     return led
 
@@ -189,7 +202,7 @@ def build(session: Session, run: models.Run) -> L.Ledger:
 def content(led: L.Ledger) -> ArtifactContent:
     notices = []
     for message in led.notices:
-        failed = "not read" in message or "not fully read" in message and "Retry" in message
+        failed = "was not read" in message or "was not fully read (" in message or message.endswith("Retry reads the rest.")
         notices.append(Notice(kind="documents_failed" if failed else "info", message=message, retryable=failed))
     return ArtifactContent(sections=[
         Section(id="totals", number="1", title="Totals", blocks=[led.totals]),
