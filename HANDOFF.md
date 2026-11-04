@@ -262,3 +262,13 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Cleanup: lane worktree `.claude/worktrees/agent-aa39d6d2a3522bea4` (branches `slice4-ui`, `worktree-agent-aa39d6d2a3522bea4`) merged; check for a node_modules link before removing.
 - Servers: backend 8000 (fresh seed `dev-data-c11` in session 9017f0bb scratchpad) stops with this session. Reseed before demoing.
 - Next candidates: trace the two order-dependent e2e failures; slice 5 (Loss Run, synthetic data) brainstorm; template library. Fresh session.
+
+## 2026-11-03 21:20: the two "order-dependent" e2e failures fixed (main e810446)
+- Neither was order-dependent. `certificates.spec.ts:93`: uploads dedupe by sha256, so the fixed fixture only counted as a new upload on a never-used DB (on a used DB it lands in the client's documents as "Read on ..."). Now uploads its own copy (`cert_written_contract_gl--e2e<ms>.pdf`, PDF comment after %%EOF); `dev_seed._cert_truth` ignores a `--<tag>` stem suffix (unit test in `backend/tests/test_dev_seed.py`). `tasks.spec.ts:104`: `check()` on a toggle whose PATCH is forced to 500 raced the optimistic rollback; now `click()`, rollback still asserted.
+- Verified: both tests x10 on a used DB: 7/20 failed before, 20/20 after; tsc clean; test_dev_seed 7/7. Full e2e 63/63 on a fresh seed before the fix; not re-run after (change is test-only).
+- Pattern for future specs: any e2e upload that must be "new" should use unique name + bytes, not a fixed fixture. Playwright `check()` is wrong for toggles expected to roll back.
+- Personal-lines keyboard flakes (`:139`, `:282`) passed in both full runs today; not reproduced, unchanged.
+- Owner verdict on conference flyers (OLake, Datastrato/Gravitino, PuppyGraph): not relevant to the clone (lakehouse infra, no fit for SQLite + per-document extraction). Do not re-raise.
+- Open (unchanged): issued record shows draft prose on sign-off rows; each decision makes a new draft version; issued sheet keeps old scroll; Policy Check `_form_facts` doubled-edition bug likely (needs live Policy Check eval, paid); owner calls: real legal wording, condition matcher loosening, Proposal mark / left-panel icons.
+- Servers: backend 8000 (seed `dev-data-e2e2` in session 54b9b315 scratchpad, mutated by e2e) stops with this session. Reseed before demoing.
+- Next candidates: slice 5 (Loss Run, synthetic data) brainstorm; template library. Fresh session.
