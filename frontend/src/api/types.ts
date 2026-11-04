@@ -120,6 +120,10 @@ export interface QueueItem {
   proposal_run_id: number | null;
   /** The linked proposal run's `retryable` ("Retry proposal"), null without a linked proposal (API.md). */
   proposal_retryable: boolean | null;
+  /** The workflow's primary action label ("Review losses"; slice 5a T12). */
+  action?: string | null;
+  /** Loss reviews: checks needing action; null for other workflows. */
+  open_checks?: number | null;
 }
 
 export type Queue = { line: Line; truncated: boolean } & Record<QueueGroup, QueueItem[]>;
@@ -596,4 +600,203 @@ export interface RunEvent {
   run_id: number;
   type: "run.status" | "document.status" | "run.usage" | "artifact.ready" | "run.end" | "run.snapshot";
   data: Record<string, unknown>;
+}
+
+// --------------------------------------------------------------------- loss reviews (slice 5a, backend/API.md)
+// Money is integer cents. The claims are paged from GET /api/loss-runs/{id}/claims, never part of the artifact.
+
+export type LossRole = "counted" | "superseded" | "conflicting" | "left_out";
+export type ClaimStatus = "open" | "closed" | "reopened" | "unknown";
+export type LossMoney = "paid" | "reserve" | "incurred" | "recovery" | "deductible";
+export type LossAmounts = Record<LossMoney, number | null>;
+
+export interface SheetMapping {
+  index: number;
+  header: string;
+  column: string;
+  label: string;
+  by: "synonym" | "model";
+}
+
+export interface SheetSummary {
+  name: string;
+  rows: number;
+  data_rows: number;
+  header_row: number | null;
+  has_claims_table: boolean;
+  mapped: SheetMapping[];
+  unmapped: { index: number; header: string }[];
+}
+
+/** POST /api/documents/spreadsheets: each accepted document's `spreadsheet`. */
+export interface SpreadsheetSummary {
+  format: "xlsx" | "csv";
+  data_rows: number;
+  page_count: number;
+  sheets: SheetSummary[];
+}
+
+export interface LossChip {
+  document_id: number;
+  letter: string;
+  filename: string;
+  kind: "page" | "sheet";
+  /** "Travelers p.14" or "Sheet 2024, row 17". */
+  label: string;
+  /** PDF page, or the sheet page to load from `url`. */
+  page_no: number | null;
+  rects: number[][];
+  page_width: number | null;
+  page_height: number | null;
+  url: string | null;
+}
+
+export interface LossMetricTotal {
+  cents: number;
+  from_claims: number;
+}
+
+export interface LossDocumentSummary {
+  document_id: number;
+  letter: string;
+  filename: string;
+  kind: string;
+  carrier: string | null;
+  valuation_date: string | null;
+  status: string;
+  rows: number;
+  counted_rows: number;
+  unverified_rows: number;
+  printed_totals: number;
+  unread_pages: number[];
+}
+
+export interface LossTotals {
+  type: "loss_totals";
+  id: string;
+  claims: number;
+  open_claims: number;
+  paid: LossMetricTotal;
+  reserve: LossMetricTotal;
+  incurred: LossMetricTotal;
+  recovery: LossMetricTotal;
+  deductible: LossMetricTotal;
+  unreconciled: boolean;
+  as_of: string | null;
+  counts: Record<string, number>;
+  documents: LossDocumentSummary[];
+}
+
+export interface LossCheckOption extends Partial<LossAmounts> {
+  document_id: number;
+  label: string;
+  valuation_date: string | null;
+  claim_row_ids: number[];
+}
+
+export interface LossCheck {
+  type: "loss_check";
+  id: string;
+  kind: "total" | "conflict" | "unverified";
+  verdict: "matches" | "off" | "conflicting" | "unverified" | "handled";
+  decided_by: "broker" | "rows";
+  title: string;
+  message: string;
+  document_id: number | null;
+  metric: LossMoney | "claim_count" | null;
+  scope_kind: "all" | "policy_year" | "policy_number" | "carrier" | "page_subtotal" | "sheet" | null;
+  scope_value: string | null;
+  printed: number | null;
+  computed: number | null;
+  difference: number | null;
+  claim_key: string | null;
+  rows: number | null;
+  /** Query parameters for GET .../claims that open the rows in scope. */
+  filter: Record<string, unknown>;
+  options: LossCheckOption[];
+  picked_document_id: number | null;
+  fingerprint: string;
+  status: "open" | "resolved" | "match";
+  needs_action: boolean;
+  changed_since_resolved: boolean;
+  note: string | null;
+  updated_at: string | null;
+  chips: LossChip[];
+}
+
+export interface LossReview {
+  run: Run;
+  client: string | null;
+  client_source: "broker" | "extracted" | null;
+  synthetic: boolean;
+  artifact_id: number | null;
+  version: number | null;
+  totals: LossTotals | null;
+  checks: LossCheck[];
+  check_counts?: { to_resolve: number; handled: number; matches: number };
+  notices: Notice[];
+  counts: Record<string, number> | null;
+  /** document id -> per sheet: header row and mapped / unmapped columns (after the read). */
+  sheets: Record<string, { sheet: string; index: number; header_row: number | null; mapped: SheetMapping[]; unmapped: { index: number; header: string }[] }[]>;
+}
+
+export interface ClaimRow {
+  id: number;
+  document_id: number | null;
+  letter: string | null;
+  filename: string | null;
+  source: "extracted" | "added";
+  location: string;
+  claim_number: string;
+  claim_key: string;
+  claimant: string | null;
+  date_of_loss: string | null;
+  status: ClaimStatus;
+  status_raw: string | null;
+  policy_number: string | null;
+  policy_year: number | null;
+  line: string | null;
+  carrier: string | null;
+  extracted: LossAmounts;
+  effective: LossAmounts;
+  claim: { paid: number | null; reserve: number | null; incurred: number | null; open: boolean; date_of_loss: string | null };
+  role: LossRole;
+  role_reason: string | null;
+  counted: boolean;
+  group_key: string;
+  verify_state: "verified" | "unverified";
+  verify_reason: string | null;
+  decision: { id: number; kind: "edited" | "confirmed" | "left_out" } | null;
+  changed_since_resolved: boolean;
+  flags: string[];
+  note: string | null;
+  chip: LossChip | null;
+  history?: ClaimRow[];
+}
+
+export interface ClaimsPage {
+  run_id: number;
+  total: number;
+  offset: number;
+  limit: number;
+  sort: string;
+  dir: "asc" | "desc";
+  as_of: string | null;
+  rows: ClaimRow[];
+}
+
+export interface LossReviewListItem {
+  run_id: number;
+  client: string | null;
+  client_source: "broker" | "extracted" | null;
+  status: RunStatus;
+  active: boolean;
+  queue_state: QueueState;
+  files: number;
+  created_at: string | null;
+  finished_at: string | null;
+  latest_valuation_date: string | null;
+  claims: number | null;
+  incurred: number | null;
+  open_checks: number | null;
 }
