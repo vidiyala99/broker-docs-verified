@@ -610,6 +610,7 @@ export type LossRole = "counted" | "superseded" | "conflicting" | "left_out";
 export type LossClaimStatus = "open" | "closed" | "reopened" | "unknown";
 export type LossMoney = "paid" | "reserve" | "incurred" | "recovery" | "deductible";
 export type LossAmounts = Record<LossMoney, number | null>;
+export type LossQuickFilter = "over_100k" | "open_only" | "last_3_months" | "open_reserve";
 
 export interface SheetMapping {
   index: number;
@@ -735,6 +736,8 @@ export interface LossReview {
   totals: LossTotals | null;
   checks: LossCheck[];
   check_counts?: { to_resolve: number; handled: number; matches: number };
+  /** Claims each quick filter opens (distinct claims, effective values, D10); null before the review is built. */
+  filter_counts?: Record<"all" | LossQuickFilter, number> | null;
   notices: Notice[];
   counts: Record<string, number> | null;
   /** document id -> per sheet: header row and mapped / unmapped columns (after the read). */

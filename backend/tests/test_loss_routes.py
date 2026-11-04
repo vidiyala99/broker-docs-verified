@@ -121,6 +121,22 @@ def test_claims_page_sort_quick_filters_and_history(lapi):
     assert [r["claim_number"] for r in unv["rows"]] == ["TR-400"]
 
 
+def test_filter_counts_match_the_claims_each_quick_filter_opens(lapi):
+    run_id, out, (_, xlsx_id, _) = _review(lapi)
+    counts = out["filter_counts"]
+    # claims, not lines: TR-300's two conflicting lines are one claim; superseded TR-200 (xlsx) is not a claim
+    assert counts == {"all": 4, "over_100k": 1, "open_only": 2, "last_3_months": 1, "open_reserve": 2}
+    for name in ("over_100k", "open_only", "last_3_months", "open_reserve"):
+        rows = lapi.client.get(f"/api/loss-runs/{run_id}/claims", params={name: True, "limit": 200}).json()["rows"]
+        assert counts[name] == len({r["group_key"] for r in rows}), name
+    # counts follow effective values: an edit that lifts TR-400 over $100K moves it into Over $100K
+    tr400 = next(r for r in lapi.client.get(f"/api/loss-runs/{run_id}/claims", params={
+        "document_id": xlsx_id, "include_superseded": True}).json()["rows"] if r["claim_number"] == "TR-400")
+    body = lapi.client.post(f"/api/loss-runs/{run_id}/rows/{tr400['id']}/decision",
+                            json={"kind": "edit", "amounts": {"incurred": 150_000_00}}).json()
+    assert body["review"]["filter_counts"]["over_100k"] == 2
+
+
 def test_sheet_chip_opens_the_rendered_page_with_the_row_box(lapi):
     run_id, _, (_, xlsx_id, _) = _review(lapi)
     rows = lapi.client.get(f"/api/loss-runs/{run_id}/claims", params={"document_id": xlsx_id,

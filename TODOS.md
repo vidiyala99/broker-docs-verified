@@ -1,5 +1,12 @@
 # TODOS
 
+## Incremental loss-run ledger rebuild
+- **What:** rebuild only the claim groups and documents a broker action touches (one row's edit, one check's pick), not the whole review's ledger.
+- **Why:** at the L8 cap (200,000 rows) every broker action takes about 9 s (T13 measurement, HANDOFF 2026-11-04 02:10): `build_ledger` recomputes every role, total and check.
+- **Pros:** actions stay instant at any size. **Cons:** cross-file roles (supersede, conflict) and per-document reconciliation make the touched set non-trivial; needs a property test against the full rebuild.
+- **Context:** owner decision 2026-11-04 12:40: keep it as a TODO; the UI applies the change at once and shows "Recounting..." on the totals while a slow rebuild runs.
+- **Depends on:** slice 5a backend (`backend/loss_runs/ledger.py`, `routes/loss_runs.py`).
+
 ## Chunked extraction for long documents
 - **What:** split documents over the 80-page cap into page windows, extract per window, merge and de-duplicate facts.
 - **Why:** policies (slice 2) are long; slice 1 hard caps (D3) reject them.
