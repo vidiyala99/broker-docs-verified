@@ -111,7 +111,13 @@ export function metaParts(item: QueueItem, shared = false): { lead: string | nul
 
 /** What the row's report is, in the broker's words: the menu item and the name link both use it. */
 export function reportNoun(item: QueueItem): string {
-  return item.workflow_slug === "policy-check" ? "policy check" : item.workflow_slug === "compare-quotes" ? "comparison" : "report";
+  return item.workflow_slug === "policy-check"
+    ? "policy check"
+    : item.workflow_slug === "compare-quotes"
+      ? "comparison"
+      : item.workflow_slug === "loss-run"
+        ? "loss review"
+        : "report";
 }
 
 export const openLabel = (item: QueueItem) => `Open ${reportNoun(item)}`;

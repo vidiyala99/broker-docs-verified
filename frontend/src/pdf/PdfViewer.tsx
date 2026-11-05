@@ -15,14 +15,17 @@ export interface PdfTarget {
   page: number;
   /** Highlight for this page; null when opened without a chip. */
   chip: Chip | null;
+  /** Loss runs (R5, D13): a spreadsheet's rendered sheet page is its own one-page PDF. `documentId` is then the
+   * cache key of that page (lossruns/sheetTarget), not the document's id. */
+  url?: string;
 }
 
 const docCache = new Map<number, Promise<PDFDocumentProxy>>();
 
-function loadDoc(documentId: number): Promise<PDFDocumentProxy> {
+function loadDoc(documentId: number, url?: string): Promise<PDFDocumentProxy> {
   let p = docCache.get(documentId);
   if (!p) {
-    p = getDocument({ url: api.fileUrl(documentId) }).promise;
+    p = getDocument({ url: url ?? api.fileUrl(documentId) }).promise;
     p.catch(() => docCache.delete(documentId));
     docCache.set(documentId, p);
   }
@@ -62,7 +65,7 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
     const id = target.documentId;
     setRendering(true);
     setError(false);
-    loadDoc(id).then(
+    loadDoc(id, target.url).then(
       (d) => live && setLoaded({ id, doc: d }),
       () => live && setError(true),
     );

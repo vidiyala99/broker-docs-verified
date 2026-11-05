@@ -192,7 +192,13 @@ export function Glyph({ name, size = 20, tabs = false, className = "" }: { name:
   );
 }
 
-const WORKFLOW_GLYPH: Record<string, GlyphName> = { "compare-quotes": "compare", "policy-check": "policy-check", proposal: "proposal", certificate: "certificate" };
+const WORKFLOW_GLYPH: Record<string, GlyphName> = {
+  "compare-quotes": "compare",
+  "policy-check": "policy-check",
+  proposal: "proposal",
+  certificate: "certificate",
+  "loss-run": "analytics",
+};
 
 /** A workflow's mark, with its document tabs. */
 export function WorkflowMark({ slug, size = 28, className = "" }: { slug: string; size?: number; className?: string }) {

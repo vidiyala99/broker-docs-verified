@@ -22,6 +22,7 @@ export function runTitle(run: Run): string {
   if (run.workflow_name === "Proposal Builder") return `Proposal, run ${run.id}`;
   if (run.workflow_name === "Policy Check") return `Policy check, run ${run.id}`;
   if (run.workflow_name === "Certificate of Insurance") return `Certificate, run ${run.id}`;
+  if (run.workflow_name === "Loss Review") return `Loss review, run ${run.id}`;
   return `Run ${run.id}`;
 }
 

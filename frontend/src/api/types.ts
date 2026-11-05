@@ -31,6 +31,8 @@ export interface DocumentInfo {
   created_at: string;
   /** Only on the POST /api/documents/ams response. */
   ams?: AmsSummary;
+  /** Only on spreadsheet uploads (POST /api/documents/spreadsheets, slice 5a). */
+  spreadsheet?: SpreadsheetSummary;
 }
 
 export interface Rejection {

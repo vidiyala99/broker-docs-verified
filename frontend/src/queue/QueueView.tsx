@@ -5,6 +5,7 @@ import {
   ArrowSquareOut,
   ArrowsLeftRight,
   Certificate,
+  ChartLine,
   CaretRight,
   CheckCircle,
   FilePlus,
@@ -17,6 +18,7 @@ import { useToast } from "../ui/Toast";
 import { Collapse, Count, usePresence } from "../ui/motion";
 import { RowMenu, type MenuItem } from "../tasks/RowMenu";
 import { certificateNewHref } from "../certificates/certUtil";
+import { lossNewHref } from "../lossruns/lossUtil";
 import { discrepancyHref } from "../tasks/taskUtil";
 import { draftFromComparison, restoreDraft } from "./buildProposal";
 import type { QueueData } from "./useQueue";
@@ -395,7 +397,16 @@ function QueueRow({
   // Rows without a next step (In progress, Done recently, a Needs attention row that cannot be retried) have no
   // primary action: the client name is the link to the report, so a quiet "Open" beside it was the same stop twice.
   let primary: ReactNode = null;
-  if (group === "needs_review") {
+  const lossReview = item.workflow_slug === "loss-run";
+  if (lossReview && (group === "needs_review" || group === "ready")) {
+    // Slice 5a: a loss review's one next step is the review page itself ("Review losses", API `action`).
+    primary = (
+      <a href={runHref(item.run_id)} className="btn btn--primary btn--sm">
+        {item.action ?? "Review losses"}
+        {forName}
+      </a>
+    );
+  } else if (group === "needs_review") {
     primary = (
       <a
         href={runHref(item.run_id)}
@@ -458,6 +469,8 @@ function QueueRow({
   menu.push({ label: moveLabel(otherLine(item.line)), icon: <ArrowsLeftRight size={16} aria-hidden />, run: () => actions.move(item) });
   // Slice 4 hook: a certificate for this client, prefilled (spec section 4 "Hooks").
   menu.push({ label: "Issue certificate", icon: <Certificate size={16} aria-hidden />, run: () => (window.location.hash = certificateNewHref(item.client)) });
+  // Slice 5a hook: a new loss review for this client, prefilled.
+  menu.push({ label: "Review losses", icon: <ChartLine size={16} aria-hidden />, run: () => (window.location.hash = lossNewHref(item.client)) });
 
   return (
     <li

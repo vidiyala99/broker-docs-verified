@@ -3,7 +3,7 @@ import { RailGlyph } from "../voice/railMarks";
 import { APP_NAME } from "../config";
 import { Tip } from "../ui/Tip";
 
-export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "certificates" | "tasks" | "integrations";
+export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "certificates" | "tasks" | "integrations" | "analytics";
 
 interface RailItem {
   label: string;
@@ -31,7 +31,7 @@ const GROUPS: RailItem[][] = [
   [
     { label: "Assistant", glyph: "assistant" },
     { label: "Market search", glyph: "search" },
-    { label: "Analytics", glyph: "analytics" },
+    { label: "Analytics", glyph: "analytics", href: "#/analytics", section: "analytics", tip: "Analytics: loss reviews" },
     { label: "Insights", glyph: "insights" },
   ],
   [{ label: "Vault", glyph: "vault" }],
