@@ -351,3 +351,11 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Memory: ~1 GB free all evening. Before lanes: `wsl --shutdown`, close spare tabs, maybe the editor's Pyright.
 - Apify is not connected (no MCP server, token or CLI); owner asked, nothing set up.
 - Still open: public repo refresh (scrub routine, 2026-11-04 16:00 entry), T10 docs, Loom, deploy (parked).
+
+## 2026-11-05 00:45: Needs attention fix merged (main 3058030)
+- Activity/queue change 1 shipped: a comparison whose latest proposal failed/cancelled is in **Needs attention** ("Proposal didn't finish", primary Retry proposal; menu Open failed proposal / Start new proposal). A deleted proposal run = no proposal = Ready. D3 amendment recorded in the work-queue spec ledger ("Owner amendment after build"); API.md group table updated.
+- Bug caught on resume: `QueueView.tsx` gated Retry proposal on `group === "ready"`, so the backend change alone would have left the row with no action. Now gated on needs_attention.
+- Verified: backend 1703 pass/2 skip; tsc clean on main; e2e queue + queue-nav 18/18 on a fresh seed (8010/5183), axe 0 at 1440/1024/390. Full e2e not re-run. `/verify` cannot run here (no origin remote: POLICY_SOURCE_UNAVAILABLE); checks run by hand.
+- Worktree `agent-aeb680885ec25e0da` and its branch removed. Change 3 (Activity rows client-first) not started; start it fresh if wanted (change 2 moved into slice 6).
+- **Next:** `/plan-eng-review` on `docs/specs/2026-11-05-compare-match-design.md`, then slice 6 lanes per spec section 7. Fresh session.
+- Still open: Activity rows (change 3), public repo refresh (scrub routine), T10 docs, Loom, deploy (parked).
