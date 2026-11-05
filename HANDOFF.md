@@ -337,3 +337,9 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Left: T10 docs (rewrite spec sections 3/4 against the ledger + fix-lane amendments); public repo refresh (scrub routine); Loom.
 - Stray folder `.claude/worktrees/agent-ab05ed4dfec0e5336` (unregistered, branch deleted, a file was locked) can be deleted by hand.
 - Servers: backend 8000 (seed `dev-data-1718` in session 7b21df2d scratchpad) + Vite 5173 from main, fresh seed with run 12.
+
+## 2026-11-04 22:40: Activity/queue lane started, stalled (low memory); resume next session
+- Owner-approved (17:23, do not re-ask), one lane: (1) comparison whose latest proposal failed/cancelled -> **Needs attention** (reason "Proposal didn't finish", action Retry proposal; done with no proposal stays Ready; amend work-queue spec D3 in its ledger); (2) retitle the Commercial home queue page (now "Compare Quotes" but lists all commercial work), keep Personal lines consistent; (3) Activity rows for brokers: client name first (serif), workflow second, carrier summary instead of file chips, right noun per workflow (never "8 quotes" for a loss review), plain status using queue reasons, run numbers demoted; add client/carriers to the runs list API if missing.
+- Worktree `.claude/worktrees/agent-aeb680885ec25e0da` (branch `worktree-agent-aeb680885ec25e0da`, from 994a766): uncommitted edits to `backend/work_queue.py`, `backend/tests/test_work_queue_classify.py`, `test_work_queue_api.py`, `test_dev_seed.py` (change 1 in progress). No UI work yet; design stack (all 7 skills, brief `frontend/ACTIVITY-BRIEF.md`, Playwright at 1440/1024/390, max 3 rounds) still to do. Ports 8052/5212.
+- Every agent stalled today at ~0.6-1 GB free RAM. Before resuming: close spare browser tabs, `wsl --shutdown`, consider closing the editor's Pyright (~860 MB).
+- Still open: public repo refresh (scrub routine, see the 16:00 entry), T10 docs, Loom.
