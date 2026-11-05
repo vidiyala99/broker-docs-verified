@@ -87,7 +87,8 @@ def test_unknown_workflow_is_rejected():
 def test_default_call_is_compare_quotes_without_a_proposal_block():
     out = eval_hook.run_eval_batch([str(QUOTES / "carrier_a_clean.pdf")],
                                    provider=FakeProvider(smart_responder()))
-    assert set(out) == {"input_tokens", "documents"}
+    # slice 6 (T6): a Compare run also returns its artifact response's cells and marks ("compare")
+    assert set(out) == {"input_tokens", "documents", "compare"}
 
 
 # --------------------------------------------------------------------- proposal run

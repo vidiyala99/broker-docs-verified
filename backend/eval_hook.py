@@ -49,6 +49,15 @@ the block (a role left out is N/A, no document). A slot carries the role's docum
 path, the raw evidence state (verified, scan_read, absent, failed, conflicting,
 not_found), the value only for a cited state, its citations resolved to (document
 path, page) and its conflict list.
+
+Compare Quotes (slice 6, task T6, R7/R12): a Compare run's output also carries a ``compare``
+block read from the run's artifact response (views.artifact_out, the same marks the browser
+gets): every table cell with its state, value, ``mark`` and ``mark_reason``, citations as
+(document path, page), the columns and the Key difference (tests/eval/compare_gate.py scores
+it against hand-written expected marks). A ``.docx`` or ``.xlsx`` path in a Compare or
+Proposal run goes through ``uploads.prepare_office`` exactly as the upload route does (R5):
+the rendered PDF record is what the run reads and cites, and a refused file is reported failed
+with its OfficeError code (or over_cap for a ParseError limit).
 """
 
 from __future__ import annotations
@@ -103,8 +112,34 @@ _PROPOSAL_PARAM_KEYS = ("broker_name", "brokerage_name", "additional_context", "
 _OUTLINE_KEYS = ("id", "kind", "title", "ai_instruction", "fact_sections")
 
 
+_OFFICE_SUFFIXES = (".docx", ".xlsx")
+
+
 class WorkflowUnavailable(NotImplementedError):
     """The requested workflow (or its template) is not seeded in this backend."""
+
+
+class _OfficeRefusal(Exception):
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+def _prepare_office(data: bytes, filename: str):
+    """uploads.prepare_office (the POST /api/documents path for .docx/.xlsx), with a refusal as an eval reason:
+    the OfficeError code (unreadable, macros, external_links, format_mismatch, ...) or the ParseError code mapped
+    like a PDF's (too_large / too_many_pages -> over_cap)."""
+    from backend.office_docx import OfficeError
+    from backend.pipeline.parse import ParseError
+    from backend.uploads import prepare_office
+
+    try:
+        return prepare_office(data, filename, DEFAULT_LIMITS)
+    except OfficeError as exc:
+        raise _OfficeRefusal(str(exc.code)) from None
+    except ParseError as exc:
+        code = str(getattr(exc.code, "value", exc.code))
+        raise _OfficeRefusal(_REASONS.get(code, code)) from None
 
 
 def run_eval_batch(paths: Sequence[str], *, provider: Provider | None = None,
@@ -229,6 +264,7 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                template: str | int | None = None,
                role_of: Mapping[str, str] | None = None) -> dict[str, Any]:
     proposal = slug == PROPOSAL_SLUG
+    compare = slug == db.COMPARE_QUOTES_SLUG
     policy = slug == POLICY_SLUG
     cert = slug == CERTIFICATE_SLUG
     loss = slug == LOSS_RUN_SLUG
@@ -269,6 +305,16 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                         documents[path] = _failed(str(exc.code))
                         continue
                     kind, pdf, page_count = "ams", rendered.pdf, rendered.page_count
+                source_format = None
+                if (compare or proposal) and Path(path).suffix.lower() in _OFFICE_SUFFIXES:
+                    # Slice 6 (R5): a Word or Excel quote takes the upload route's checks and renderer
+                    # (uploads.prepare_office); the rendered PDF record is what the run reads and cites.
+                    try:
+                        prepared = _prepare_office(data, Path(path).name)
+                    except _OfficeRefusal as exc:
+                        documents[path] = _failed(exc.code)
+                        continue
+                    pdf, page_count, source_format = prepared.pdf, prepared.page_count, prepared.source_format
                 if loss and Path(path).suffix.lower() in _SHEET_SUFFIXES:
                     # Same checks as the spreadsheet upload route (R7): a refused file never reaches the run.
                     from backend.loss_runs import sheets
@@ -280,12 +326,14 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                     kind, pdf, page_count = "spreadsheet", b"", sheets.layout(book)["page_count"]
                 doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=Path(path).name,
                                       stored_name=uuid.uuid4().hex, size_bytes=len(data),
-                                      sha256=hashlib.sha256(data).hexdigest(), kind=kind,
+                                      sha256=hashlib.sha256(pdf if source_format else data).hexdigest(), kind=kind,
                                       page_count=page_count)
+                if source_format:
+                    doc.source_format = source_format
                 s.add(doc)
                 s.flush()
                 blobs[doc.id] = pdf
-                if kind in ("ams", "spreadsheet"):
+                if kind in ("ams", "spreadsheet") or source_format:
                     originals[doc.id] = data
                 order.append((path, doc.id))
         if not order:
@@ -299,6 +347,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 out["certificate"] = _empty_certificate_block(["no readable document: no run"])
             if loss:
                 out["loss_run"] = _empty_loss_block(documents, ["no readable document: no run"])
+            if compare:
+                out["compare"] = _empty_compare_block(["no readable document: no run"])
             return out
 
         def load(ref: DocumentRef) -> bytes:
@@ -361,6 +411,8 @@ async def _run(paths: list[str], provider: Provider, budget_limit: int | None,
                 out["certificate"] = _certificate_block(s, run, order)
             if loss:
                 out["loss_run"] = _loss_block(s, run, order, documents)
+            if compare:
+                out["compare"] = _compare_block(s, run, order)
         return out
     finally:
         engine.dispose()
@@ -665,6 +717,81 @@ def _loss_block(s: Any, run: models.Run, order: list[tuple[str, int]], documents
         sheet = re.search(r"on sheet (.+?)\.$", n.message)
         block["notices"].append({"kind": kind, "document": doc, "sheet": sheet.group(1) if sheet else None,
                                  "message": n.message})
+    return block
+
+
+# --------------------------------------------------------------------- Compare Quotes response (slice 6, T6)
+#
+# Contract: tests/eval/compare_gate.py. Every Compare Quotes run adds a ``compare`` block read from the run's
+# artifact response exactly as GET /api/runs/{id}/artifact returns it (views.artifact_out: marks computed on read,
+# R2), never recomputed here (R12, O6): columns (letter, label, document path, document_kind), every table cell
+# (row key, column, document path, raw evidence state, value, edited, complete, mark, mark_reason, citations as
+# (document path, page)) and the Key difference block (source, text, stale).
+
+
+def _empty_compare_block(warnings: list[str]) -> dict[str, Any]:
+    return {"workflow": db.COMPARE_QUOTES_SLUG, "run_status": None, "columns": [], "cells": [],
+            "key_difference": None, "notices": [], "warnings": list(warnings)}
+
+
+def _compare_block(s: Any, run: models.Run, order: list[tuple[str, int]]) -> dict[str, Any]:
+    from backend import views
+
+    path_by_doc = {doc_id: path for path, doc_id in order}
+    block = _empty_compare_block([])
+    block["run_status"] = str(run.status)
+    art = run.artifact
+    if art is None or not art.versions:
+        block["warnings"].append("the run produced no artifact")
+        return block
+    response = views.artifact_out(s, art)
+    content = response["content"]
+    wanted: set[int] = set()
+    for section in content["sections"]:
+        for b in section["blocks"]:
+            if b.get("type") == "table":
+                for row in b["rows"]:
+                    for cell in row["cells"].values():
+                        wanted.update(cell.get("passage_ids") or [])
+    passages = {p.id: p for p in s.scalars(select(models.Passage).where(models.Passage.id.in_(wanted)))}
+
+    def cites(ids: Sequence[int]) -> list[dict[str, Any]]:
+        out = []
+        for pid in ids:
+            p = passages.get(pid)
+            out.append({"document": path_by_doc.get(p.document_id) if p else None,
+                        "page": p.page_no if p else None, "passage_id": pid})
+        return out
+
+    seen_columns: set[str] = set()
+    for section in content["sections"]:
+        for b in section["blocks"]:
+            if b.get("type") == "key_difference":
+                block["key_difference"] = {
+                    "source": b.get("source"), "stale": b.get("stale"),
+                    "text": "".join(seg.get("text", "") for seg in b.get("segments") or []),
+                    "segments": [{"text": seg.get("text"), "cells": seg.get("cells") or []}
+                                 for seg in b.get("segments") or []],
+                    "marks": b.get("marks") or []}
+                continue
+            if b.get("type") != "table":
+                continue
+            doc_by_col = {c["key"]: c.get("document_id") for c in b["columns"]}
+            for c in b["columns"]:
+                if c["key"] not in seen_columns:
+                    seen_columns.add(c["key"])
+                    block["columns"].append({"key": c["key"], "label": c.get("label"),
+                                             "document": path_by_doc.get(c.get("document_id")),
+                                             "document_kind": c.get("document_kind"), "warning": c.get("warning")})
+            for row in b["rows"]:
+                for col, cell in row["cells"].items():
+                    block["cells"].append({
+                        "block_id": b["id"], "row": row["key"], "column": col,
+                        "document": path_by_doc.get(doc_by_col.get(col)),
+                        "value": cell.get("value"), "state": cell.get("state"), "edited": bool(cell.get("edited")),
+                        "complete": cell.get("complete"), "mark": cell.get("mark"),
+                        "mark_reason": cell.get("mark_reason"), "citations": cites(cell.get("passage_ids") or [])})
+    block["notices"] = [{"kind": n.get("kind"), "message": n.get("message")} for n in content.get("notices") or []]
     return block
 
 
