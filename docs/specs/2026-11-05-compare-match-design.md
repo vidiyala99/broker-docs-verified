@@ -1,7 +1,7 @@
 # Slice 6: Compare Quotes match (formats, upload page, marked differences)
 
-Date: 2026-11-05. Status: design approved in chat by the owner, section by section; this spec awaits owner review,
-then `/plan-eng-review`. Visual design of the two screens goes through the design stack (all required skills,
+Date: 2026-11-05. Status: design approved in chat by the owner, section by section; spec approved by the owner (00:34),
+next `/plan-eng-review`. Visual design of the two screens goes through the design stack (all required skills,
 Playwright at 1440/1024/390, max 3 rounds), not this spec.
 
 ## 1. Purpose and decisions

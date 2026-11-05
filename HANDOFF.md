@@ -343,3 +343,11 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Worktree `.claude/worktrees/agent-aeb680885ec25e0da` (branch `worktree-agent-aeb680885ec25e0da`, from 994a766): uncommitted edits to `backend/work_queue.py`, `backend/tests/test_work_queue_classify.py`, `test_work_queue_api.py`, `test_dev_seed.py` (change 1 in progress). No UI work yet; design stack (all 7 skills, brief `frontend/ACTIVITY-BRIEF.md`, Playwright at 1440/1024/390, max 3 rounds) still to do. Ports 8052/5212.
 - Every agent stalled today at ~0.6-1 GB free RAM. Before resuming: close spare browser tabs, `wsl --shutdown`, consider closing the editor's Pyright (~860 MB).
 - Still open: public repo refresh (scrub routine, see the 16:00 entry), T10 docs, Loom.
+
+## 2026-11-05 00:35: slice 6 (Compare Quotes match) spec approved; Needs attention fix still parked
+- **Spec:** `docs/specs/2026-11-05-compare-match-design.md` (6e8bfda), owner-approved section by section, then as a whole. Source: BrokerDocs demo screenshots (three formats, upload page, marked comparison, Key difference). Decisions D1-D5 in the spec, do not re-ask. Next: `/plan-eng-review` on it, then lanes per spec section 7.
+- **Needs attention fix (Activity/queue change 1)** is still uncommitted in worktree `.claude/worktrees/agent-aeb680885ec25e0da` (`backend/work_queue.py` + 3 test files, D3 amended). Its 3 test files pass (116); full backend suite, frontend check (row under Needs attention with Retry proposal), e2e not run. Ship it first (owner saw the bug live: Copperfield Marine "Proposal didn't finish" under Ready). Change 2 (home retitle) moved into slice 6; change 3 (Activity rows client-first) still pending in that lane.
+- Dev servers were reaped for low memory (fresh seed in session e95edeb8 scratchpad `dev-data`, runs 1-12); restart with a fresh seed when needed.
+- Memory: ~1 GB free all evening. Before lanes: `wsl --shutdown`, close spare tabs, maybe the editor's Pyright.
+- Apify is not connected (no MCP server, token or CLI); owner asked, nothing set up.
+- Still open: public repo refresh (scrub routine, 2026-11-04 16:00 entry), T10 docs, Loom, deploy (parked).
