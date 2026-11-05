@@ -5,8 +5,8 @@ runs, and **every value it shows is checked against the page it came from before
 and the cited page opens with the exact line highlighted. If a value cannot be verified, the app says so instead
 of guessing.
 
-> **Unofficial portfolio project.** Built as part of a job application to BrokerDocs and inspired by their product.
-> Not affiliated with or endorsed by BrokerDocs. All documents in this repo are **synthetic sample data**.
+> **Unofficial portfolio project** inspired by commercial insurance broker document workflows.
+> Not affiliated with or endorsed by any broker software vendor or carrier. All documents in this repo are **synthetic sample data**.
 
 **Demo video:** _(Loom link)_
 
