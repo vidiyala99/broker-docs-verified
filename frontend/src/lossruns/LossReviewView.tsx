@@ -10,7 +10,7 @@ import { RunProgress } from "../run/RunProgress";
 import { Glyph, ReadingMark } from "../voice/marks";
 import type { PdfTarget } from "../pdf/PdfViewer";
 import { ByFile, type FileActions } from "./ByFile";
-import { CardWord, cardTitle, Checks, type CheckActions } from "./Checks";
+import { CardWord, cardTitle, Checks, chipText, type CheckActions } from "./Checks";
 import { ClaimsTable, type RowActions, type TableQuery } from "./ClaimsTable";
 import { checkCards, chipTarget, day, docName, groupOf, lossNewHref, parseCents, usd, type CheckCard } from "./lossUtil";
 import "./lossruns.css";
@@ -307,9 +307,11 @@ export function LossReviewView({ runId, viewport, onRunChanged }: { runId: numbe
     [toast, load],
   );
 
+  const reviewRef = useRef(review);
+  reviewRef.current = review;
   const openChip = useCallback((chip: LossChipData, scan: boolean) => {
     opener.current = document.activeElement as HTMLElement | null;
-    setPdf(chipTarget(chip, scan));
+    setPdf(chipTarget(chip, scan, docName(reviewRef.current, chip.document_id), chipText(chip)));
   }, []);
   const closeSource = useCallback(() => {
     setPdf(null);

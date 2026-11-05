@@ -115,9 +115,20 @@ test("Review page: totals footing, checks per printed line, quick filters, a che
 
   // a sheet chip opens its rendered sheet page beside the register
   await page.getByRole("button", { name: /All claims/ }).first().click();
-  await page.locator(".lr-tablewrap .lr-chip").filter({ hasText: "Sheet" }).first().click();
+  // the CSV row chip (AG-2307 in the export): named for people, its only "sheet" is the file so it reads "Row 6"
+  const csvText = page.locator(".lr-tablewrap .lr-chip .lr-chip__text").filter({ hasText: /^Row 6$/ }).first();
+  await expect(csvText).toHaveText("Row 6"); // visible text; the file name is only in the tooltip and screen-reader name
+  await csvText.click();
   await expect(page.getByRole("button", { name: "Back to checks" })).toBeVisible();
+  await expect(page.locator(".lr-source__name")).toHaveText("Ashgrove 2025 CSV, Row 6");
+  await expect(page.locator(".pdf__caption")).toHaveText("Source: Ashgrove 2025 CSV, Row 6");
+  await expect(page.locator(".lr-source")).not.toContainText("lr_main");
+  // a sheet page opens readable (not Fit width) with the cited row's box scrolled into view
+  await expect(page.getByRole("button", { name: /Fit width/ })).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".pdf__frame canvas")).toBeVisible();
+  const box = page.locator(".pdf-highlight");
+  await expect(box).toBeInViewport();
+  expect((await box.boundingBox())!.height).toBeGreaterThan(18); // the row is readable size, not a sliver
   await shot(page, "1440-04-source");
   await page.keyboard.press("Escape");
   await expect(page.locator(".lr-ledger")).toBeVisible();

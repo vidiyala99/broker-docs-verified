@@ -18,6 +18,10 @@ export interface PdfTarget {
   /** Loss runs (R5, D13): a spreadsheet's rendered sheet page is its own one-page PDF. `documentId` is then the
    * cache key of that page (lossruns/sheetTarget), not the document's id. */
   url?: string;
+  /** Opening zoom (default Fit width). A rendered sheet page is a landscape grid of small type: it opens readable. */
+  zoom?: number;
+  /** Caption under the page, replacing "Source <chip>, page <n>" (a sheet page names its row, not a page). */
+  caption?: string;
 }
 
 const docCache = new Map<number, Promise<PDFDocumentProxy>>();
@@ -44,7 +48,8 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
   const doc = loaded && loaded.id === target.documentId ? loaded.doc : null;
   const [error, setError] = useState(false);
   const [page, setPage] = useState(target.page);
-  const [zoom, setZoom] = useState<number | "fit">("fit");
+  const [zoom, setZoom] = useState<number | "fit">(target.zoom ?? "fit");
+  useEffect(() => setZoom(target.zoom ?? "fit"), [target.documentId, target.zoom]);
   const [pageInput, setPageInput] = useState(String(target.page));
   const [attempt, setAttempt] = useState(0);
   const [rendering, setRendering] = useState(true);
@@ -228,7 +233,7 @@ export function PdfViewer({ target }: { target: PdfTarget }) {
       </div>
       {chip && (
         <p className="pdf__caption">
-          Source {chip.label}, page {chip.page_no}
+          {target.caption ?? `Source ${chip.label}, page ${chip.page_no}`}
           {!chip.verified && ". Read from scan, unverified: the whole page is marked"}
         </p>
       )}

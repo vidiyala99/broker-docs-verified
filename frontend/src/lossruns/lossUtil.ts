@@ -6,7 +6,10 @@ import { API_BASE } from "../config";
  * A loss-run chip in the source viewer. PDF chips open the document's page; sheet chips open the rendered sheet page
  * (a one-page PDF from `sheet-pages/{n}`, R5) under its own cache key, with the row's box (D13).
  */
-export function chipTarget(chip: LossChip, scan = false): PdfTarget {
+/** A rendered sheet page is landscape 792pt of 8pt type: 1.5x reads like the printed sheet at 12px. */
+export const SHEET_ZOOM = 1.5;
+
+export function chipTarget(chip: LossChip, scan = false, name = "", text = chip.label): PdfTarget {
   const sheet = chip.kind === "sheet" && chip.url != null;
   const box = {
     passage_id: 0,
@@ -20,13 +23,18 @@ export function chipTarget(chip: LossChip, scan = false): PdfTarget {
     page_width: chip.page_width ?? 612,
     page_height: chip.page_height ?? 792,
   };
+  // Named for people (the chip's readable file name and short text, "Ashgrove 2025 CSV, Row 6"); a sheet page opens at
+  // a readable zoom with its row scrolled into view, and its caption names the row, not "page 1" of the render.
+  const who = name || chip.filename;
   return {
     documentId: sheet ? -(chip.document_id * 100_000 + (chip.page_no ?? 1)) : chip.document_id,
-    filename: sheet ? `${chip.filename}, ${chip.label}` : chip.filename,
+    filename: sheet ? `${who}, ${text}` : who,
     letter: chip.letter,
     page: box.page_no,
     chip: box,
     url: sheet ? `${chip.url!.startsWith("http") ? "" : API_BASE}${chip.url}` : undefined,
+    zoom: sheet ? SHEET_ZOOM : undefined,
+    caption: sheet ? `Source: ${who}, ${text}` : `Source: ${who}, page ${box.page_no}`,
   };
 }
 
