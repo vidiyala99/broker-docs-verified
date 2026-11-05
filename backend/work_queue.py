@@ -15,7 +15,8 @@ Classification, first match wins (D2, D3, D4, D10 and M1 applied):
      +- queue_state == open:
      |    +- status failed|partial|cancelled ------------------> needs_attention (reasons, D10; open_counts if a check)
      |    +- Policy Check, has report, open discrepancies > 0 --> needs_review
-     |    +- Compare done, no proposal, or proposal failed|cancelled -> ready (reason "Proposal didn't finish" when so)
+     |    +- Compare done, latest proposal failed|cancelled ------> needs_attention ("Proposal didn't finish"; D3 amended)
+     |    +- Compare done, no proposal -------------------------> ready
      |    +- otherwise (check fully resolved, proposal done) -> done_recently if in window
      +- queue_state done|dismissed -----------------------------> done_recently if in window
      +- outside window -----------------------------------------> omitted (Activity only)
@@ -25,7 +26,8 @@ Selection (D4, M2): rows matching the filter above, actionable rows first (activ
 rows that left the queue, newest first within each; at most 500, `truncated` when more matched.
 
 A proposal counts as built ("done proposal") when its run is done or partial: both wrote a
-proposal document. Failed or cancelled sends the comparison back to Ready.
+proposal document. Failed or cancelled sends the comparison to Needs attention with "Proposal didn't
+finish" and its "Retry proposal" (D3 amended by the owner 2026-11-04: a failure never reads as Ready).
 
 Client name (W4, D1, M7): the broker's `client_name`, else the extracted verified `named_insured`
 (Policy Check: renewal, then expiring, then quote; Compare Quotes: the value most quotes state,
@@ -228,7 +230,7 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
             "queue_state": run.queue_state,
             "queue_changed_at": _iso(run.queue_changed_at),
             "proposal_run_id": run.proposal_run_id,
-            # Work queue UI: "Retry proposal" on a Ready comparison whose proposal did not finish.
+            # Work queue UI: "Retry proposal" on a comparison whose proposal did not finish (Needs attention, D3 amended).
             "proposal_retryable": proposal.retryable if proposal is not None else None,
             "action": QUEUE_ACTIONS.get(run.workflow_slug),
             "open_checks": run.open_checks if is_loss else None,
@@ -248,7 +250,11 @@ def classify(run: QueueRun, counts: Mapping[str, int] | None, proposal: Proposal
         if is_loss and run.has_report:
             return item("needs_review" if run.open_checks else "ready")
         if is_compare and run.status == str(RunStatus.DONE) and (proposal is None or not proposal.built):
-            return item("ready", why=reasons(run, proposal))
+            # D3 amended (owner 2026-11-04): a proposal that failed or was cancelled is a failure like any other,
+            # so the comparison needs attention ("Proposal didn't finish", primary action "Retry proposal").
+            if proposal is not None and proposal.unfinished:
+                return item("needs_attention", why=reasons(run, proposal))
+            return item("ready")
     if in_window(run, now):
         return item("done_recently")
     return None
@@ -608,8 +614,8 @@ def on_run_terminal(session: Session, run: models.Run, now: datetime | None = No
 
     A proposal run built from a comparison (D3): done or partial means the comparison's proposal
     exists, so the comparison leaves Ready now and Done recently counts from this moment (D2).
-    Failed or cancelled changes nothing stored: the comparison is classified back into Ready
-    with "Proposal didn't finish". Only the comparison's latest proposal (its `proposal_run_id`)
+    Failed or cancelled changes nothing stored: the comparison is classified into Needs attention
+    with "Proposal didn't finish" (D3 amended 2026-11-04). Only the comparison's latest proposal (its `proposal_run_id`)
     counts."""
     sid = source_run_id(run)
     if sid is None:

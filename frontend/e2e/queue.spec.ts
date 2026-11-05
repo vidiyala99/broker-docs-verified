@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 // Work queue UI + Activity (docs/specs/2026-11-02-work-queue-design.md section 2; ledger D5, D6, D9, D11, M1, M5;
 // owner feedback 2026-11-03: Retry proposal; QUEUE-BRIEF.md) against the dev backend (backend/dev_seed.py):
-// run 7 personal Needs review, run 8 personal Needs attention, run 4 commercial Ready with "Proposal didn't finish"
+// run 7 personal Needs review, run 8 personal Needs attention, run 4 commercial Needs attention with "Proposal didn't finish"
 // (run 9 is its failed proposal), runs 1/2/3/5 Needs attention (run 1 unnamed), run 6 Ready.
 // Groups on both pages; Review deep link; Retry, Retry proposal and Dismiss leave the group; Mark done + Undo,
 // Dismiss + Undo; Build proposal preselects documents and client and Undo restores the old draft; an In progress row
@@ -115,13 +115,14 @@ test("both pages show the seeded runs in the right groups, named by client", asy
   await page.goto("/#/");
   await expect(page.getByRole("heading", { level: 1, name: "Compare Quotes" })).toBeVisible();
   await expect(inGroup(page, "ready", 6)).toBeVisible();
-  await expect(inGroup(page, "ready", 4)).toBeVisible();
+  await expect(inGroup(page, "ready", 4)).toHaveCount(0);
   await expect(row(page, 6).getByRole("button", { name: /^Build proposal/ })).toBeVisible();
-  // A comparison whose proposal did not finish offers Retry proposal, not a fresh Build proposal.
+  // A comparison whose proposal did not finish needs attention (D3 amended) and offers Retry proposal,
+  // not a fresh Build proposal.
   await expect(row(page, 4)).toContainText("Proposal didn't finish");
   await expect(row(page, 4).getByRole("button", { name: /^Retry proposal/ })).toBeVisible();
   await expect(row(page, 4).getByRole("button", { name: /^Build proposal/ })).toHaveCount(0);
-  for (const id of [1, 2, 3, 5]) await expect(inGroup(page, "needs_attention", id)).toBeVisible();
+  for (const id of [1, 2, 3, 4, 5]) await expect(inGroup(page, "needs_attention", id)).toBeVisible();
   await expect(row(page, 1)).toContainText("Unnamed client");
   await expect(row(page, 5)).toContainText("name from the documents");
   // Proposal runs live under Proposals and Activity, never in the queue.
@@ -239,7 +240,7 @@ test("Retry leaves Needs attention; the In progress row moves on finish (polling
   expect(seen.n, "polling stops once nothing runs").toBe(after);
 });
 
-test("Retry proposal reruns the failed proposal and moves the comparison out of Ready", async ({ page }) => {
+test("Retry proposal reruns the failed proposal and moves the comparison out of Needs attention", async ({ page }) => {
   let retried = false;
   await page.route(/\/api\/runs\/9\/retry$/, async (route) => {
     retried = true;
@@ -261,7 +262,7 @@ test("Retry proposal reruns the failed proposal and moves the comparison out of 
     row(page, 4).getByRole("button", { name: /^Retry proposal/ }).click(),
   ]);
   expect(post.url()).toMatch(/\/api\/runs\/9\/retry$/);
-  await expect(inGroup(page, "ready", 4)).toHaveCount(0);
+  await expect(inGroup(page, "needs_attention", 4)).toHaveCount(0);
   await expect(inGroup(page, "in_progress", 4)).toContainText("Building proposal");
 });
 

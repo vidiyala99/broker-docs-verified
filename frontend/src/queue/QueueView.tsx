@@ -392,7 +392,8 @@ function QueueRow({
       setBusy(false);
     }
   };
-  const retryProposal = group === "ready" && canRetryProposal(item);
+  // D3 amended (owner 2026-11-04): a comparison whose proposal did not finish sits in Needs attention.
+  const retryProposal = group === "needs_attention" && canRetryProposal(item);
 
   // Rows without a next step (In progress, Done recently, a Needs attention row that cannot be retried) have no
   // primary action: the client name is the link to the report, so a quiet "Open" beside it was the same stop twice.

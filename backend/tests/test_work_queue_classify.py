@@ -111,11 +111,21 @@ def test_a_done_comparison_without_a_proposal_is_ready():
 
 
 @pytest.mark.parametrize("status", ["failed", "cancelled"])
-def test_a_comparison_whose_proposal_did_not_finish_is_back_in_ready(status):
-    """D3: a failed or cancelled proposal never loses the comparison."""
+def test_a_comparison_whose_proposal_did_not_finish_needs_attention(status):
+    """D3 (amended by the owner 2026-11-04): a failed or cancelled proposal never loses the comparison, and it is
+    a failure like any other, so the comparison sits in Needs attention, not Ready."""
     r = run(proposal_run_id=99)
-    assert group(r, prop=proposal(status)) == "ready"
-    assert item(r, prop=proposal(status))["reasons"] == ["Proposal didn't finish"]
+    assert group(r, prop=proposal(status)) == "needs_attention"
+    it = item(r, prop=proposal(status))
+    assert it["reasons"] == ["Proposal didn't finish"]
+    assert it["proposal_retryable"] is True and it["retryable"] is False  # "Retry proposal", not Retry
+    assert it["action"] == "Compare quotes"
+
+
+def test_a_comparison_whose_proposal_is_gone_is_ready():
+    """A proposal_run_id naming a deleted run is no proposal: Ready, no reasons."""
+    r = run(proposal_run_id=99)
+    assert group(r, prop=None) == "ready" and item(r, prop=None)["reasons"] is None
 
 
 @pytest.mark.parametrize("status", ["done", "partial"])

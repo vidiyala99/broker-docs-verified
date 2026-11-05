@@ -111,8 +111,8 @@ def test_seeded_comparisons_name_distinct_clients_and_keep_one_documents_fallbac
 
 def test_seeded_queue_names_clients_and_links_a_failed_proposal(tmp_path, monkeypatch):
     """Work queue seed: runs 7/8 and two comparisons carry broker client names, one comparison is
-    left unnamed, and a failed proposal built from a comparison puts it in Ready with
-    "Proposal didn't finish" (D3). Proposal runs never show in the queue."""
+    left unnamed, and a failed proposal built from a comparison puts it in Needs attention with
+    "Proposal didn't finish" (D3, amended 2026-11-04). Proposal runs never show in the queue."""
     monkeypatch.setenv("BROKERDOCS_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     s = dev_seed.Seeder()
@@ -128,10 +128,11 @@ def test_seeded_queue_names_clients_and_links_a_failed_proposal(tmp_path, monkey
         assert runs[named["id"]]["proposal_run_id"] == proposal
 
         commercial = s.client.get("/api/queue", params={"line": "commercial"}).json()
-        ready = {i["run_id"]: i for i in commercial["ready"]}
-        assert ready[named["id"]]["client"] == dev_seed.CLIENTS["fallback"]
-        assert ready[named["id"]]["reasons"] == ["Proposal didn't finish"]
         attention = {i["run_id"]: i for i in commercial["needs_attention"]}
+        assert attention[named["id"]]["client"] == dev_seed.CLIENTS["fallback"]
+        assert attention[named["id"]]["reasons"] == ["Proposal didn't finish"]
+        assert attention[named["id"]]["proposal_retryable"] is True
+        assert named["id"] not in {i["run_id"] for i in commercial["ready"]}
         assert attention[unnamed["id"]]["client"] is None and attention[unnamed["id"]]["client_source"] is None
         every = [i["run_id"] for g in ("in_progress", "needs_review", "ready", "needs_attention", "done_recently")
                  for i in commercial[g]]

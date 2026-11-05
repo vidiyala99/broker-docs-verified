@@ -424,7 +424,7 @@ def test_proposal_done_moves_the_comparison_to_done_recently(api):
     assert group == "done_recently" and it["proposal_run_id"] == r.json()["run"]["id"]
 
 
-def test_proposal_failed_returns_the_comparison_to_ready(api_factory):
+def test_proposal_failed_puts_the_comparison_in_needs_attention(api_factory):
     mode = {"refuse": False}
     base = api_responder()
 
@@ -440,7 +440,7 @@ def test_proposal_failed_returns_the_comparison_to_ready(api_factory):
     a.events(r.json()["run"]["id"])
     assert a.client.get(f"/api/runs/{r.json()['run']['id']}").json()["status"] == "failed"
     group, it = _where(_queue(a), source["id"])
-    assert group == "ready" and it["reasons"] == ["Proposal didn't finish"]
+    assert group == "needs_attention" and it["reasons"] == ["Proposal didn't finish"]
     assert it["proposal_retryable"] is True  # the queue's "Retry proposal" (owner feedback 2026-11-03)
     assert a.client.get(f"/api/runs/{source['id']}").json()["queue_changed_at"] is None
 
@@ -471,11 +471,11 @@ def test_proposal_running_then_cancelled(api_factory):
     a.client.post(f"/api/runs/{prop_id}/cancel")
     assert a.client.get(f"/api/runs/{prop_id}").json()["status"] == "cancelled"
     group, it = _where(_queue(a), source["id"])
-    assert group == "ready" and it["reasons"] == ["Proposal didn't finish"]
+    assert group == "needs_attention" and it["reasons"] == ["Proposal didn't finish"]
     gated.gate.set()
 
 
-def test_proposal_interrupted_by_a_restart_returns_the_comparison_to_ready(api):
+def test_proposal_interrupted_by_a_restart_puts_the_comparison_in_needs_attention(api):
     source = _compare(api)
     prop = _proposal(api, [source["documents"][0]["document_id"]], source_run_id=source["id"]).json()["run"]
     api.events(prop["id"])
@@ -484,7 +484,7 @@ def test_proposal_interrupted_by_a_restart_returns_the_comparison_to_ready(api):
     _set(api, source["id"], queue_changed_at=None)
     assert runner.reconcile_interrupted_runs(api.ctx.factory) == [prop["id"]]
     group, it = _where(_queue(api), source["id"])
-    assert group == "ready" and it["reasons"] == ["Proposal didn't finish"]
+    assert group == "needs_attention" and it["reasons"] == ["Proposal didn't finish"]
 
 
 def test_only_the_latest_proposal_moves_the_comparison(api):

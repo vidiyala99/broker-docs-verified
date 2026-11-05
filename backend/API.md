@@ -678,7 +678,7 @@ lines). Missing or any other value is `422 invalid_request`, like `?line=` on
   run's own fields.
 - `proposal_retryable`: for a comparison whose `proposal_run_id` names an existing proposal run, that run's
   `retryable` (true when `POST /api/runs/{proposal_run_id}/retry` would be accepted: it failed, was cancelled or is
-  partial, and is idle); `null` when there is no linked proposal. The queue's Ready row shows "Retry proposal" when
+  partial, and is idle); `null` when there is no linked proposal. The queue's Needs attention row shows "Retry proposal" when
   true (the retry keeps the template, details and outline; D3 then moves the comparison to In progress and, once the
   proposal is done, to Done recently).
 
@@ -688,9 +688,9 @@ Groups, first match wins:
 |---|---|
 | (not listed) | Proposal Builder runs (they live under Proposals and Activity) |
 | `in_progress` | the run is queued, running or composing; or a comparison whose proposal (`proposal_run_id`) is |
-| `needs_attention` | `queue_state` `open` and status `failed`, `partial` or `cancelled` (a partial Policy Check shows here once, with its `open_counts`) |
+| `needs_attention` | `queue_state` `open` and status `failed`, `partial` or `cancelled` (a partial Policy Check shows here once, with its `open_counts`); or a Compare Quotes `done` whose latest proposal failed or was cancelled (reason "Proposal didn't finish", D3 amended) |
 | `needs_review` | `queue_state` `open`, Policy Check with a report and at least one open discrepancy |
-| `ready` | `queue_state` `open`, Compare Quotes `done`, and no proposal, or its proposal failed or was cancelled |
+| `ready` | `queue_state` `open`, Compare Quotes `done`, and no proposal |
 | `done_recently` | anything else whose later of `finished_at` and `queue_changed_at` is within the last 14 days (resolved checks, proposal built (done or partial), marked done, dismissed) |
 | (not listed) | older than that: Activity only |
 
