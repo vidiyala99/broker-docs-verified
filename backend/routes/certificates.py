@@ -91,8 +91,8 @@ async def client_documents(client: str = Query(..., min_length=1, max_length=mod
                 continue
             for rd in run.documents:
                 doc = rd.document
-                if doc.kind == "ams" or doc.parse_error:
-                    continue
+                if doc.kind == "ams" or doc.parse_error or doc.source_format in ("docx", "xlsx"):
+                    continue  # slice 6 (R5): a certificate reads PDFs only, so its picker hides Word/Excel quotes
                 if doc.sha256 not in picked or picked[doc.sha256].id < doc.id:
                     picked[doc.sha256] = doc
         read_at: dict[str, Any] = {}

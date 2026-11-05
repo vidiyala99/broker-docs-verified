@@ -119,6 +119,9 @@ class Document(Base):
     sha256: Mapped[str] = mapped_column(String(64), index=True)
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     kind: Mapped[str] = mapped_column(String(50), default="quote")
+    # Slice 6 (D1): the uploaded file's format. pdf | docx | xlsx (Word/Excel quotes are stored as a rendered PDF
+    # plus the original); AMS exports json | csv; spreadsheet loss runs xlsx | csv. No migrations: db.check_schema.
+    source_format: Mapped[str] = mapped_column(String(10), default="pdf", server_default="pdf")
     parse_error: Mapped[str | None] = mapped_column(String(50), nullable=True)  # ParseErrorCode
     parse_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

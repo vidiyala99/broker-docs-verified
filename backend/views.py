@@ -35,6 +35,7 @@ def document_out(doc: models.Document) -> dict[str, Any]:
         "page_count": doc.page_count,
         "sha256": doc.sha256,
         "kind": doc.kind,
+        "source_format": doc.source_format or "pdf",  # slice 6: the uploaded file's format
         "parse_error": doc.parse_error,
         "warning": doc.parse_message if doc.parse_error else None,
         "created_at": _ts(doc.created_at),
@@ -45,7 +46,8 @@ def run_document_out(rd: models.RunDocument) -> dict[str, Any]:
     # Same keys as pipeline.runner's document.status event payload.
     return {
         "run_document_id": rd.id, "document_id": rd.document_id, "position": rd.position,
-        "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename, "status": str(rd.status),
+        "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename,
+        "source_format": rd.document.source_format or "pdf", "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
         "option_count": rd.option_count, "option_label": rd.option_label,
         "reused_from_run_id": rd.reused_from_run_id, "read_at": _ts(rd.read_at),  # slice 4 extraction cache

@@ -22,6 +22,16 @@ PDF-only:
     ams.render_pdf ─► inspect_pdf on the rendered bytes (page cap) ─► store the PDF under
     <uuid4 hex> (served, parsed and verified like any PDF) and the original under
     <uuid4 hex>.orig (kept, read by load_original)
+
+Word and Excel quotes (slice 6 T1/T2, D1 D2 R5 R8) share POST /api/documents with PDFs:
+
+    upload_format: name .doc/.xls ──► legacy_format ("Save it as .docx/.xlsx"); .docm/.xlsm ──► macros
+                   name .docx/.xlsx: content a zip ──► prepare_office; OLE ──► encrypted; else ──► format_mismatch
+                   any other name ──► the PDF path above (a zip named .pdf is not_pdf)
+    prepare_office: office_docx.scan_package (zip bomb, macros, external links, entity declarations, the other
+                    format) ─► render_docx | parse_quote_workbook + render_workbook (page cap before drawing)
+                    ─► inspect_pdf on the rendered bytes ─► store the PDF under <uuid4 hex> and the original under
+                    <uuid4 hex>.orig (GET /api/documents/{id}/original returns it)
 """
 
 from __future__ import annotations
@@ -69,7 +79,7 @@ def inspect_pdf(data: bytes, limits: ParseLimits) -> Inspection:
         raise ParseError(ParseErrorCode.EMPTY, "This file is empty.")
     parse.check_size(len(data), limits)
     if not parse.is_pdf_bytes(data):
-        raise ParseError(ParseErrorCode.NOT_PDF, "Not a PDF. Only PDF files can be compared.")
+        raise ParseError(ParseErrorCode.NOT_PDF, NOT_A_QUOTE_FILE_MESSAGE)
     try:
         doc = fitz.open(stream=data, filetype="pdf")
     except Exception:
@@ -116,6 +126,79 @@ def prepare_ams(data: bytes, filename: str, limits: ParseLimits,
                        ams.map_facts(rendered))
 
 
+NOT_A_QUOTE_FILE_MESSAGE = "Not a PDF, Word (.docx) or Excel (.xlsx) file. Upload the quote in one of those formats."
+
+# Slice 6 (D1, R5): Word and Excel quotes. The format is decided by the extension AND the content (magic bytes).
+SourceFormat = str  # "pdf" | "docx" | "xlsx" (AMS: "json" | "csv"; spreadsheet loss runs: "xlsx" | "csv")
+_OFFICE_EXTENSIONS = {".docx": "docx", ".xlsx": "xlsx"}
+_LEGACY = {".doc": ("Word", ".docx"), ".xls": ("Excel", ".xlsx"), ".docm": ("Word", ".docx"),
+           ".dotm": ("Word", ".docx"), ".xlsm": ("Excel", ".xlsx"), ".xltm": ("Excel", ".xlsx")}
+_ZIP_MAGIC = b"PK\x03\x04"
+_OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # legacy .doc/.xls, and any password-protected Office file
+
+
+def upload_format(data: bytes, filename: str) -> SourceFormat:
+    """pdf | docx | xlsx for one upload to POST /api/documents. Raises OfficeError for a refused Office file.
+
+    A name ending .docx/.xlsx must hold an Office zip; .doc/.xls (and macro-enabled .docm/.xlsm) are refused with
+    "Save it as ..."; anything else takes the PDF path (inspect_pdf: magic bytes, whatever the name)."""
+    from backend.office_docx import OfficeError  # noqa: PLC0415
+
+    ext = os.path.splitext(filename)[1].lower()
+    if ext in _LEGACY:
+        app, modern = _LEGACY[ext]
+        if ext in (".doc", ".xls"):
+            raise OfficeError("legacy_format", f"This is an older {app} file ({ext}). Save it as {modern} and "
+                                               "upload again.")
+        raise OfficeError("macros", f"This {app} file can contain macros ({ext}), which are not accepted. Save it "
+                                    f"as {modern} and upload again.")
+    fmt = _OFFICE_EXTENSIONS.get(ext)
+    if fmt is None or not data:
+        return "pdf"
+    if data.startswith(_ZIP_MAGIC):
+        return fmt
+    app = "Word" if fmt == "docx" else "Excel"
+    if data.startswith(_OLE_MAGIC):
+        raise OfficeError("encrypted", f"This {app} file is password-protected or saved in an older format. Remove "
+                                       f"the password or save it as {ext}, then upload it again.")
+    raise OfficeError("format_mismatch", f"This file is named {ext} but is not a {app} document"
+                                         f"{' (it is a PDF: rename it to .pdf)' if parse.is_pdf_bytes(data) else ''}. "
+                                         f"Upload the original {app} file.")
+
+
+@dataclass(frozen=True)
+class PreparedOffice:
+    pdf: bytes  # rendered record: what is stored, served, parsed and verified
+    original: bytes  # the uploaded file, kept unchanged (Download)
+    page_count: int
+    source_format: SourceFormat  # docx | xlsx
+
+
+def prepare_office(data: bytes, filename: str, limits: ParseLimits, fmt: SourceFormat | None = None,
+                   office_limits=None) -> PreparedOffice:
+    """Upload-time Word/Excel checks and rendering (slice 6 T1/T2), the same shape as prepare_ams.
+    Raises OfficeError or ParseError (message names the reason or the limit)."""
+    from backend import office_docx  # noqa: PLC0415 - reportlab and python-docx only for Office uploads
+
+    office_limits = office_limits or office_docx.DEFAULT_OFFICE_LIMITS
+    fmt = fmt or upload_format(data, filename)
+    if fmt not in ("docx", "xlsx"):
+        raise office_docx.OfficeError("format_mismatch", NOT_A_QUOTE_FILE_MESSAGE)
+    if not data:
+        raise ParseError(ParseErrorCode.EMPTY, "This file is empty.")
+    parse.check_size(len(data), limits)
+    office_docx.scan_package(data, fmt, office_limits)
+    if fmt == "docx":
+        rendered = office_docx.render_docx(data, limits.max_pages)
+    else:
+        book = office_docx.parse_quote_workbook(data, filename, office_limits)
+        rendered = office_docx.render_workbook(book, filename, limits.max_pages)
+    info = inspect_pdf(rendered.pdf, limits)  # the rendered PDF meets the same caps as any PDF
+    if info.parse_error:  # pragma: no cover - our own renderer's output always opens
+        raise office_docx.unreadable()
+    return PreparedOffice(rendered.pdf, data, info.page_count or rendered.page_count, fmt)
+
+
 def new_stored_name() -> str:
     return uuid.uuid4().hex
 
@@ -150,7 +233,7 @@ def store_bytes(data: bytes, stored_name: str) -> Path:
 
 
 def store_original(data: bytes, stored_name: str) -> Path:
-    """Keep an AMS export's uploaded file beside its rendered PDF (R1 D4 A)."""
+    """Keep an AMS export's (R1 D4 A) or a Word/Excel quote's (slice 6) uploaded file beside its rendered PDF."""
     target = _target(stored_name, _ORIGINAL_SUFFIX)
     _write_atomic(target, data)
     return target

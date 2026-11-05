@@ -411,19 +411,42 @@ def _accepts_sheets(d: dict[str, Any]) -> bool:
     return _SHEET_TYPE in [a.strip().lower() for a in str(d.get("accepts") or "").split(",")]
 
 
-def check_slot_kinds(input_slots: Sequence[Any] | None, kinds: Sequence[str], slot_keys: Sequence[str]) -> None:
+def _reads_sheet_rows(d: dict[str, Any]) -> bool:
+    """A slot that reads spreadsheets as claim rows (the loss review): it takes .csv as well as .xlsx. Compare Quotes
+    and Proposal Builder take .xlsx only as a quote rendered to a PDF record (slice 6, R5)."""
+    accepts = [a.strip().lower() for a in str(d.get("accepts") or "").split(",")]
+    return _SHEET_TYPE in accepts and "text/csv" in accepts
+
+
+# Slice 6 (R5): a Word or Excel quote (a rendered PDF record) fits only a slot that lists its type.
+_OFFICE_TYPES = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                 "xlsx": _SHEET_TYPE}
+
+
+def check_slot_kinds(input_slots: Sequence[Any] | None, kinds: Sequence[str], slot_keys: Sequence[str],
+                     formats: Sequence[str | None] | None = None) -> None:
     """Each document fits its slot's `accepts` (slice 3): an AMS export only in a slot that takes
-    JSON or CSV, a spreadsheet loss run (slice 5a) only in a slot that takes spreadsheets, any other
-    document only in a slot that takes PDFs. Raises SlotError."""
+    JSON or CSV, a spreadsheet loss run (slice 5a) only in a slot that reads spreadsheet rows, a Word or
+    Excel quote (slice 6, `formats` = Document.source_format) only in a slot that lists its type and does
+    not read spreadsheet rows, any other document only in a slot that takes PDFs. Raises SlotError."""
     defs = {d["key"]: d for d in _slot_defs(input_slots)}
-    for kind, key in zip(kinds, slot_keys, strict=True):
+    formats = list(formats) if formats is not None else [None] * len(kinds)
+    for kind, key, fmt in zip(kinds, slot_keys, formats, strict=True):
         d = defs.get(key)
         if d is None:
             continue
         pdf_ok, ams_ok = _accepts(d)
         if kind == SPREADSHEET_KIND:
-            if not _accepts_sheets(d):
+            if not _reads_sheet_rows(d):
                 raise SlotError(f"{_label(d)} takes PDF documents; a spreadsheet is read only by a loss review.")
+            continue
+        if kind != "ams" and fmt in _OFFICE_TYPES:
+            accepts = [a.strip().lower() for a in str(d.get("accepts") or "").split(",")]
+            if _reads_sheet_rows(d):
+                raise SlotError(f"{_label(d)} reads spreadsheets as loss runs; upload this file again as a loss "
+                                "run.")
+            if _OFFICE_TYPES[fmt] not in accepts:
+                raise SlotError(f"{_label(d)} takes PDF documents.")
             continue
         if kind == "ams" and not ams_ok:
             raise SlotError(f"{_label(d)} takes PDF documents; an AMS export goes in the AMS slot.")
@@ -446,7 +469,9 @@ def unread_required_slots(run: models.Run) -> list[str]:
 def _doc_payload(rd: models.RunDocument) -> dict[str, Any]:
     return {
         "run_document_id": rd.id, "document_id": rd.document_id, "position": rd.position,
-        "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename, "status": str(rd.status),
+        "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename,
+        "source_format": rd.document.source_format or "pdf",  # slice 6: pdf | docx | xlsx column label
+        "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
         "option_count": rd.option_count, "option_label": rd.option_label,
         # slice 4 extraction cache: the run whose read was copied, and when the facts were first read
@@ -656,9 +681,11 @@ class RunManager:
             if missing:
                 raise LookupError(f"no document {missing[0]}")
             slot_keys = resolve_slots(workflow.input_slots, ids, slots)
-            kinds = dict(s.execute(select(models.Document.id, models.Document.kind)
-                                   .where(models.Document.id.in_(ids))).all())
-            check_slot_kinds(workflow.input_slots, [kinds[i] or "quote" for i in ids], slot_keys)
+            kinds = {i: (k, f) for i, k, f in s.execute(
+                select(models.Document.id, models.Document.kind, models.Document.source_format)
+                .where(models.Document.id.in_(ids))).all()}
+            check_slot_kinds(workflow.input_slots, [kinds[i][0] or "quote" for i in ids], slot_keys,
+                             [kinds[i][1] for i in ids])
             wanted = list(zip(ids, slot_keys))
             active = s.scalars(select(models.Run).where(
                 models.Run.workflow_id == workflow_id,
@@ -761,6 +788,9 @@ class RunManager:
                 raise LookupError(f"no document {missing[0]}")
             if any(found[i].kind == "ams" for i in ids):
                 raise ValueError("A certificate reads PDF documents, not an AMS export.")
+            slot = _slot_defs(run.workflow.input_slots)[0]["key"]
+            check_slot_kinds(run.workflow.input_slots, [found[i].kind or "quote" for i in ids], [slot] * len(ids),
+                             [found[i].source_format for i in ids])  # slice 6 (R5): no Word or Excel quotes
             have = {rd.document_id for rd in run.documents}
             if any(i in have for i in ids):
                 raise ValueError("That document is already on this certificate.")

@@ -124,12 +124,14 @@ def check_schema(engine: Engine) -> None:
     if "task" not in names:
         missing.append("the task table")
     missing += _certificate_schema_gaps(insp, names)
+    if "document" in names and "source_format" not in {c["name"] for c in insp.get_columns("document")}:
+        missing.append("the document.source_format column")  # slice 6 (D1, F7)
     if not missing:
         return
     where = engine.url.database or "the in-memory database"
     raise SchemaOutdated(
-        f"The database {where} was created before a schema change (slice 3b, the work queue or slice 4 "
-        f"certificates) "
+        f"The database {where} was created before a schema change (slice 3b, the work queue, slice 4 "
+        f"certificates or slice 6 Word and Excel quotes) "
         f"and lacks {', '.join(missing)}. There are no migrations: stop the server, delete {where} (and its "
         f"-wal and -shm files if present), then start again for an empty database, or reseed dev data with: "
         f"{RESEED_COMMAND} (with BROKERDOCS_DATA_DIR set to a scratch folder).")
@@ -303,12 +305,19 @@ _SECTIONS = [
                     guidance="Differences in named insured, address or term between quotes."),
 ]
 
+# Upload formats a slot can list in `accepts` (F10: one constant per format; the upload page derives its picker from
+# the slot). Word and Excel quotes go only in the Compare Quotes and Proposal Builder `quotes` slots (R5).
+PDF_TYPE = "application/pdf"
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+QUOTE_TYPES = f"{PDF_TYPE},{DOCX_TYPE},{XLSX_TYPE}"
+
 COMPARE_QUOTES: dict = {
     "slug": COMPARE_QUOTES_SLUG,
     "name": "Compare Quotes",
     "category": "Quoting",
     "input_slots": [
-        {"key": "quotes", "label": "Quotes", "accepts": "application/pdf", "min": 1, "max": 8}
+        {"key": "quotes", "label": "Quotes", "accepts": QUOTE_TYPES, "min": 1, "max": 8}
     ],
     "instructions": (
         "Compare the uploaded insurance quotes side by side. Report only values "
@@ -369,7 +378,7 @@ PROPOSAL_BUILDER: dict = {
     "name": "Proposal Builder",
     "category": "Quoting",
     "input_slots": [
-        {"key": "quotes", "label": "Quotes", "accepts": "application/pdf", "min": 1, "max": 8}
+        {"key": "quotes", "label": "Quotes", "accepts": QUOTE_TYPES, "min": 1, "max": 8}  # Build proposal (R5)
     ],
     "instructions": (
         "Read the uploaded carrier quotes for a client proposal. Report only values stated in the "
@@ -445,7 +454,7 @@ CERTIFICATE: dict = {
 # pass (LOSS_RUN_FIELDS); claim rows and printed totals from loss_runs.pdf_rows (PDF) or loss_runs.sheets (code).
 # COMPOSING builds the review in code (loss_runs.report): no compose call.
 
-SPREADSHEET_TYPES = "text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+SPREADSHEET_TYPES = f"text/csv,{XLSX_TYPE}"
 
 LOSS_RUN: dict = {
     "slug": LOSS_RUN_SLUG,

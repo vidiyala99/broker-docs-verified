@@ -21,12 +21,17 @@ from backend.loss_runs import sheets
 from backend.pipeline.runner import DocumentRef, files_dir, load_stored_bytes
 from backend.routes.common import ApiError, get_ctx, not_found
 from backend.ams import DEFAULT_AMS_LIMITS, AmsError
+from backend.office_docx import OfficeError
 from backend.uploads import (
+    Inspection,
     PreparedAms,
+    PreparedOffice,
     inspect_pdf,
     load_original,
     new_stored_name,
     prepare_ams,
+    prepare_office,
+    upload_format,
     remove_stored,
     safe_display_name,
     sheet_cache_path,
@@ -53,7 +58,7 @@ async def _read_capped(upload: UploadFile, cap: int) -> bytes | None:
             return None
 
 
-def _reject(filename: str, exc: ParseError | AmsError) -> dict[str, Any]:
+def _reject(filename: str, exc: ParseError | AmsError | OfficeError) -> dict[str, Any]:
     return {"filename": filename, "code": str(exc.code), "message": exc.message, "limit": exc.limit}
 
 
@@ -64,8 +69,24 @@ def _too_many_documents(limits) -> ParseError:
                       limit=limits.max_documents_per_run)
 
 
+def _prepare_upload(data: bytes, name: str, limits) -> tuple[str, Inspection | None, PreparedOffice | None]:
+    """(source format, PDF inspection, rendered Word/Excel quote). Raises ParseError or OfficeError."""
+    fmt = upload_format(data, name)
+    if fmt == "pdf":
+        return fmt, inspect_pdf(data, limits), None
+    return fmt, None, prepare_office(data, name, limits, fmt)
+
+
+def _store_office(prepared: PreparedOffice, stored: str) -> None:
+    store_bytes(prepared.pdf, stored)
+    store_original(prepared.original, stored)
+
+
 @router.post("/documents")
 async def upload_documents(files: list[UploadFile] = File(...), ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]:
+    """PDFs, plus Word (.docx) and Excel (.xlsx) quotes rendered to a PDF record at upload (slice 6, D1 D2): those
+    keep their original for GET /documents/{id}/original and go only in Compare Quotes and Proposal Builder runs (R5).
+    """
     limits = ctx.settings.limits
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
@@ -80,20 +101,26 @@ async def upload_documents(files: list[UploadFile] = File(...), ctx: AppContext 
                 raise ParseError(ParseErrorCode.TOO_LARGE,
                                  f"This file is larger than {mb}; the limit is {mb} per document.",
                                  limit=limits.max_bytes)
-            info = await asyncio.to_thread(inspect_pdf, data, limits)
-        except ParseError as exc:
+            fmt, info, office = await asyncio.to_thread(_prepare_upload, data, name, limits)
+        except (ParseError, OfficeError) as exc:
             rejected.append(_reject(name, exc))
             continue
         finally:
             await upload.close()
         stored = new_stored_name()
-        await asyncio.to_thread(store_bytes, data, stored)
+        if office is not None:
+            info = Inspection(office.page_count)
+            record = office.pdf  # what is read, served and cached on (its sha256), the original kept beside it
+            await asyncio.to_thread(_store_office, office, stored)
+        else:
+            record = data
+            await asyncio.to_thread(store_bytes, data, stored)
         try:
             with db.session_scope(ctx.factory) as s:
                 doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=name, stored_name=stored,
-                                      size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest(),
+                                      size_bytes=len(data), sha256=hashlib.sha256(record).hexdigest(),
                                       page_count=info.page_count, parse_error=info.parse_error,
-                                      parse_message=info.parse_message)
+                                      parse_message=info.parse_message, source_format=fmt)
                 s.add(doc)
                 s.flush()
                 accepted.append(document_out(doc))
@@ -145,7 +172,8 @@ async def upload_ams(files: list[UploadFile] = File(...), ctx: AppContext = Depe
             with db.session_scope(ctx.factory) as s:
                 doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=name, stored_name=stored,
                                       size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest(),
-                                      page_count=prepared.page_count, kind=AMS_KIND)
+                                      page_count=prepared.page_count, kind=AMS_KIND,
+                                      source_format=prepared.rendered.record.format)
                 s.add(doc)
                 s.flush()
                 out = document_out(doc)
@@ -201,7 +229,8 @@ async def upload_spreadsheets(files: list[UploadFile] = File(...), ctx: AppConte
             with db.session_scope(ctx.factory) as s:
                 doc = models.Document(workspace_id=db.DEFAULT_WORKSPACE_ID, filename=name, stored_name=stored,
                                       size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest(),
-                                      page_count=meta["page_count"], kind=SPREADSHEET_KIND)
+                                      page_count=meta["page_count"], kind=SPREADSHEET_KIND,
+                                      source_format=meta["format"])
                 s.add(doc)
                 s.flush()
                 out = document_out(doc)
@@ -316,6 +345,33 @@ async def get_document_file(document_id: int, ctx: AppContext = Depends(get_ctx)
     ascii_name = ref.filename.encode("ascii", "replace").decode().replace('"', "").replace("?", "_")
     return Response(data, media_type="application/pdf", headers={
         "Content-Disposition": f"inline; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(ref.filename)}",
+        "Cache-Control": "private, max-age=3600",
+    })
+
+
+_ORIGINAL_TYPES = {"pdf": "application/pdf", "docx": db.DOCX_TYPE, "xlsx": db.XLSX_TYPE,
+                   "json": "application/json", "csv": "text/csv"}
+
+
+@router.get("/documents/{document_id}/original")
+async def get_document_original(document_id: int, ctx: AppContext = Depends(get_ctx)) -> Response:
+    """Download: the file as uploaded (slice 6). A Word or Excel quote, an AMS export or a spreadsheet returns its
+    kept original (uploads.store_original); a PDF returns itself. Always an attachment."""
+    with ctx.factory() as s:
+        doc = s.get(models.Document, document_id)
+        if doc is None:
+            raise not_found("document", document_id)
+        fmt = doc.source_format or "pdf"
+        kept = fmt != "pdf"
+        ref = DocumentRef(doc.id, doc.filename, doc.stored_name)
+    try:
+        data = await asyncio.to_thread(load_original if kept else load_stored_bytes,
+                                       ref.stored_name if kept else ref)
+    except (OSError, ValueError):
+        raise ApiError(404, "file_missing", "Couldn't open this file. It is no longer on disk.") from None
+    ascii_name = ref.filename.encode("ascii", "replace").decode().replace('"', "").replace("?", "_")
+    return Response(data, media_type=_ORIGINAL_TYPES.get(fmt, "application/octet-stream"), headers={
+        "Content-Disposition": f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(ref.filename)}",
         "Cache-Control": "private, max-age=3600",
     })
 
