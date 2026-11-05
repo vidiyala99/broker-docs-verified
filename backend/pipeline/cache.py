@@ -50,8 +50,10 @@ from backend.schemas import FactField, RunDocumentStatus
 # Before slice 6: "2026-11-04.2". .1 (slice 5a): loss-run rows, sheets and printed totals join the read
 # .2: loss-run PDF verify places rows read twice / miscopied on their printed line, reads total lines in code
 #     and re-attributes a total's metric by its column (stored rows and totals from .1 would differ)
-EXTRACTION_VERSION = "2026-11-05.1"  # slice 6: Compare Quotes reads endorsement wording, exclusion titles, the
+EXTRACTION_VERSION = "2026-11-05.2"  # .1 (slice 6): Compare Quotes reads endorsement wording, exclusion titles, the
 #     schedule heading and the document kind in the same call (COMPARE_TERMS_NOTE, R1/R9)
+# .2: verify's amount rule (merge.labelled_amount): a money field's printed label is dropped from its value, or the
+#     value is not cited when the label is another money field's (live eval 2026-11-05, long_120.retention)
 ENV_SWITCH = "BROKERDOCS_EXTRACTION_CACHE"
 _OFF = {"off", "0", "false", "no", "disabled"}
 

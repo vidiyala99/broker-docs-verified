@@ -98,6 +98,7 @@ class ExtractionResult:
     usage: CallUsage
     model: str
     document_kind: str | None = None  # slice 6, Compare Quotes: quote | proposal | summary | other (display only)
+    fields: tuple[FactField, ...] = ()  # the fields asked for (verify's amount rule reads their labels)
 
 
 # --------------------------------------------------------------------- prompt pieces
@@ -577,7 +578,8 @@ async def extract_document(
     facts, count, option = normalize_output(result.data, fields)
     return ExtractionResult(facts=facts, option_count=count, option_label=option,
                             usage=result.usage, model=result.model,
-                            document_kind=document_kind(result.data) if wants_exclusions(fields) else None)
+                            document_kind=document_kind(result.data) if wants_exclusions(fields) else None,
+                            fields=tuple(fields))
 
 
 async def ocr_page(provider: Provider, budget: RunBudget, png: bytes, *, page_no: int,

@@ -87,6 +87,19 @@ came back the cell reads "Couldn't verify", not a wrong value.
 The filter runs on windowed (long) documents only; a single-call quote
 never reaches merge.
 
+Amount rule (labelled_amount, amount_rule; every document, short or windowed: pipeline.windows.verify_document
+applies it to each verified result before merging). A money field (MONEY_FIELDS, or a key naming a limit,
+deductible, premium or retention) whose value is "<label>: <amount>" (or "<label> - <amount>") keeps only the
+amount and its trailing qualifier. Live eval 2026-11-05: long_120.retention came back as "Amended Deductible:
+$10,000 per occurrence" (page 104); verify accepted it because the value is inside its quote, and the cell showed
+the label. When the label names another money field of the schema and none of this field's words ("Each
+Occurrence Limit: $1,000,000" as the retention), the model read the wrong line: the result is NOT_FOUND, reason
+other_field_label ("Couldn't verify"). A label of this field's words, an amendment marker or unknown words is
+dropped. Values that start with the amount ("$2.416 per $1,000 of gross sales"), lists of labelled amounts (a
+second colon or a semicolon) and labels holding a digit or "$" are left unchanged. False-positive risk: a value
+whose label is a qualifier that is another field's word ("Per Occurrence: $5,000" as the retention, "occurrence"
+being Each Occurrence Limit's word) is not cited; the cell reads "Couldn't verify", never a wrong value.
+
 Running header rule (RUNNING_HEADER_FIELDS, only policy_form for now). A
 candidate whose value is a whole line on 3 or more pages (page numbering such
 as "Page 40 of 120" and spacing ignored) is a running page header and is
@@ -189,7 +202,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from backend.pipeline import verify
 from backend.schemas import (
@@ -315,6 +328,89 @@ def implausible_reason(fdef: FactField | str, value: str | None) -> str | None:
     if key in DATED_FIELDS and not states_date(v) and _POLICY_PERIOD_DURATION_RE.search(v):
         return "policy_period_duration"
     return None
+
+
+# Amount rule (labelled_amount): the value of a limit, deductible, premium, fee, tax or rate field is the amount
+# (with any trailing qualifier such as "per occurrence"), never the printed label in front of it.
+MONEY_FIELDS = frozenset({"retention", "each_occurrence_limit", "aggregate_limit", "total_premium", "taxes_and_fees",
+                          "minimum_earned_premium", "rate"})
+_MONEY_KEY_RE = re.compile(r"(?:^|[_:])(?:limit|deductible|premium|retention)(?:_|$)")
+# "<label>: <amount>" or "<label> - <amount>": a label of words (no digit, "$", colon or semicolon) and one amount
+# after it with no second label (no further colon or semicolon), so a list of labelled amounts is left alone.
+_LABELLED_AMOUNT_RE = re.compile(
+    r"^\s*(?P<label>[^\d$:;]*[a-z][^\d$:;]*?)\s*(?::|\s[-–—]\s)\s*"
+    r"(?P<amount>(?:usd\s*)?\$?\s?\d[^:;]*?)\s*$", re.I)
+_LABEL_MAX_WORDS = 10
+
+
+def is_money_field(key: str) -> bool:
+    """True for a field whose value is an amount or a rate: the Compare money fields, and any key naming a
+    limit, deductible, premium or retention (policy check coverage limits and deductibles, certificate limits)."""
+    return key in MONEY_FIELDS or bool(_MONEY_KEY_RE.search(key))
+
+
+def _stems(text: str) -> set[str]:
+    out = set()
+    for w in _words(text):
+        if w.endswith("xes"):
+            w = w[:-2]  # taxes -> tax
+        elif w.endswith("s") and len(w) > 3:
+            w = w[:-1]  # fees -> fee, limits -> limit
+        out.add(w)
+    return out
+
+
+def _own_label_stems(f: FactField | str) -> set[str]:
+    key = f.key if isinstance(f, FactField) else str(f)
+    label = f.label if isinstance(f, FactField) else ""
+    name = key.rsplit(":", 1)[-1].replace("_", " ")
+    return _stems(f"{label} {name}") - GENERIC_LABEL_WORDS
+
+
+def labelled_amount(fdef: FactField | str, value: str | None,
+                    fields: Sequence[FactField | str] = ()) -> tuple[str | None, str | None]:
+    """A money field's value with a printed label in front of the amount ("Amended Deductible: $10,000 per
+    occurrence" for retention, live eval 2026-11-05 long_120 page 104).
+
+    Returns (value, None) unchanged when the field is not a money field or the value is not "<label>: <amount>";
+    (amount, None) with the label dropped when the label names this field, is an amendment marker or names no other
+    money field; (None, "other_field_label") when the label holds a word only another money field of ``fields`` has
+    in its label and no word only this field has ("Each Occurrence Limit: $1,000,000" returned as the retention,
+    "Minimum Earned Premium: $2,500" as the total premium): the model read the wrong line.
+    The amount keeps its trailing qualifier ("$10,000 per occurrence", "$2.416 per $1,000 of gross sales")."""
+    key = fdef.key if isinstance(fdef, FactField) else str(fdef)
+    v = (value or "").strip()
+    if not v or not is_money_field(key):
+        return value, None
+    mo = _LABELLED_AMOUNT_RE.match(v)
+    if not mo or len(mo.group("label").split()) > _LABEL_MAX_WORDS:
+        return value, None
+    label = _stems(mo.group("label"))
+    own = _own_label_stems(fdef)
+    others = set().union(*(_own_label_stems(f) for f in fields
+                           if (f.key if isinstance(f, FactField) else str(f)) != key
+                           and is_money_field(f.key if isinstance(f, FactField) else str(f))))
+    # words both fields' labels hold ("premium" in Total Premium and Minimum Earned Premium) decide nothing
+    if not label & (own - others) and label & (others - own):
+        return None, "other_field_label"
+    return mo.group("amount"), None
+
+
+def amount_rule(r: verify.VerifyResult, fields: Sequence[FactField | str] = ()) -> verify.VerifyResult:
+    """labelled_amount applied to one verified (or scan_read) result: the label is dropped from the value (the
+    passage, matched text and boxes stay: they still hold the label and the amount), or the result becomes
+    NOT_FOUND with reason other_field_label. Any other result is returned unchanged."""
+    if not r.cited:
+        return r
+    fdef = next((f for f in fields if (f.key if isinstance(f, FactField) else str(f)) == r.field), r.field)
+    amount, why = labelled_amount(fdef, r.value, fields)
+    if why:
+        log.info("verify: %s value %r is printed under another field's label; not cited", r.field, r.value)
+        return replace(r, state=EvidenceState.NOT_FOUND, rects=[], reason=why)
+    if amount != r.value:
+        log.info("verify: %s label dropped from %r", r.field, r.value)
+        return replace(r, value=amount)
+    return r
 
 
 def value_key(value: str | None) -> tuple[str, ...]:
@@ -716,8 +812,9 @@ def conflict_message(label: str, shown: tuple[str | None, int | None],
     return f"This document states different values for {label}: {listed}. {tail}"
 
 
-__all__ = ["AMEND_RE", "DATED_FIELDS", "GENERIC_LABEL_WORDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS", "TEMPORAL_FIELDS",
-           "MergedFact", "conflict_message", "contained_in", "definition_body", "form_edition", "implausible_reason",
-           "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "split_form_value",
+__all__ = ["AMEND_RE", "DATED_FIELDS", "GENERIC_LABEL_WORDS", "MONEY_FIELDS", "NEGATION_TOKENS", "RUNNING_HEADER_FIELDS",
+           "TEMPORAL_FIELDS",
+           "MergedFact", "amount_rule", "conflict_message", "contained_in", "definition_body", "form_edition",
+           "implausible_reason", "is_money_field", "labelled_amount", "merge_document", "merge_field", "repeated_line_pages", "running_header_pages", "split_form_value",
            "states_date", "states_time",
            "value_key"]

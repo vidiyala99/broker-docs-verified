@@ -276,6 +276,39 @@ def test_documents_of_15_pages_or_fewer_take_the_unchanged_single_call():
     assert windows.verify_document(res, pages) == verify.verify_facts(res.facts, pages)
 
 
+# --------------------------------------------------------------------- amount rule on both paths
+
+AMENDED = "Amended Deductible: $10,000 per occurrence"
+LIMIT_LINE = "Each Occurrence Limit: $1,000,000"
+
+
+def _labelled_money_model(req):
+    """Like the live model on long_120 (2026-11-05): copies the label into a money value. It also returns the
+    occurrence limit's line as the aggregate limit (the wrong line)."""
+    text = user_text(req)
+    facts = []
+    if AMENDED in text:
+        facts.append({"field": "retention", "value": AMENDED, "page": 33, "quote": AMENDED})
+    if LIMIT_LINE in text:
+        facts.append({"field": "aggregate_limit", "value": LIMIT_LINE, "page": 2, "quote": LIMIT_LINE})
+    return {"facts": facts, "options_detected": 1, "option_compared": None}
+
+
+@pytest.mark.parametrize("n", [12, 40])  # one call, and windows plus merge
+def test_a_money_value_with_its_printed_label_shows_the_amount_and_another_fields_label_is_not_cited(n):
+    hit = n - 7 if n > 12 else 9
+    pages = doc(n, {2: LIMIT_LINE, hit: "Endorsement No. 4: Amendment of Deductible\n" + AMENDED})
+    res = run(windows.extract_document(FakeProvider(_labelled_money_model), RunBudget(), FIELDS, pages,
+                                       document_name="q.pdf"))
+    assert isinstance(res, extract.ExtractionResult) == (n <= 15)
+    out = {r.field: r for r in windows.verify_document(res, pages)}
+    ret = out["retention"]
+    assert (ret.value, ret.state, ret.page_no) == ("$10,000 per occurrence", EvidenceState.VERIFIED, hit)
+    assert AMENDED in ret.matched_text  # the passage still holds the label and the amount
+    agg = out["aggregate_limit"]
+    assert agg.state == EvidenceState.NOT_FOUND and agg.value != "$1,000,000"
+
+
 # --------------------------------------------------------------------- concurrency, failure, budget
 
 

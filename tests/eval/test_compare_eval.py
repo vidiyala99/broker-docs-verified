@@ -571,6 +571,33 @@ def test_recorded_live_compare_replay(suite):
         assert g.aggregate(doc_scores).hard_fails == 0
 
 
+def test_recorded_long_120_retention_label_is_dropped_on_replay(suite):
+    """The 2026-11-05 live run failed the facts gate once: long_120.retention came back as "Amended Deductible:
+    $10,000 per occurrence" (page 104) and verified, since the value is inside its quote. Replaying that run's
+    recorded replies offline, the amount rule (backend.pipeline.merge.labelled_amount) drops the label: the cell is
+    the amount, still on page 104, and the long group has no facts hard fail. Only the facts are checked: the
+    compose prompt holds the corrected value, so the recorded compose reply no longer matches it."""
+    path = RECORDED_DIR / "compare_live_2026-11-05.json"
+    if not path.exists():
+        pytest.skip(f"{path.name} is not in this checkout")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    raw = next(r["content"] for rs in data["cases"]["long"]["replies"].values() for r in rs
+               if '"Amended Deductible: $10,000 per occurrence","page":104' in r["content"])
+    assert '"field":"retention","value":"Amended Deductible: $10,000 per occurrence"' in raw  # the recorded reply
+    eval_hook = _backend("backend.eval_hook")
+    cases, docs, paths = suite
+    case = cases["long"]
+    p = [paths[f] for f in case["documents"]]
+    out = eval_hook.run_eval_batch(p, provider=rr.replay_provider(data["cases"]["long"]["replies"]))
+    for fid, path_ in zip(case["documents"], p):
+        sc = g.score_document(docs[fid], g.DocResult.from_dict({**out["documents"][path_], "fixture_id": fid}))
+        assert sc.hard_fails == 0, (fid, [o for o in sc.outcomes if o.hard_fail])
+    s120 = g.score_document(docs["long_120"],
+                            g.DocResult.from_dict({**out["documents"][paths["long_120"]], "fixture_id": "long_120"}))
+    ret = next(o for o in s120.outcomes if o.field == "retention")
+    assert (ret.predicted, ret.state, ret.page, ret.correct) == ("$10,000 per occurrence", "verified", 104, True)
+
+
 # ---------------------------------------------------------------------------
 # Live gate (paid; owner approves each run)
 # ---------------------------------------------------------------------------

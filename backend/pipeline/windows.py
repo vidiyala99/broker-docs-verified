@@ -299,15 +299,18 @@ def verify_document(
     Short documents go through verify.verify_facts exactly as before T14.
     Long documents: every window candidate is verified against all pages,
     then merged to one fact per field (pipeline.merge).
+    Both: a money field's printed label is dropped from its value, or the
+    value is not cited when the label is another field's (merge.amount_rule).
     """
+    fields = extraction.fields
     if isinstance(extraction, extract.ExtractionResult):
-        return verify.verify_facts(extraction.facts, pages, config)
+        return [merge.amount_rule(r, fields) for r in verify.verify_facts(extraction.facts, pages, config)]
     index = verify.build_index(pages)
     seen: dict[verify.CandidateFact, verify.VerifyResult] = {}
     checked = []
     for cand in extraction.candidates():
         if cand not in seen:  # overlapping windows often return the same fact twice
-            seen[cand] = verify.verify_fact(cand, index, config)
+            seen[cand] = merge.amount_rule(verify.verify_fact(cand, index, config), fields)
         checked.append(seen[cand])
     # page text for the endorsement rule (merge.AMEND_RE): text layer plus model-OCR text
     page_text = {int(p.page_no): f"{getattr(p, 'text', '') or ''}\n{getattr(p, 'ocr_text', None) or ''}"

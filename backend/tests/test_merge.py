@@ -771,3 +771,112 @@ def test_cells_without_merge_data_are_unchanged():
     cell = next(r.cells["A"] for t in compose.build_tables(inp).values() for r in t.rows if r.key == "retention")
     assert cell.passage_ids == [3] and cell.notice is None
     assert "notice" in cell.model_dump() and cell.model_dump()["notice"] is None
+
+
+# --------------------------------------------------------------------- amount rule (labelled money values)
+
+BY_KEY = {f.key: f for f in FIELDS}
+
+
+def amount(key, value):
+    return merge.labelled_amount(BY_KEY.get(key, key), value, FIELDS)
+
+
+@pytest.mark.parametrize("key,value,want", [
+    # live eval 2026-11-05, long_120 page 104: an amendment marker and the field's own label
+    ("retention", "Amended Deductible: $10,000 per occurrence", "$10,000 per occurrence"),
+    ("retention", "Deductible: $5,000", "$5,000"),
+    ("retention", "Deductible (per Declarations): $5,000 per occurrence", "$5,000 per occurrence"),
+    ("retention", "Self-Insured Retention - $25,000", "$25,000"),
+    ("retention", "Each Occurrence Deductible: $2,500", "$2,500"),  # its own word wins over another field's
+    ("retention", "Amended: $10,000", "$10,000"),  # an amendment marker alone
+    ("each_occurrence_limit", "Each Occurrence Limit: $1,000,000", "$1,000,000"),
+    ("aggregate_limit", "General Aggregate Limit (applies per policy period): $2,000,000", "$2,000,000"),
+    ("total_premium", "Total Premium (including taxes and fees): $14,490.00", "$14,490.00"),
+    ("taxes_and_fees", "Policy Fee: $250.00", "$250.00"),
+    ("taxes_and_fees", "Surplus Lines Tax – $798.40", "$798.40"),
+    ("minimum_earned_premium", "Minimum Earned Premium: 25%", "25%"),
+    ("minimum_earned_premium", "MEP: $2,500", "$2,500"),  # unknown words: the label is dropped
+    ("rate", "Rate: $2.416 per $1,000 of gross sales", "$2.416 per $1,000 of gross sales"),
+    ("coverage_a_limit", "Coverage A (Dwelling): $360,000", "$360,000"),  # policy check
+    ("cert:auto_combined_single_limit", "Combined Single Limit: $1,000,000", "$1,000,000"),
+])
+def test_a_money_value_keeps_the_amount_and_drops_its_printed_label(key, value, want):
+    assert amount(key, value) == (want, None)
+
+
+@pytest.mark.parametrize("key,value", [
+    ("rate", "$2.416 per $1,000 of gross sales"),  # starts with the amount: unchanged
+    ("retention", "$10,000 per occurrence"),
+    ("retention", "$5,000"),
+    ("total_premium", "USD 12,450.00"),
+    ("taxes_and_fees", "Surplus Lines Tax: $412.00; Policy Fee: $250.00"),  # a list of labelled amounts
+    ("taxes_and_fees", "Policy Fee: $250.00, Inspection Fee: $150.00"),
+    ("rate", "Rate per $1,000 of gross sales: $2.416"),  # the label holds an amount
+    ("retention", "Deductible: Not applicable"),  # no amount after the label
+    ("retention", "Blanket"),
+    ("am_best_rating", "A (Excellent), X"),  # not a money field
+    ("am_best_rating", "AM Best Rating: A- (Excellent), IX"),
+    ("named_insured", "Named Insured: Cedar Hollow Hospitality LLC"),
+    ("policy_term", "Policy Period: 01/01/2027 to 01/01/2028"),
+    ("additional_insured", "Additional Insured: Blanket where required by written contract"),
+    ("retention", None),
+    ("retention", ""),
+])
+def test_values_that_are_not_a_labelled_amount_are_left_alone(key, value):
+    assert amount(key, value) == (value, None)
+
+
+@pytest.mark.parametrize("key,value", [
+    ("retention", "Each Occurrence Limit: $1,000,000"),
+    ("retention", "Amended General Aggregate Limit: $4,000,000"),  # the marker does not save another field's label
+    ("aggregate_limit", "Each Occurrence Limit: $1,000,000"),
+    ("total_premium", "Minimum Earned Premium: $2,500"),
+    ("total_premium", "Taxes and Fees: $1,050.00"),
+    ("taxes_and_fees", "Total Premium: $14,490.00"),
+])
+def test_an_amount_printed_under_another_money_fields_label_is_rejected(key, value):
+    assert amount(key, value) == (None, "other_field_label")
+
+
+def test_money_fields_are_the_compare_amounts_and_keys_naming_a_limit_deductible_premium_or_retention():
+    assert merge.MONEY_FIELDS <= {f.key for f in FIELDS}
+    for key in ("coverage_a_limit", "deductible_all_peril", "deductible_wind_hail", "cyber_aggregate_limit",
+                "eo_each_claim_limit", "cert:wc_el_disease_policy_limit", "total_premium"):
+        assert merge.is_money_field(key), key
+    for key in ("am_best_rating", "policy_term", "carrier_name", "additional_insured", "lr:valuation_date",
+                "limitations", "key_exclusions"):
+        assert not merge.is_money_field(key), key
+
+
+def test_without_a_schema_only_the_label_is_dropped_never_rejected():
+    assert merge.labelled_amount("retention", "Each Occurrence Limit: $1,000,000") == ("$1,000,000", None)
+
+
+def test_amount_rule_drops_the_label_from_a_verified_result_and_keeps_its_passage():
+    r = vr("Amended Deductible: $10,000 per occurrence", 104, quote="Amended Deductible: $10,000 per occurrence")
+    out = merge.amount_rule(r, FIELDS)
+    assert (out.value, out.state, out.page_no, out.quote, out.matched_text, out.rects) == (
+        "$10,000 per occurrence", V, 104, r.quote, r.matched_text, r.rects)
+
+
+def test_amount_rule_does_not_cite_a_value_under_another_fields_label():
+    r = vr("Each Occurrence Limit: $1,000,000", 3, quote="Each Occurrence Limit: $1,000,000")
+    out = merge.amount_rule(r, FIELDS)
+    assert (out.state, out.reason, out.rects, out.value) == (NF, "other_field_label", [], r.value)
+
+
+def test_amount_rule_leaves_uncited_and_plain_results_alone():
+    nf = vr("Amended Deductible: $10,000", 104, NF)
+    assert merge.amount_rule(nf, FIELDS) is nf
+    plain = vr("$10,000 per occurrence", 104)
+    assert merge.amount_rule(plain, FIELDS) is plain
+    rating = vr("A (Excellent), X", 1, field="am_best_rating")
+    assert merge.amount_rule(rating, FIELDS) is rating
+
+
+def test_a_labelled_amendment_groups_with_the_bare_amount_it_repeats():
+    """After the amount rule a labelled and a bare copy of one amount are one value, not a conflict."""
+    a = merge.amount_rule(vr("Amended Deductible: $10,000", 104, quote="Amended Deductible: $10,000"), FIELDS)
+    m = merge.merge_field(BY_KEY["retention"], [a, vr("$10,000", 110)])
+    assert (m.value, m.page_no, m.state, m.resolution) == ("$10,000", 104, V, "same_value")
