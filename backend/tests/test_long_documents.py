@@ -16,7 +16,8 @@ from backend.schemas import EvidenceState, RunDocumentStatus, RunStatus
 from pipeline_fakes import GatedProvider, smart_responder
 from test_runner import DOC_A, Harness, _extract_reserve, _run_to_end, go
 
-FACT_KEYS = [f["key"] for f in db.COMPARE_QUOTES["fact_schema"]]
+# slice 6: the exclusions field merges to its schedule heading fact (absent here) in its place
+FACT_KEYS = [f["key"] if f["kind"] == "scalar" else "exclusions_schedule" for f in db.COMPARE_QUOTES["fact_schema"]]
 
 
 def long_pdf(n: int, facts: dict[int, str] | None = None) -> bytes:

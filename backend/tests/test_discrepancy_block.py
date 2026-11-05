@@ -154,7 +154,12 @@ OLD_VERSION = {  # a slice 1 / slice 2 version as stored before the union grew: 
 
 def test_versions_stored_before_the_union_grew_still_validate_unchanged():
     content = ArtifactContent.model_validate(OLD_VERSION)
-    assert content.model_dump(mode="json") == OLD_VERSION
+    dumped = content.model_dump(mode="json")
+    # slice 6 added two nullable keys with null defaults (Cell.complete, Column.document_kind); nothing else moves
+    table = dumped["sections"][2]["blocks"][0]
+    assert table["columns"][0].pop("document_kind") is None
+    assert table["rows"][0]["cells"]["A"].pop("complete") is None
+    assert dumped == OLD_VERSION
     assert content.passage_ids() == {1, 2, 3}
     # the minimal stored shape (defaults omitted) of slice 1 also still loads
     minimal = {"sections": [{"id": "s", "number": "1", "title": "S", "blocks": [
@@ -173,6 +178,19 @@ def _run(session):
     return run
 
 
+def old_shape(dumped: dict) -> dict:
+    """A dumped OLD_VERSION without the null keys slice 6 added (Cell.complete, Column.document_kind)."""
+    for sec in dumped["sections"]:
+        for b in sec["blocks"]:
+            if b.get("type") == "table":
+                for col in b["columns"]:
+                    assert col.pop("document_kind") is None
+                for row in b["rows"]:
+                    for cell in row["cells"].values():
+                        assert cell.pop("complete") is None
+    return dumped
+
+
 def test_old_and_new_versions_load_from_the_database(session):
     run = _run(session)
     art = models.Artifact(run_id=run.id, title="Report", current_version=1)
@@ -180,7 +198,7 @@ def test_old_and_new_versions_load_from_the_database(session):
     session.flush()
     session.add(models.ArtifactVersion(artifact_id=art.id, version=1, content=OLD_VERSION))
     session.flush()
-    assert art.latest_content().model_dump(mode="json") == OLD_VERSION
+    assert old_shape(art.latest_content().model_dump(mode="json")) == OLD_VERSION
     models.snapshot_version(session, art, policy_check_content(), note="policy check")
     session.flush()
     session.expire_all()
@@ -188,10 +206,10 @@ def test_old_and_new_versions_load_from_the_database(session):
     latest = art.latest_content()
     assert latest == policy_check_content() and latest.passage_ids() == {1, 2, 3, 4, 5}
     v1 = ArtifactContent.model_validate(art.version_row(1).content)
-    assert v1.model_dump(mode="json") == OLD_VERSION
+    assert old_shape(v1.model_dump(mode="json")) == OLD_VERSION
     models.restore_version(session, art, 1)
     session.flush()
-    assert art.latest_content().model_dump(mode="json") == OLD_VERSION
+    assert old_shape(art.latest_content().model_dump(mode="json")) == OLD_VERSION
 
 
 # --------------------------------------------------------------------- DOCX export

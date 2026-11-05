@@ -96,8 +96,9 @@ def test_run_completes_with_verified_facts_artifact_events_and_call_log(h):
     occ = facts[(a, "each_occurrence_limit")]
     assert occ.page_no == 2 and occ.passage.rects
     assert facts[(b, "each_occurrence_limit")].state == EvidenceState.ABSENT
-    # one fact per field per document (M5: absent fields come back null)
-    assert len(run.facts) == 2 * len(db.COMPARE_QUOTES["fact_schema"])
+    # one fact per scalar field per document (M5: absent fields come back null); slice 6's notable_exclusions
+    # has no fact of its own (exclusion titles and the schedule heading are facts only when printed)
+    assert len(run.facts) == 2 * sum(1 for f in db.COMPARE_QUOTES["fact_schema"] if f["kind"] == "scalar")
     art = run.artifact
     assert art is not None and art.current_version == 1
     content = art.latest_content()
@@ -473,7 +474,7 @@ def test_retry_reprocesses_only_failed_documents_and_snapshots_new_version(h):
     assert extra_extracts == 1
     s, run = h.run_row(rid)
     assert run.status == RunStatus.DONE and run.artifact.current_version == 2
-    assert len(run.facts) == 2 * len(db.COMPARE_QUOTES["fact_schema"])
+    assert len(run.facts) == 2 * sum(1 for f in db.COMPARE_QUOTES["fact_schema"] if f["kind"] == "scalar")
     s.close()
 
 

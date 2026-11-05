@@ -61,7 +61,8 @@ def test_no_cited_candidate_means_couldnt_verify_or_not_specified():
 
 def test_merge_document_returns_one_fact_per_field_in_field_order():
     out = merge.merge_document(FIELDS, [vr("Harborline", 1, field="carrier_name"), vr("$5,000", 2)])
-    assert [m.field for m in out] == [f.key for f in FIELDS]
+    # slice 6: the exclusions field merges to its schedule heading (and any exclusion:<title> keys) in its place
+    assert [m.field for m in out] == [f.key if f.kind == "scalar" else "exclusions_schedule" for f in FIELDS]
     by = {m.field: m for m in out}
     assert by["carrier_name"].value == "Harborline" and by["retention"].value == "$5,000"
     assert by["named_insured"].state == EvidenceState.ABSENT

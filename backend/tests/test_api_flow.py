@@ -67,7 +67,7 @@ def test_workspace_and_workflows(api):
     assert ws["limits"] == {"max_pages": 300, "max_bytes": 50 * 1024 * 1024, "max_megabytes": 50.0,
                             "max_documents_per_run": 8, "accepts": "application/pdf", "run_token_budget": 1_500_000}
     wf = api.client.get("/api/workflows/compare-quotes").json()
-    assert wf["name"] == "Compare Quotes" and len(wf["fact_schema"]) == 20 and wf["section_plan"][0]["number"] == "1"
+    assert wf["name"] == "Compare Quotes" and len(wf["fact_schema"]) == 24 and wf["section_plan"][0]["number"] == "1"
     assert api.client.get(f"/api/workflows/{wf['id']}").json()["slug"] == "compare-quotes"
     assert [w["slug"] for w in api.client.get("/api/workflows").json()["workflows"]] == ["compare-quotes", "proposal-builder", "policy-check",
                                                                                            "certificate", "loss-run"]
@@ -218,7 +218,7 @@ def test_artifact_has_chips_with_labels_pages_and_trust_counts(done):
     absent = cell(art, COVERAGE, "each_occurrence_limit", "B")
     assert absent["value"] == "Not specified" and absent["passage_ids"] == []
     assert art["counts"]["verified"] == 7 and art["counts"]["edited"] == 0
-    assert art["counts"]["absent"] == 40 - 7
+    assert art["counts"]["absent"] == 48 - 7  # 24 rows x 2 documents (slice 6 adds 4 term rows)
     assert art["is_current"] and art["version"] == 1 and art["stale_sections"] == []
     by_id = api.client.get(f"/api/artifacts/{art['id']}").json()
     assert by_id["content"] == art["content"]

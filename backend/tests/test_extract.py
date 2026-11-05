@@ -44,9 +44,11 @@ def test_schema_enumerates_exactly_the_field_keys():
     fields = [FactField.model_validate(f) for f in COMPARE_QUOTES["fact_schema"]]
     schema = extract.build_extraction_schema(fields)
     item = schema.json_schema["properties"]["facts"]["items"]
-    assert item["properties"]["field"]["enum"] == [f.key for f in fields]
+    assert item["properties"]["field"]["enum"] == [f.key for f in fields if f.kind == "scalar"]
     assert item["additionalProperties"] is False
-    assert set(schema.json_schema["required"]) == {"facts", "options_detected", "option_compared"}
+    # slice 6: Compare also asks for exclusion titles, the schedule heading and the document kind
+    assert set(schema.json_schema["required"]) == {"facts", "options_detected", "option_compared", "exclusions",
+                                                   "exclusions_schedule", "document_kind"}
 
 
 def test_policy_form_description_asks_for_the_printed_form_number_and_reaches_the_prompt():

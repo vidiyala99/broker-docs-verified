@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.db import COMPARE_QUOTES
+from backend.db import PROPOSAL_BUILDER
 from backend.pipeline import extract, verify, windows
 from backend.providers import FakeProvider, RunBudget
 from backend.providers.fake import FakeReply
@@ -107,7 +107,8 @@ def test_policy_check_catalogue_has_unique_snake_case_keys_and_one_forms_field()
 
 
 def test_fact_field_kind_defaults_to_scalar_so_existing_workflows_are_unchanged():
-    fields = [FactField.model_validate(f) for f in COMPARE_QUOTES["fact_schema"]]
+    # Proposal Builder: the Compare Quotes fields without slice 6's exclusions field
+    fields = [FactField.model_validate(f) for f in PROPOSAL_BUILDER["fact_schema"]]
     assert all(f.kind == "scalar" for f in fields)
     assert scalar_fields(fields) == fields
     with pytest.raises(ValueError):
@@ -118,7 +119,8 @@ def test_fact_field_kind_defaults_to_scalar_so_existing_workflows_are_unchanged(
 
 
 def test_schema_without_a_forms_field_is_exactly_the_old_one():
-    fields = [FactField.model_validate(f) for f in COMPARE_QUOTES["fact_schema"]]
+    # Proposal Builder: the Compare Quotes fields without slice 6's exclusions field
+    fields = [FactField.model_validate(f) for f in PROPOSAL_BUILDER["fact_schema"]]
     assert extract.build_extraction_schema(fields) == fact_extraction_schema([f.key for f in fields])
 
 
