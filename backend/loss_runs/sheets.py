@@ -65,6 +65,10 @@ class SheetLimits:
     max_columns: int = 80
     max_cell_chars: int = 300
     header_scan_rows: int = 100
+    # Slice 6 (R8, Compare quotes): refuse a cell longer than max_cell_chars or a value beyond max_columns instead of
+    # cutting it, and keep a merged range's value in its top-left cell only (a quote page draws it once).
+    refuse_over_cap: bool = False
+    fill_merged_cells: bool = True
 
 
 DEFAULT_SHEET_LIMITS = SheetLimits()
@@ -129,6 +133,13 @@ def _cell_text(value: Any, limits: SheetLimits) -> str | None:
         return value.isoformat()
     if isinstance(value, dt.time):
         return value.isoformat()
+    if limits.refuse_over_cap:
+        text = normalize.clean_text(value, limits.max_cell_chars + 1)
+        if text is not None and len(text) > limits.max_cell_chars:
+            raise SheetError("cell_too_long", f"A cell in this spreadsheet holds more than {limits.max_cell_chars:,} "
+                                              f"characters; the limit is {limits.max_cell_chars:,} per cell.",
+                             limit=limits.max_cell_chars)
+        return text
     return normalize.clean_text(value, limits.max_cell_chars)
 
 
@@ -230,6 +241,12 @@ def _parse_xlsx(data: bytes, limits: SheetLimits) -> Workbook:
                     frow = next(formula_iter) if formula_iter is not None else None
                     row_no = next((c.row for c in vrow if getattr(c, "row", None)), row_no + 1)
                     if len(vrow) > limits.max_columns:
+                        if limits.refuse_over_cap and any(getattr(c, "value", None) is not None
+                                                          for c in vrow[limits.max_columns:]):
+                            raise SheetError("too_many_columns", f"Sheet {_sheet_name(name)} has values beyond column "
+                                                                 f"{col_letter(limits.max_columns)}; the limit is "
+                                                                 f"{limits.max_columns} columns per sheet.",
+                                             limit=limits.max_columns)
                         vrow = vrow[: limits.max_columns]
                     cells: list[str | None] = []
                     missing: list[int] = []
@@ -252,7 +269,8 @@ def _parse_xlsx(data: bytes, limits: SheetLimits) -> Workbook:
                     data_rows += 1
                     if data_rows > limits.max_rows_per_file + limits.header_scan_rows * limits.max_sheets:
                         _too_many_rows(limits)
-                _apply_merges(sheet, merges)
+                if limits.fill_merged_cells:
+                    _apply_merges(sheet, merges)
                 sheets.append(sheet)
         finally:
             if formula_wb is not None:
