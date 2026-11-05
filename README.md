@@ -14,12 +14,12 @@ of guessing.
 
 | Workflow | What the broker gets |
 |---|---|
-| **Compare Quotes** | Side-by-side coverage table across carriers, every cell cited; long documents up to 300 pages; conflicting values shown, never silently picked |
+| **Compare Quotes** | Side-by-side coverage table across carriers from PDF, Word and Excel quotes, every cell cited (Word and Excel are rendered to pages so citations still land on a line); endorsements (additional insured, waiver of subrogation, primary & non-contributory) and notable exclusions marked worse, lowest premium marked best; a one-line Key difference that cites the cells it compares; long documents up to 300 pages; conflicting values shown, never silently picked |
 | **Proposal Builder** | A client proposal from a comparison: outline editing, DOCX export |
 | **Policy Check** | Expiring vs renewal vs quote vs the agency system (AMS): discrepancies with severity, each side cited |
 | **Certificates (COI)** | Every claim on a certificate checked against the policies before it can be issued |
-| **Loss runs** | Claims from spreadsheets and PDFs in one ledger; printed totals reconciled to the cent; anything unverifiable marked Needs review _(backend done, UI in progress)_ |
-| **Work queue** | Home screen: each client's work grouped by what needs doing next |
+| **Loss runs** | Claims from spreadsheets and PDFs in one ledger; printed totals reconciled to the cent; anything unverifiable marked Couldn't check; register and per-file views, every broker action with Undo |
+| **Work queue** | Commercial and Personal lines homes: each client's work grouped by what needs doing next; Tasks and Activity |
 
 ## How it is built
 
@@ -41,11 +41,12 @@ React + TypeScript (Vite)  ──>  FastAPI (Python 3.12)  ──>  OpenAI (stru
 
 - Live eval gates per workflow (`tests/eval/`), run against synthetic fixtures with exact truth
   (`tests/fixtures/`). Hard fails (a wrong value shown as verified, an injection followed, a wrong total verdict)
-  must be zero. Latest live results: Compare Quotes 268/286 fields, 0 hard fails; Policy Check recall 13/13;
-  Certificates 15/15 supported claims; Loss runs 85/85 printed totals, 1,844/1,844 PDF rows.
+  must be zero. Latest live results: Compare Quotes 268/286 fields, 0 hard fails; Compare marks 15/15 worse/best
+  marks across PDF, Word and Excel quotes, 0 hard fails; Policy Check recall 13/13; Certificates 15/15 supported
+  claims; Loss runs 85/85 printed totals, 1,844/1,844 PDF rows.
 - Live model replies are recorded and replayed offline (`tests/eval/reply_recorder.py`), so a live failure can be
   debugged without paying for reruns.
-- Backend: ~1,700 tests (`backend/tests/`). Frontend: Playwright end-to-end with axe accessibility checks
+- Backend: ~1,900 tests (`backend/tests/`). Frontend: Playwright end-to-end with axe accessibility checks
   (`frontend/e2e/`).
 
 ## Run it locally (no API key needed)
@@ -54,7 +55,7 @@ The dev server runs the real API with a scripted model and seeds demo runs. From
 
 ```
 py -3.12 -m venv backend/.venv
-backend/.venv/Scripts/python -m pip install "fastapi>=0.115,<0.200" "uvicorn>=0.30" "python-multipart>=0.0.9" "sqlalchemy>=2.0.35,<2.1" "pymupdf==1.28.0" "pydantic>=2.7,<3" "openai>=3.42,<4" "openpyxl>=3.1,<4" "reportlab>=4.2,<5" "httpx>=0.27,<1"
+backend/.venv/Scripts/python -m pip install "fastapi>=0.115,<0.200" "uvicorn>=0.30" "python-multipart>=0.0.9" "sqlalchemy>=2.0.35,<2.1" "pymupdf==1.28.0" "pydantic>=2.7,<3" "openai>=3.42,<4" "openpyxl>=3.1,<4" "reportlab>=4.2,<5" "python-docx>=1.1,<2" "httpx>=0.27,<1"
 
 $env:BROKERDOCS_DATA_DIR = "$env:TEMP\brokerdocs-dev"
 backend/.venv/Scripts/python -m backend.dev_seed seed     # ~20 s, creates the demo runs
