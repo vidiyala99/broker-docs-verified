@@ -307,6 +307,15 @@ directions): `qa-screenshots/loss-runs/directions/a-1440.png`, `a-1024.png`, `a-
 - "Show the rows" carries no count (the API sends `rows` only for unverified checks).
 - Recounting shows after 350ms, so fast actions do not flicker.
 
+**Source pane (coordinator note)**: the header and caption name the file for people with the chip's short text
+("Ashgrove 2025 CSV, Row 6", never the CSV's file stem as a sheet); a sheet page opens at 1.5x (`SHEET_ZOOM`) with the
+cited row's dashed box scrolled into view, not at Fit width. e2e asserts both. The rendered sheet page's own printed
+heading (drawn by the backend renderer) still prints the file name.
+
+**Verification** (worktree, 2026-11-05): backend `1702 passed, 2 skipped in 254.49s`; full e2e on a fresh seed,
+`--workers=1`, ports 5211/8051: `72 passed (9.8m)`; axe 0 violations on Analytics (1440, 1024, 390), review (1440,
+1024, 390), By file (1440), wizard (Who, Files); `tsc --noEmit` clean.
+
 **Not built / known gaps**
 - `needs_review` (Couldn't check) has no seeded instance (the scripted model reads every line perfectly): the card,
   footing and row are built and typed, but only checked visually in phase A's comp, not in e2e.
