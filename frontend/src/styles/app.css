@@ -2530,6 +2530,9 @@ kbd {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* A landscape page (rendered Excel sheet) at Fit width sits near the frame's height: a scrollbar that comes and
+     goes changes the width, Fit width redraws, and the page flickers blank. Reserve the gutter so the width is fixed. */
+  scrollbar-gutter: stable;
   padding: var(--space-4);
   background: var(--color-canvas);
 }
