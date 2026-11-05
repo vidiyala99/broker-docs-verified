@@ -25,8 +25,8 @@ async function axe(page: Page, label: string) {
 test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   // 1. Opens app: rail, drop zone with limits, recent runs (DG1, DG6).
   await page.goto("/");
-  await expect(page.getByText("Drop quote PDFs to compare").first()).toBeVisible();
-  await expect(page.getByText(/up to 300 pages and 50 MB each, 8 files per comparison/).first()).toBeVisible();
+  // Slice 6 (lane B): the home is the Commercial work queue; its primary opens the upload page (#/compare/new).
+  await expect(page.getByRole("link", { name: "Compare quotes" })).toHaveAttribute("href", "#/compare/new");
   // Slices 2 and 3: Proposals and Policy check are live; the rest of the rail still says "coming in a later slice".
   await expect(page.getByRole("link", { name: "Proposals, new proposal" })).toHaveAttribute("href", "#/proposals/new");
   await expect(page.getByRole("link", { name: "Policy check, new check" })).toHaveAttribute("href", "#/policy-check/new");
@@ -38,15 +38,18 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   await shot(page, "1440-01-launch");
   await axe(page, "launch");
 
-  // 2. Drops quote PDFs: per-file rows, inline rejection naming the problem.
-  await page.locator(".upload input[type=file]").setInputFiles([
+  // 2. Drops quote PDFs on the upload page (slice 6): per-file rows, inline rejection naming the problem.
+  await page.getByRole("link", { name: "Compare quotes" }).click();
+  await expect(page.getByText("Upload quotes").first()).toBeVisible();
+  await expect(page.getByText(/Up to 300 pages and 50 MB each, 8 files per comparison/).first()).toBeVisible();
+  await page.locator(".compare-new input[type=file]").setInputFiles([
     path.join(FIX, "carrier_a_clean.pdf"),
     path.join(FIX, "carrier_b_scanned.pdf"),
     path.join(FIX, "not_a_pdf.pdf"),
     path.join(FIX, "carrier_c_clean.pdf"),
   ]);
-  await expect(page.locator(".file-row--ready")).toHaveCount(3);
-  await expect(page.locator(".file-row--rejected")).toContainText("Not a PDF");
+  await expect(page.locator(".quote-row--ready")).toHaveCount(3);
+  await expect(page.locator(".quote-row--rejected")).toContainText("Not a PDF");
   await shot(page, "1440-02-upload");
 
   // 3. Clicks Run: per-document rows driven by SSE, then the report.

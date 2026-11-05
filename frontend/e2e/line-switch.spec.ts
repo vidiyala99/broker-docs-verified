@@ -110,11 +110,13 @@ test("keyboard flip is instant: indicator, glyph, crumb and tab land on the firs
   await expect(page.getByRole("link", { name: "Cancel" })).toHaveAttribute("href", "#/personal-lines");
 });
 
-test("Compare start screen leads with the queue's book; the Upload choice does not rename the page", async ({ page }) => {
-  await page.goto("/#/");
-  await expect(crumbs(page)).toHaveText(/^Commercial.*Compare Quotes$/);
-  // The 300px Upload panel: both halves keep one width (plain 1fr let "Commercial" take 130px of 245), and the
-  // indicator lands on the picked half.
+// Slice 6 (lane B, allowed edit): the Compare start screen is now its own page (#/compare/new) rather than the book's
+// queue, so its crumbs and title tab follow the Line choice like the Policy Check wizard's.
+test("New comparison page: the crumbs and the book tab follow the Line choice", async ({ page }) => {
+  await page.goto("/#/compare/new");
+  await expect(crumbs(page)).toHaveText(/^Commercial.*Compare Quotes.*New comparison$/);
+  await expect(tab(page)).toHaveText("Commercial");
+  // Both halves keep one width, and the indicator lands on the picked half.
   const widths = await page.locator(".line-choice__opt").evaluateAll((els) => els.map((e) => (e as HTMLElement).offsetWidth));
   expect(Math.abs(widths[0] - widths[1]), widths.join(", ")).toBeLessThanOrEqual(1);
   await seg(page).getByText("Personal", { exact: true }).click();
@@ -123,9 +125,11 @@ test("Compare start screen leads with the queue's book; the Upload choice does n
   await expect
     .poll(() => page.locator(".line-choice__seg").evaluate((el) => new DOMMatrix(getComputedStyle(el, "::after").transform).m41))
     .toBeCloseTo(left + 1, 0);
-  await expect(crumbs(page)).toHaveText(/^Commercial.*Compare Quotes$/);
-  await page.goto("/#/?line=personal");
-  await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes$/);
+  await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes.*New comparison$/);
+  await expect(tab(page)).toHaveText("Personal lines");
+  await page.goto("/#/compare/new?line=personal");
+  await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes.*New comparison$/);
+  await expect(page.getByRole("link", { name: "Cancel" })).toHaveAttribute("href", "#/personal-lines");
 });
 
 test("Tasks filter at 390: options size to text and the selection is the option's own fill", async ({ page }) => {

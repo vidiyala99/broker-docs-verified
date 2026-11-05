@@ -363,6 +363,23 @@ See `frontend/LOSS-RUNS-BRIEF.md`. No new tokens.
 - **Motion**: Collapse for the Matches fold and the note editor (pointer only); totals dim during a recount (opacity,
   150ms); keyboard changes are instant; reduced motion keeps the fades.
 
+## Compare match (slice 6, lane B, 2026-11-05)
+See `frontend/COMPARE-MATCH-BRIEF.md`. No new tokens.
+- **Book homes**: `#/` is titled "Commercial" (it lists all commercial work) and shares one component with Personal lines:
+  serif title, one muted line, primary "Compare quotes" (to `#/compare/new`) and secondary "Check a renewal"; no left
+  panel. The empty state keeps a large drop zone that hands its files to the upload page.
+- **New comparison** (`#/compare/new`): wizard shell, title "New comparison" with the book tab, crumbs follow the Line
+  choice. "Compare N quotes" top right, `aria-disabled` with its reason under it below two ready quotes (R4). Quote rows:
+  column letter, format glyph (Phosphor file family), name, "Word, 2 pages", Remove; a refused file keeps its row with
+  the server's message.
+- **Marks**: worse = value in a 1px `--severity-high-fg` box (4px radius) plus a WarningDiamond glyph whose tooltip is
+  the reason (the DG3 triangle stays "Couldn't verify"); best = value in `--doc-3-fg`, semibold, plus the status word
+  LOWEST. Both are in the cell's accessible name. Column heads carry a muted kind line ("Word quote", "Spreadsheet").
+- **Key difference**: the report's first section, one `--color-canvas` panel (6px radius, no border, no side rule),
+  serif title, 16px prose with a chip after each cited segment (kept on its last word's line), a 12px source line
+  (rule or model). An edited cited cell shows an "edited by you" chip (surface fill, input border, pencil) that goes to
+  the cell. Stale: the usual tag plus Rewrite.
+
 ## Open item: collapsed-outline warning mark (recommendation, not decided)
 Recommend: when the outline is collapsed and any value is scan-read,
 couldn't verify, or failed, the collapse handle shows the triangle glyph from

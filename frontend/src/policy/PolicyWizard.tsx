@@ -363,7 +363,8 @@ function StepDocuments({
           selected={draft.pdfs}
           max={MAX_PDFS}
           onChange={(docs) => setDocs("pdfs", docs)}
-          filter={(d) => d.kind !== "ams"}
+          // R5 (slice 6): Policy Check takes PDF documents only, so Word and Excel quotes are not offered here.
+          filter={(d) => d.kind !== "ams" && (d.source_format ?? "pdf") === "pdf"}
           emptyText="No PDFs uploaded yet. Drop policy PDFs above."
           fullText={`This check has ${MAX_PDFS} PDFs, the most it can use.`}
         />

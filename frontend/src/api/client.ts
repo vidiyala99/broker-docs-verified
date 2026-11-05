@@ -92,10 +92,17 @@ export const api = {
   runs: (limit = 20, line?: Line) =>
     request<{ runs: Run[] }>(`/api/runs?limit=${limit}${line ? `&line=${line}` : ""}`).then((r) => r.runs),
   run: (id: number) => request<Run>(`/api/runs/${id}`),
-  startRun: (documentIds: number[], line?: Line, clientName?: string) =>
+  /** `additionalContext` (slice 6, Compare Quotes): optional, at most 1,000 characters; sent only when not blank. */
+  startRun: (documentIds: number[], line?: Line, clientName?: string, additionalContext?: string) =>
     request<{ run: Run; created: boolean }>("/api/runs", {
       method: "POST",
-      body: json({ document_ids: documentIds, workflow: "compare-quotes", ...(line ? { line } : {}), ...clientBody(clientName) }),
+      body: json({
+        document_ids: documentIds,
+        workflow: "compare-quotes",
+        ...(line ? { line } : {}),
+        ...clientBody(clientName),
+        ...(additionalContext && additionalContext.trim() ? { parameters: { additional_context: additionalContext.trim() } } : {}),
+      }),
     }),
   /** Re-tag a run (run header control). The body is exactly {"line": ...} (API.md). */
   setRunLine: (id: number, line: Line) => request<Run>(`/api/runs/${id}`, { method: "PATCH", body: json({ line }) }),
@@ -231,6 +238,8 @@ export const api = {
   /** Sent only when the undo toast closes or the page unmounts (D6). */
   deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: "DELETE" }),
   fileUrl: (documentId: number) => `${API_BASE}/api/documents/${documentId}/file`,
+  /** Slice 6: the file as uploaded (a Word or Excel quote's kept original; a PDF returns itself), as an attachment. */
+  originalUrl: (documentId: number) => `${API_BASE}/api/documents/${documentId}/original`,
   eventsUrl: (runId: number, lastEventId?: number) =>
     `${API_BASE}/api/runs/${runId}/events${lastEventId != null ? `?last_event_id=${lastEventId}` : ""}`,
 };

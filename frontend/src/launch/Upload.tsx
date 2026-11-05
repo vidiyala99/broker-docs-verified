@@ -1,8 +1,38 @@
-import { useId, useRef, useState, type DragEvent } from "react";
-import { FilePdf, Trash, UploadSimple, WarningCircle } from "@phosphor-icons/react";
+import { useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from "react";
+import { File as FileGlyph, FileDoc, FilePdf, FileXls, UploadSimple } from "@phosphor-icons/react";
 import { api, ApiError, uploadFile } from "../api/client";
-import type { DocumentInfo, Limits } from "../api/types";
-import { MoreRow, useFold } from "../ui/Fold";
+import type { DocumentInfo, Limits, SourceFormat } from "../api/types";
+
+// ---------------------------------------------------------------- formats (slice 6)
+
+const EXT_OF_TYPE: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+};
+
+/** The picker filter for what POST /api/documents takes (`limits.accepts`, one list in backend/db.py): the MIME types
+ *  plus their extensions, so every file dialog filters the same way. The server still checks the content. */
+export function acceptOf(limits: Limits): string {
+  const types = limits.accepts.split(",").map((t) => t.trim()).filter(Boolean);
+  return [...types.map((t) => EXT_OF_TYPE[t]).filter(Boolean), ...types].join(",");
+}
+
+/** A file's format from its name, before the server says (upload rows still in flight or refused). */
+export function formatOfName(name: string): SourceFormat | null {
+  const ext = name.toLowerCase().split(".").pop();
+  return ext === "pdf" || ext === "docx" || ext === "xlsx" ? ext : null;
+}
+
+export const FORMAT_WORD: Partial<Record<SourceFormat, string>> = { pdf: "PDF", docx: "Word", xlsx: "Excel" };
+
+/** Format glyph (decorative): Phosphor's file family, one silhouette per format. */
+export function FormatGlyph({ format, size = 20, className }: { format: SourceFormat | null | undefined; size?: number; className?: string }) {
+  if (format === "docx") return <FileDoc size={size} aria-hidden className={className} />;
+  if (format === "xlsx") return <FileXls size={size} aria-hidden className={className} />;
+  if (format === null) return <FileGlyph size={size} aria-hidden className={className} />;
+  return <FilePdf size={size} aria-hidden className={className} />;
+}
 
 export interface FileRow {
   key: string;
@@ -35,7 +65,10 @@ export function DropZone({
   limitsLine,
   buttonLabel = "Choose files",
   multiple = true,
+  note,
 }: {
+  /** A second, quieter line under the limits line. */
+  note?: ReactNode;
   limits: Limits;
   onFiles: (files: File[]) => void;
   large?: boolean;
@@ -70,6 +103,7 @@ export function DropZone({
       <UploadSimple size={large ? 28 : 20} aria-hidden className="dropzone__icon" />
       <p className="dropzone__title">{title}</p>
       <p className="dropzone__limits">{limitsLine ?? limitsText(limits)}</p>
+      {note && <p className="dropzone__note">{note}</p>}
       <button type="button" className="btn btn--primary" disabled={disabled} onClick={() => input.current?.click()}>
         {buttonLabel}
       </button>
@@ -89,20 +123,52 @@ export function DropZone({
   );
 }
 
-/** Upload state shared by the drop zones (one request per file for per-row progress). */
-export function useUploads(limits: Limits | null) {
-  const [rows, setRows] = useState<FileRow[]>([]);
-  const seq = useRef(0);
+/** Upload rows held outside React, so a list can outlive the screen that started it (slice 6: files dropped on the home
+ *  page keep uploading and show on `#/compare/new`). */
+export interface UploadStore {
+  get: () => FileRow[];
+  set: (fn: (rows: FileRow[]) => FileRow[]) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+export function createUploadStore(): UploadStore {
+  let rows: FileRow[] = [];
+  const listeners = new Set<() => void>();
+  return {
+    get: () => rows,
+    set: (fn) => {
+      rows = fn(rows);
+      listeners.forEach((l) => l());
+    },
+    subscribe: (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+  };
+}
+
+/** The new comparison's files: shared by the home page's empty-state drop zone and `#/compare/new` (spec 4.2). */
+export const compareUploads = createUploadStore();
+
+let uploadSeq = 0;
+
+/** Upload state shared by the drop zones (one request per file for per-row progress). Pass a store to share the rows
+ *  across screens; without one the rows live and die with the component. */
+export function useUploads(limits: Limits | null, store?: UploadStore) {
+  const [own] = useState(createUploadStore);
+  const s = store ?? own;
+  const rows = useSyncExternalStore(s.subscribe, s.get);
+  const setRows = s.set;
 
   const patch = (key: string, p: Partial<FileRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)));
 
   const add = (files: File[]) => {
     const max = limits?.max_documents_per_run ?? 8;
-    let accepted = rows.filter((r) => r.status !== "rejected").length;
+    let accepted = s.get().filter((r) => r.status !== "rejected").length;
     const next: FileRow[] = [];
     for (const f of files) {
-      seq.current += 1;
-      const key = `f${seq.current}`;
+      uploadSeq += 1;
+      const key = `f${uploadSeq}`;
       if (accepted >= max) {
         next.push({ key, name: f.name, size: f.size, status: "rejected", progress: 0, message: `A comparison takes at most ${max} files. Remove one to add this file.` });
         continue;
@@ -121,77 +187,12 @@ export function useUploads(limits: Limits | null) {
   };
 
   const remove = (key: string) => {
-    const row = rows.find((r) => r.key === key);
+    const row = s.get().find((r) => r.key === key);
     setRows((rs) => rs.filter((r) => r.key !== key));
     if (row?.doc) api.deleteDocument(row.doc.id).catch(() => undefined);
   };
 
-  const clear = () => setRows([]);
+  const clear = () => setRows(() => []);
   return { rows, add, remove, clear };
 }
 
-/**
- * Compact rows, same shape as the run panel's document rows: letter, filename, page count, status
- * glyph, Remove. A second line only for news (upload progress, a warning, a rejection). Past six
- * rows the quiet ones fold into "+N more"; uploading and rejected rows never fold.
- */
-export function FileRows({ rows, onRemove }: { rows: FileRow[]; onRemove: (key: string) => void }) {
-  const listId = useId();
-  const fold = useFold(rows, (r) => r.status !== "ready" || Boolean(r.doc?.warning));
-  if (!rows.length) return null;
-  const letters = new Map<string, string>();
-  rows.filter((r) => r.status === "ready").forEach((r, i) => letters.set(r.key, String.fromCharCode(65 + i)));
-  return (
-    <ul className="file-rows file-rows--compact" id={listId} aria-label="Files for this run">
-      {fold.entries.map((e) => {
-        if (e.more) return <MoreRow key="more" hidden={fold.hidden} expanded={fold.expanded} onToggle={fold.toggle} noun="files" controls={listId} />;
-        const r = e.item;
-        const letter = letters.get(r.key) ?? null;
-        const pages = r.status === "ready" ? r.doc?.page_count : null;
-        return (
-          <li key={r.key} className={`file-row file-row--${r.status}`}>
-            {letter ? (
-              <span className={`doc-letter hue-${((letter.charCodeAt(0) - 65) % 5) + 1}`} aria-hidden>
-                {letter}
-              </span>
-            ) : (
-              <FilePdf size={20} aria-hidden className="file-row__icon" />
-            )}
-            <span className="file-row__name" title={r.name}>
-              {letter && <span className="sr-only">Document {letter}: </span>}
-              {r.name}
-            </span>
-            {pages != null && (
-              <span className="file-row__pages">
-                {pages} {pages === 1 ? "page" : "pages"}
-                <span className="sr-only">, {formatBytes(r.doc!.size_bytes)}</span>
-              </span>
-            )}
-            {/* Ready rows: the letter badge is the status; a warning carries its glyph on the news line. */}
-            {r.status === "rejected" && <WarningCircle size={16} weight="fill" aria-hidden className="danger-glyph file-row__glyph" />}
-            <button type="button" className="icon-btn file-row__remove" aria-label={`Remove ${r.name}`} onClick={() => onRemove(r.key)} disabled={r.status === "uploading"}>
-              <Trash size={16} aria-hidden />
-            </button>
-            {r.status === "uploading" && (
-              <span className="file-row__news">
-                <span className="progress" role="progressbar" aria-label={`Uploading ${r.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(r.progress * 100)}>
-                  <span className="progress__bar" style={{ transform: `scaleX(${r.progress})` }} />
-                </span>
-              </span>
-            )}
-            {r.status === "ready" && r.doc?.warning && (
-              <span className="file-row__news file-row__warn">
-                <WarningCircle size={14} weight="fill" aria-hidden /> {r.doc.warning}
-              </span>
-            )}
-            {r.status === "rejected" && (
-              <span className="file-row__news file-row__error" role="alert">
-                {r.message}
-              </span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}

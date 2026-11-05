@@ -1,8 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowsClockwise, ArrowsSplit, PencilSimple, Warning } from "@phosphor-icons/react";
-import type { Block, Cell, Chip as ChipData, EvidenceState } from "../api/types";
+import { ArrowsClockwise, ArrowsSplit, PencilSimple, Warning, WarningDiamond } from "@phosphor-icons/react";
+import type { Block, Cell, Chip as ChipData, Column, DocumentKind, EvidenceState, SourceFormat } from "../api/types";
 import { Chip, ChipList, hueOf, type OpenSource } from "./Chip";
 import { Tip } from "../ui/Tip";
+import "../launch/compare.css";
 
 type TableBlock = Extract<Block, { type: "table" }>;
 
@@ -20,6 +21,67 @@ export interface TableActions {
   onSave: (ref: CellRef, value: string | null) => Promise<void>;
   editable: boolean;
   filter: EvidenceState | "edited" | null;
+  /** Slice 6, Compare Quotes runs: each document's uploaded format (document_id -> format) for the column labels. */
+  compare?: { formats: Record<number, SourceFormat | undefined> } | null;
+}
+
+/** Spec 5: the muted line under a Compare column's carrier, from the document's format and kind. */
+export function columnKindLabel(format: SourceFormat | undefined, kind: DocumentKind | null | undefined): string {
+  if (format === "xlsx") return "Spreadsheet";
+  if (format === "docx") {
+    return kind === "quote" ? "Word quote" : kind === "proposal" ? "Word proposal" : kind === "summary" ? "Word summary" : "Word document";
+  }
+  return kind === "quote" ? "PDF quote" : kind === "proposal" ? "PDF proposal" : kind === "summary" ? "PDF summary" : "PDF";
+}
+
+/** The id of a table cell's element, so a Key difference "edited by you" chip can take the reader to it. */
+export function cellDomId(row: string, column: string): string {
+  return `cell-${row}-${column}`.replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+function kindOf(col: Column, actions: TableActions): string | null {
+  if (!actions.compare) return null;
+  return columnKindLabel(col.document_id != null ? actions.compare.formats[col.document_id] : undefined, col.document_kind);
+}
+
+/** Spec 5: the marks in words, so they never rest on colour or outline alone. */
+function markText(cell: Cell | undefined): string {
+  if (cell?.mark === "worse") return `, worse than other quotes${cell.mark_reason ? `: ${cell.mark_reason}` : ""}`;
+  if (cell?.mark === "best") return ", lowest premium";
+  return "";
+}
+
+/** The value with its mark (slice 6): worse = outlined + diamond glyph whose tooltip is the reason; best = success
+ *  colour + the LOWEST status word. The cell's accessible name carries both in words (markText). */
+function MarkedValue({ cell }: { cell: Cell }) {
+  const value = cell.value ?? "Not specified";
+  if (cell.mark === "worse") {
+    return (
+      <>
+        <span className="mark-worse" data-mark="worse">
+          {value}
+        </span>
+        <Tip text={cell.mark_reason ? `Worse than the other quotes. ${cell.mark_reason}` : "Worse than the other quotes"}>
+          <span className="mark-glyph" tabIndex={-1}>
+            <WarningDiamond size={14} weight="fill" aria-hidden />
+          </span>
+        </Tip>
+      </>
+    );
+  }
+  if (cell.mark === "best") {
+    return (
+      <>
+        <span className="mark-best" data-mark="best">
+          {value}
+        </span>
+        <span className="mark-best__word" aria-hidden>
+          Lowest
+        </span>
+      </>
+    );
+  }
+  return <>{value}</>;
 }
 
 export function ReportTable({ block, actions }: { block: TableBlock; actions: TableActions }) {
@@ -47,6 +109,7 @@ export function ReportTable({ block, actions }: { block: TableBlock; actions: Ta
                     <span className="sr-only">Document {col.key}: </span>
                     {col.label}
                   </span>
+                  {kindOf(col, actions) && <span className="col-head__kind">{kindOf(col, actions)}</span>}
                   {col.warning && (
                     <ColumnWarning text={col.warning} onRetry={col.warning.startsWith("Extraction failed") ? actions.onRetryRun : null} />
                   )}
@@ -67,6 +130,7 @@ export function ReportTable({ block, actions }: { block: TableBlock; actions: Ta
                       key={col.key}
                       cell={cell}
                       cellRef={{ block_id: block.id, row_key: row.key, column_key: col.key }}
+                      domId={actions.compare ? cellDomId(row.key, col.key) : undefined}
                       label={`${row.label}, ${col.key} ${col.label}`}
                       actions={actions}
                     />
@@ -105,11 +169,13 @@ function stateOf(cell: Cell | undefined): EvidenceState | "edited" {
 function EditableCell({
   cell,
   cellRef,
+  domId,
   label,
   actions,
 }: {
   cell: Cell | undefined;
   cellRef: CellRef;
+  domId?: string;
   label: string;
   actions: TableActions;
 }) {
@@ -181,10 +247,11 @@ function EditableCell({
   return (
     <td
       ref={td}
+      id={domId}
       className={`cell cell--${state}${editing ? " is-editing" : ""}${matches ? " is-match" : ""}`}
       data-state={state}
       tabIndex={canEdit && !editing ? 0 : undefined}
-      aria-label={editing ? undefined : `${label}: ${describe(cell, state)}${canEdit ? ". Press Enter to edit" : ""}`}
+      aria-label={editing ? undefined : `${label}: ${describe(cell, state)}${markText(cell)}${canEdit ? ". Press Enter to edit" : ""}`}
       onDoubleClick={(e) => !editing && !(e.target as HTMLElement).closest("button") && begin()}
       onKeyDown={onKey}
     >
@@ -308,7 +375,7 @@ function CellBody({ cell, state, actions }: { cell: Cell | undefined; state: Evi
   return (
     <div className="cell__content">
       <span className="cell__value">
-        {cell.value ?? "Not specified"}
+        <MarkedValue cell={cell} />
         {state === "edited" ? (
           <Tip text={cell.original_value ? `Edited by you. Original: ${cell.original_value}` : "Edited by you"}>
             <PencilSimple size={14} className="edited-glyph" aria-hidden />

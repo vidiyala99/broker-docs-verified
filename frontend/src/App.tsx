@@ -4,7 +4,8 @@ import { api, ApiError } from "./api/client";
 import { keyboardAction, pointerAction } from "./ui/input";
 import { reducedMotion } from "./ui/motion";
 import type { Line, Run, Workspace } from "./api/types";
-import { LaunchView } from "./launch/LaunchView";
+import { compareHref, LaunchView } from "./launch/LaunchView";
+import { CompareNew } from "./launch/CompareNew";
 import { RunView } from "./run/RunView";
 import { NarrowNotice, Rail, TopBar, type Crumb, type Section } from "./shell/Shell";
 import { IntegrationsPage } from "./integrations/IntegrationsPage";
@@ -35,6 +36,8 @@ type Route = {
   runId: number | null;
   wizard: boolean;
   policy: boolean;
+  /** Slice 6: `#/compare/new` (`?line=personal` from Personal lines), the new comparison's upload page. */
+  compareNew: boolean;
   integrations: boolean;
   personal: boolean;
   tasks: boolean;
@@ -59,6 +62,7 @@ function parseRoute(hash: string): Route {
     runId: m ? Number(m[1]) : null,
     wizard: /^#\/proposals\/new/.test(hash),
     policy: /^#\/policy-check\/new/.test(hash),
+    compareNew: /^#\/compare\/new\b/.test(hash),
     integrations: /^#\/integrations\b/.test(hash),
     personal: /^#\/personal-lines\b/.test(hash),
     tasks: /^#\/tasks\b/.test(hash),
@@ -87,7 +91,7 @@ export function App() {
   // Keyboard navigation, reduced motion, in-page hash changes (filters, deep-link params) and browsers without the API
   // swap instantly. The state update still runs synchronously inside the transition callback (flushSync).
   useEffect(() => {
-    const pageOf = (r: Route) => [r.runId, r.wizard, r.policy, r.integrations, r.personal, r.tasks, r.activity, r.certificates, r.certificateNew, r.analytics, r.lossNew].join("|");
+    const pageOf = (r: Route) => [r.runId, r.wizard, r.policy, r.compareNew, r.integrations, r.personal, r.tasks, r.activity, r.certificates, r.certificateNew, r.analytics, r.lossNew].join("|");
     let current = pageOf(parseRoute(window.location.hash));
     const on = () => {
       const next = parseRoute(window.location.hash);
@@ -141,17 +145,27 @@ export function App() {
   // Line switch (LINE-SWITCH-BRIEF.md): the Policy Check wizard's Line choice lives here, so the crumbs can lead with
   // the book the new check will be filed in. Defaults to the entry preset; a new visit (another preset) starts over.
   // `pointer` marks a flip made with a pointer, so the new book crumb fades in (keyboard flips are instant).
-  const checkEntry = route.policy ? (route.line ?? "commercial") : null;
-  const [checkChoice, setCheckChoice] = useState<{ entry: Line; line: Line; pointer: boolean } | null>(null);
-  const checkLine: Line = checkChoice && checkChoice.entry === checkEntry ? checkChoice.line : (checkEntry ?? "commercial");
+  // Slice 6: the new comparison page (`#/compare/new`) holds its Line choice the same way.
+  const choicePage = route.policy ? "policy" : route.compareNew ? "compare" : null;
+  const checkEntry = choicePage ? `${choicePage}:${route.line ?? "commercial"}` : null;
+  const entryLine: Line = route.line ?? "commercial";
+  const [checkChoice, setCheckChoice] = useState<{ entry: string; line: Line; pointer: boolean } | null>(null);
+  const checkLine: Line = checkChoice && checkChoice.entry === checkEntry ? checkChoice.line : entryLine;
   const checkRefiled = !!checkChoice && checkChoice.entry === checkEntry && checkChoice.pointer;
   const chooseCheckLine = useCallback(
-    (line: Line) => setCheckChoice({ entry: checkEntry ?? "commercial", line, pointer: !keyboardAction() && pointerAction() }),
+    (line: Line) => checkEntry && setCheckChoice({ entry: checkEntry, line, pointer: !keyboardAction() && pointerAction() }),
     [checkEntry],
   );
   useEffect(() => {
-    if (!route.policy) setCheckChoice(null);
-  }, [route.policy]);
+    if (!choicePage) setCheckChoice(null);
+  }, [choicePage]);
+
+  // Slice 6: the Compare start screen is now `#/compare/new`, and each book has one home: the old personal entry
+  // (`#/?line=personal`) is the Personal lines page.
+  const oldPersonalHome = route.line === "personal" && /^#\/?(\?|$)/.test(window.location.hash);
+  useEffect(() => {
+    if (oldPersonalHome) window.location.replace("#/personal-lines");
+  }, [oldPersonalHome]);
 
   // Which runs the shell lists: only the run view's "Recent work" section reads this list now (the run's own line,
   // unknown until the run loads). Personal lines and the Compare screen show the work queue; Activity loads its own.
@@ -206,10 +220,12 @@ export function App() {
           ? "New proposal"
           : route.policy
             ? "New policy check"
-            : route.runId
-              ? `${runClient ?? `Run ${route.runId}`}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
-              : "Compare Quotes";
-  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, route.activity, route.certificates, route.certificateNew, route.analytics, route.lossNew, lossRun, certRun, proposalRun, policyRun, runClient]);
+            : route.compareNew
+              ? "New comparison"
+              : route.runId
+                ? `${runClient ?? `Run ${route.runId}`}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
+                : BOOK_NAME.commercial;
+  }, [route.runId, route.wizard, route.policy, route.compareNew, route.integrations, route.personal, route.tasks, route.activity, route.certificates, route.certificateNew, route.analytics, route.lossNew, lossRun, certRun, proposalRun, policyRun, runClient]);
 
   // Rail: Personal lines for its page and its entry screens; a run view highlights its workflow whatever its line
   // (the rail names the tool, the crumb names the book; PERSONAL-LINES-BRIEF.md).
@@ -262,7 +278,7 @@ export function App() {
       ? [bookCrumb, { label: "Proposals", href: "#/proposals/new" }, { label: `Run ${route.runId}` }]
       : policyRun
         ? [bookCrumb, { label: "Policy check", href: `#/policy-check/new${preset}` }, { label: runLabel }]
-        : [bookCrumb, { label: WORKFLOW_NAME, href: `#/${preset}` }, { label: runLabel }];
+        : [bookCrumb, { label: WORKFLOW_NAME, href: compareHref(personalRun ? "personal" : "commercial") }, { label: runLabel }];
   const crumbs: Crumb[] = route.lossNew
     ? [commercialCrumb, { label: "Analytics", href: "#/analytics" }, { label: "New loss review" }]
     : route.analytics
@@ -292,11 +308,18 @@ export function App() {
               { label: "Policy check" },
               { label: "New check" },
             ]
-          : route.runId
-            ? runCrumbs
-            : // Line switch: the Compare start screen is its book's work queue, so it leads with that book. Its Upload
-              // panel's Line choice files the next comparison and does not rename the page (LINE-SWITCH-BRIEF.md).
-              [personalEntry ? toPersonal : commercialCrumb, { label: WORKFLOW_NAME }];
+          : route.compareNew
+            ? // Slice 6: the new comparison page files the run in the chosen book, so its crumbs follow the choice
+              // as the Policy Check wizard's do (COMPARE-MATCH-BRIEF.md).
+              [
+                { ...(checkLine === "personal" ? toPersonal : commercialCrumb), refile: checkRefiled },
+                { label: WORKFLOW_NAME },
+                { label: "New comparison" },
+              ]
+            : route.runId
+              ? runCrumbs
+              : // Slice 6: the Commercial home lists all commercial work under the book's name, like Personal lines.
+                [{ label: BOOK_NAME.commercial }];
 
   return (
     <ToastProvider>
@@ -310,7 +333,7 @@ export function App() {
         <Rail section={section} />
         <div className="app__main">
           <TopBar crumbs={crumbs} />
-          {viewport === "narrow" && !certPage && !lossPage && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
+          {viewport === "narrow" && route.runId != null && !certPage && !lossPage && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
           {route.integrations ? (
             // Static mock: needs nothing from the server, so it renders even when the backend is down.
             <IntegrationsPage />
@@ -360,12 +383,14 @@ export function App() {
           ) : route.activity ? (
             <ActivityPage preset={route.line} />
           ) : route.personal ? (
-            <PersonalLinesPage />
+            <PersonalLinesPage workspace={workspace} />
+          ) : route.compareNew ? (
+            <CompareNew workspace={workspace} entryLine={entryLine} line={checkLine} onLineChange={chooseCheckLine} />
           ) : route.policy ? (
             <PolicyWizard
               workspace={workspace}
               viewport={viewport}
-              entryLine={route.line ?? "commercial"}
+              entryLine={entryLine}
               line={checkLine}
               onLineChange={chooseCheckLine}
             />
@@ -380,12 +405,7 @@ export function App() {
               onRunChanged={setRouteRun}
             />
           ) : (
-            <LaunchView
-              key={route.line ?? "commercial"}
-              workspace={workspace}
-              viewport={viewport}
-              line={route.line ?? "commercial"}
-            />
+            <LaunchView workspace={workspace} line="commercial" />
           )}
         </div>
       </div>

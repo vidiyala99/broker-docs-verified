@@ -1,0 +1,335 @@
+/* Slice 6, lane B: the new comparison page, Compare marks and the Key difference. Tokens only (DESIGN.md);
+   decisions in frontend/COMPARE-MATCH-BRIEF.md. */
+
+/* ------------------------------------------------------------------ #/compare/new */
+
+.compare-new__head {
+  align-items: flex-start;
+}
+
+.compare-new__go {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-1);
+}
+
+.compare-new__go-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.compare-new__gate {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-text-muted);
+}
+
+.compare-new__gate.is-nudged {
+  color: var(--color-stale-fg);
+  font-weight: var(--weight-medium);
+}
+
+.compare-new__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-8);
+  max-width: 1080px;
+}
+
+/* Two columns once the files still get 500px or more (1024 included); one column below, details capped to a form width. */
+@media (min-width: 1000px) {
+  .compare-new__grid {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: var(--space-8);
+  }
+}
+
+@media (min-width: 1280px) {
+  .compare-new__grid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--space-10);
+  }
+}
+
+.compare-new__details {
+  max-width: 560px;
+}
+
+.compare-new__files,
+.compare-new__details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.compare-new__lede {
+  margin-top: calc(-1 * var(--space-2));
+  color: var(--color-text-muted);
+  max-width: 60ch;
+}
+
+.compare-new .dropzone--large {
+  max-width: none;
+}
+
+.dropzone__note {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: var(--numeric-table);
+}
+
+/* Quote rows: letter slot, format glyph, name, meta, Remove; a second line only for news (a refusal, a warning). */
+.quote-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.quote-row {
+  display: grid;
+  grid-template-columns: 20px 20px minmax(0, 1fr) auto 32px;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  align-items: center;
+  min-height: 48px;
+  padding: var(--space-1) 0;
+  border-top: var(--border-width) solid var(--color-hairline);
+}
+
+.quote-row:last-child {
+  border-bottom: var(--border-width) solid var(--color-hairline);
+}
+
+.quote-row__slot {
+  display: inline-flex;
+}
+
+.quote-row__glyph {
+  color: var(--color-text-muted);
+}
+
+.quote-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-medium);
+}
+
+.quote-row__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: var(--numeric-table);
+  white-space: nowrap;
+}
+
+.quote-row__progress {
+  width: 72px;
+}
+
+.quote-row__refused {
+  color: var(--color-danger-fg);
+  font-weight: var(--weight-medium);
+}
+
+.quote-row__remove {
+  justify-self: end;
+}
+
+.quote-row__news {
+  grid-column: 3 / -1;
+  padding-bottom: var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--color-text-muted);
+}
+
+.quote-row__error {
+  color: var(--color-danger-fg);
+}
+
+.quote-row--rejected .quote-row__name {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+.context-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.context-field__input {
+  width: 100%;
+  min-height: 112px;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  resize: vertical;
+}
+
+.context-field__input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.context-field__input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 0;
+  border-color: var(--color-primary);
+}
+
+.context-field__count {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: var(--numeric-table);
+}
+
+@media (max-width: 599px) {
+  .compare-new__head {
+    padding: var(--space-4);
+  }
+  .compare-new__go {
+    justify-items: stretch;
+    width: 100%;
+  }
+  .compare-new__go-row .btn--primary {
+    flex: 1;
+  }
+  .compare-new .wizard__body {
+    padding: var(--space-4) var(--space-4) var(--space-10);
+  }
+  .compare-new .dropzone--large {
+    padding: var(--space-8) var(--space-4);
+  }
+  .quote-row {
+    grid-template-columns: 20px 20px minmax(0, 1fr) 32px;
+  }
+  .quote-row__meta {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .quote-row__remove {
+    grid-column: 4;
+    grid-row: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ comparison table */
+
+.col-head__kind {
+  display: block;
+  margin-top: 2px;
+  padding-left: 28px; /* under the carrier name, past the 20px letter and its 8px gap */
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-muted);
+}
+
+/* Worse: an outlined value with a diamond glyph (the triangle stays "Couldn't verify", DG3). */
+.mark-worse {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid var(--severity-high-fg);
+  border-radius: var(--radius-chip);
+}
+
+/* A chip stays on the line of the word it follows. */
+.nowrap {
+  white-space: nowrap;
+}
+
+.mark-glyph {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-left: var(--space-1);
+  color: var(--severity-high-fg);
+}
+
+/* Best: the value in the success colour plus the plain uppercase status word (DESIGN.md table status words). */
+.mark-best {
+  color: var(--doc-3-fg);
+  font-weight: var(--weight-semibold);
+}
+
+.mark-best__word {
+  margin-left: var(--space-2);
+  color: var(--doc-3-fg);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------ Key difference */
+
+.key-difference {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 72ch;
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.key-difference .report-section__title {
+  font-family: var(--font-serif);
+}
+
+.key-difference__text {
+  font-size: var(--text-md);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.key-difference__text .chips {
+  margin-left: var(--space-1);
+}
+
+.key-difference__source {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-text-muted);
+}
+
+.key-difference.is-stale .key-difference__text {
+  color: var(--color-text-muted);
+}
+
+/* "edited by you": a cell reference with no source page; it takes the reader to the edited cell. */
+.chip--edited {
+  --hue-bg: var(--color-surface);
+  --hue-fg: var(--evidence-edited-fg);
+  border-color: var(--color-border-input);
+  font-weight: var(--weight-medium);
+}
+
+.chip--edited svg {
+  margin-right: 2px;
+}
+
+/* Source pane: a Word or Excel quote's original. */
+.source-pane__original {
+  margin-left: auto;
+}
+
+.source-pane__original + .btn {
+  margin-left: 0;
+}
+
+@media (max-width: 599px) {
+  .key-difference {
+    padding: var(--space-4);
+  }
+}

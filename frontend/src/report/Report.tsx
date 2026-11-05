@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { ArrowsClockwise, ClockCounterClockwise, Info, Warning, X } from "@phosphor-icons/react";
-import type { Artifact, Block, Chip as ChipData, Notice, Section, Segment } from "../api/types";
+import { useMemo, useState } from "react";
+import { ArrowsClockwise, ClockCounterClockwise, Info, PencilSimple, Warning, X } from "@phosphor-icons/react";
+import type { Artifact, Block, Cell, Chip as ChipData, KeyDifferenceBlock, Notice, Section, Segment } from "../api/types";
 import { ChipList, type OpenSource } from "./Chip";
-import { ReportTable, type TableActions } from "./Table";
+import { cellDomId, ReportTable, type TableActions } from "./Table";
+import { keyboardAction } from "../ui/input";
+import { reducedMotion } from "../ui/motion";
 
 export function Segments({
   segments,
@@ -133,6 +135,8 @@ function BlockView({ block, actions, skeleton }: { block: Block; actions: Report
           </p>
         </article>
       );
+    case "key_difference":
+      return null; // rendered by its section (KeyDifferenceView)
     case "issue":
       return (
         <article className="issue">
@@ -168,7 +172,116 @@ function ProseSkeleton() {
   );
 }
 
-function SectionView({ section, actions }: { section: Section; actions: ReportActions }) {
+type CellIndex = Map<string, Cell>;
+const cellKey = (row: string, column: string) => `${row}\u0000${column}`;
+
+/** Every table cell of the report by (row key, column letter): what a Key difference segment cites (R10). */
+function indexCells(artifact: Artifact): CellIndex {
+  const index: CellIndex = new Map();
+  for (const s of artifact.content.sections)
+    for (const b of s.blocks)
+      if (b.type === "table") for (const r of b.rows) for (const [col, cell] of Object.entries(r.cells)) index.set(cellKey(r.key, col), cell);
+  return index;
+}
+
+/** Segments carry no reliable spacing (a model segment may end without a space, a template one may start with one):
+ *  join with one space unless either side already has it or the next starts with closing punctuation. */
+function joinSpace(prev: string | undefined, next: string): string {
+  return prev != null && !/\s$/.test(prev) && !/^[\s.,;:)]/.test(next) ? " " : "";
+}
+
+/** R10: a cited cell shows its current source chips; an edited one shows "edited by you", which takes the reader to the
+ *  cell (its own source is the broker, not a page). A cell with neither (Not stated) shows nothing. */
+function CellChips({ refs, cells, actions }: { refs: KeyDifferenceBlock["segments"][number]["cells"]; cells: CellIndex; actions: ReportActions }) {
+  const ids: number[] = [];
+  const edited: { row: string; column: string }[] = [];
+  for (const ref of refs) {
+    const cell = cells.get(cellKey(ref.row, ref.column));
+    if (!cell) continue;
+    if (cell.edited) edited.push(ref);
+    else for (const id of cell.passage_ids) if (!ids.includes(id)) ids.push(id);
+  }
+  if (!ids.length && !edited.length) return null;
+  return (
+    <>
+      <ChipList ids={ids} chips={actions.chips} onOpen={actions.onOpen} />
+      {edited.map((ref) => (
+        <span key={`${ref.row}-${ref.column}`} className="chips">
+          <button
+            type="button"
+            className="chip chip--edited"
+            aria-label={`${ref.column}: edited by you. Go to the cell`}
+            onClick={() => {
+              const td = document.getElementById(cellDomId(ref.row, ref.column));
+              if (!td) return;
+              td.scrollIntoView({ block: "center", behavior: keyboardAction() || reducedMotion() ? "auto" : "smooth" });
+              td.focus({ preventScroll: true });
+            }}
+          >
+            <PencilSimple size={12} weight="bold" aria-hidden />
+            edited by you
+          </button>
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** Spec 3.3 / 5 with R3 and R10: the Key difference, first in the report, one canvas panel. Sentence segments with their
+ *  cell chips, where it came from (model or rule), and the stale tag with Rewrite when the marks moved since. */
+function KeyDifferenceView({ section, block, cells, actions }: { section: Section; block: KeyDifferenceBlock; cells: CellIndex; actions: ReportActions }) {
+  const stale = Boolean(block.stale || section.stale);
+  return (
+    <section className={`report-section level-1 key-difference${stale ? " is-stale" : ""}`} id={`section-${section.id}`} aria-labelledby={`h-${section.id}`} data-section={section.id}>
+      <div className="report-section__head">
+        <h2 id={`h-${section.id}`} className="report-section__title" tabIndex={-1}>
+          {section.title || block.title}
+        </h2>
+        {stale && (
+          <span className="stale">
+            <span className="stale-tag">
+              <ClockCounterClockwise size={14} aria-hidden />
+              May be out of date
+            </span>
+            <button type="button" className="link-btn" onClick={actions.onRegenerate} disabled={actions.regenerating}>
+              {actions.regenerating ? "Rewriting..." : "Rewrite"}
+            </button>
+          </span>
+        )}
+      </div>
+      {actions.regenerating ? (
+        <ProseSkeleton />
+      ) : (
+        <p className="key-difference__text">
+          {block.segments.map((s, i) => {
+            const chips = s.cells.length > 0 ? <CellChips refs={s.cells} cells={cells} actions={actions} /> : null;
+            // The chip stays on the line of the segment's last word (no chip alone at the start of a line).
+            const cut = chips ? s.text.trimEnd().lastIndexOf(" ") + 1 : s.text.length;
+            return (
+              <span key={i}>
+                {joinSpace(block.segments[i - 1]?.text, s.text)}
+                {s.text.slice(0, cut)}
+                {chips && (
+                  <span className="nowrap">
+                    {s.text.slice(cut)}
+                    {chips}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </p>
+      )}
+      <p className="key-difference__source">
+        {block.source === "model" ? "Drafted by the model and checked against the marked cells." : "Written by rule from the marked cells."}
+      </p>
+    </section>
+  );
+}
+
+function SectionView({ section, actions, cells }: { section: Section; actions: ReportActions; cells: CellIndex }) {
+  const kd = section.blocks.find((b): b is KeyDifferenceBlock => b.type === "key_difference");
+  if (kd) return <KeyDifferenceView section={section} block={kd} cells={cells} actions={actions} />;
   const Tag = section.level <= 1 ? "h2" : "h3";
   const skeleton = actions.regenerating && section.blocks.some((b) => b.type === "paragraph" || b.type === "list");
   return (
@@ -199,11 +312,12 @@ function SectionView({ section, actions }: { section: Section; actions: ReportAc
 }
 
 export function Report({ artifact, actions }: { artifact: Artifact; actions: ReportActions }) {
+  const cells = useMemo(() => indexCells(artifact), [artifact]);
   return (
     <article className="report" aria-label={artifact.title}>
       <Notices notices={artifact.content.notices} actions={actions} />
       {artifact.content.sections.map((s) => (
-        <SectionView key={s.id} section={s} actions={actions} />
+        <SectionView key={s.id} section={s} actions={actions} cells={cells} />
       ))}
     </article>
   );

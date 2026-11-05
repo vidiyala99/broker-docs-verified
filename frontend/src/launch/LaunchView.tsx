@@ -1,113 +1,94 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, ListChecks, ShieldCheck } from "@phosphor-icons/react";
-import { api, ApiError } from "../api/client";
+import { ShieldCheck } from "@phosphor-icons/react";
 import type { Line, Workspace } from "../api/types";
-import { LineChoice } from "../personal/LineChoice";
-import { Accordion } from "../ui/Accordion";
-import { LeftPanel, type Viewport } from "../shell/layout";
-import { Chat } from "../run/Chat";
 import { QueueView } from "../queue/QueueView";
 import { useQueue } from "../queue/useQueue";
 import { isEmpty } from "../queue/queueUtil";
-import { ClientField } from "../queue/ClientField";
-import { DropZone, FileRows, useUploads } from "./Upload";
+import { Glyph, WorkflowMark } from "../voice/marks";
+import { acceptOf, compareUploads, DropZone, useUploads } from "./Upload";
+import "../personal/personal.css";
 
-export function LaunchView({
-  workspace,
-  viewport,
-  line: entryLine,
-}: {
-  workspace: Workspace;
-  viewport: Viewport;
-  /** Preset from the entry point (`#/?line=personal` from Personal lines; the rail means commercial). */
-  line: Line;
-}) {
-  const uploads = useUploads(workspace.limits);
-  // O5: Compare Quotes has no wizard, so the line choice sits on this upload screen, defaulted from the entry point.
-  const [line, setLine] = useState<Line>(entryLine);
-  useEffect(() => setLine(entryLine), [entryLine]);
-  const [client, setClient] = useState("");
-  const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
-  const ready = uploads.rows.filter((r) => r.status === "ready" && r.doc);
-  const busy = uploads.rows.some((r) => r.status === "uploading");
-  // Work queue (spec section 2): the main area shows the entry line's queue instead of Recent runs.
-  const data = useQueue(entryLine);
-  const queueEmpty = data.queue != null && !data.error && isEmpty(data.queue);
+/** Where a book's start buttons go (slice 6: Compare opens its own upload page, `#/compare/new`). */
+export function compareHref(line: Line): string {
+  return `#/compare/new${line === "personal" ? "?line=personal" : ""}`;
+}
 
-  const start = async () => {
-    setStarting(true);
-    setStartError(null);
-    try {
-      const res = await api.startRun(ready.map((r) => r.doc!.id), line, client);
-      uploads.clear();
-      window.location.hash = `#/runs/${res.run.id}`;
-    } catch (e) {
-      setStartError(e instanceof ApiError ? e.message : "Couldn't start the run. Retry.");
-    } finally {
-      setStarting(false);
-    }
+export function checkHref(line: Line): string {
+  return `#/policy-check/new${line === "personal" ? "?line=personal" : ""}`;
+}
+
+const BOOK: Record<Line, { title: string; sub: string; compare: string; empty: string }> = {
+  commercial: {
+    title: "Commercial",
+    sub: "Business policies: liability, property, commercial auto and workers' comp.",
+    compare: "Compare quotes",
+    empty: "No commercial work yet.",
+  },
+  personal: {
+    title: "Personal lines",
+    sub: "Homeowners, auto and other household policies.",
+    compare: "Compare homeowners quotes",
+    empty: "No personal-lines work yet.",
+  },
+};
+
+function Actions({ line }: { line: Line }) {
+  return (
+    <div className="personal__actions">
+      <a href={compareHref(line)} className="btn btn--primary">
+        <WorkflowMark slug="compare-quotes" size={18} /> {BOOK[line].compare}
+      </a>
+      <a href={checkHref(line)} className="btn btn--secondary">
+        <WorkflowMark slug="policy-check" size={18} /> Check a renewal
+      </a>
+    </div>
+  );
+}
+
+/**
+ * A book's home (slice 6, spec 4.2; Activity/queue change 2): the book's whole work queue under its own name, so the
+ * Commercial home is no longer titled "Compare Quotes" (it lists loss reviews and checks too) and matches Personal
+ * lines. One primary, Compare quotes (to `#/compare/new`), and Check a renewal. No left panel. The empty state keeps a
+ * large drop zone: dropped files go into the shared upload store and the page moves to `#/compare/new`, where they keep
+ * uploading. Decisions in COMPARE-MATCH-BRIEF.md.
+ */
+export function LaunchView({ workspace, line }: { workspace: Workspace; line: Line }) {
+  const data = useQueue(line);
+  const empty = data.queue != null && !data.error && isEmpty(data.queue);
+  const uploads = useUploads(workspace.limits, compareUploads);
+  const book = BOOK[line];
+  const drop = (files: File[]) => {
+    uploads.add(files);
+    window.location.hash = compareHref(line);
   };
-
   return (
     <div className="workspace">
-      <LeftPanel viewport={viewport} label="Compare Quotes panel">
-        <div className="panel-scroll">
-          <Accordion title="Upload" count={ready.length} defaultOpen>
-            <div className="upload">
-              {!queueEmpty ? (
-                <DropZone limits={workspace.limits} onFiles={uploads.add} />
-              ) : (
-                uploads.rows.length === 0 && <p className="hint">Add quote PDFs with the drop zone on the right.</p>
-              )}
-              <FileRows rows={uploads.rows} onRemove={uploads.remove} />
-              <ClientField value={client} onChange={setClient} />
-              <LineChoice value={line} onChange={setLine} />
-              {startError && (
-                <p className="inline-error" role="alert">
-                  {startError}
-                </p>
-              )}
-              <button
-                type="button"
-                className="btn btn--primary btn--block"
-                disabled={!ready.length || busy || starting}
-                onClick={() => void start()}
-              >
-                {starting ? "Starting..." : ready.length ? `Compare ${ready.length} ${ready.length === 1 ? "quote" : "quotes"}` : "Compare quotes"}
-                {!starting && <ArrowRight size={16} aria-hidden />}
-              </button>
-              {!workspace.model_configured && (
-                <p className="hint">No model key is set on the server, so documents can't be read until one is configured.</p>
-              )}
-            </div>
-          </Accordion>
-          <Accordion title="Input parameters">
-            <p className="hint">Compare Quotes has no parameters. Column order follows the upload order.</p>
-          </Accordion>
-        </div>
-        <Chat runId={0} artifact={null} onOpen={() => undefined} onEdited={() => undefined} />
-      </LeftPanel>
+      <main className="pane personal" id="main" tabIndex={-1} aria-labelledby="book-title">
+        <div className="personal__body">
+          <header className="personal__head">
+            <h1 id="book-title" className="page-title">
+              {book.title}
+            </h1>
+            <p className="personal__sub">{book.sub}</p>
+            {/* One place per state for the two actions: the header, or the empty state (no duplicate CTAs). */}
+            {!empty && <Actions line={line} />}
+          </header>
 
-      <main className="pane" id="main" tabIndex={-1} aria-labelledby="pane-title">
-        <div className="tabs" role="presentation">
-          <span className="tab is-active">
-            <ListChecks size={16} aria-hidden /> Work queue
-          </span>
-        </div>
-        <div className="pane__body pane__body--launch">
-          <h1 id="pane-title" className="page-title">
-            Compare Quotes
-          </h1>
           <QueueView
             data={data}
-            line={entryLine}
+            line={line}
             empty={
               <div className="queue-empty queue-empty--launch">
-                <h2 className="queue-empty__title">No {entryLine === "personal" ? "personal-lines" : "commercial"} work yet.</h2>
-                <DropZone limits={workspace.limits} onFiles={uploads.add} large />
-                {uploads.rows.length > 0 && <p className="hint">Your files are listed in the Upload panel. Start the comparison there.</p>}
-                <a href={`#/policy-check/new${entryLine === "personal" ? "?line=personal" : ""}`} className="btn btn--secondary queue-empty__alt">
+                <Glyph name="blank" size={32} className="muted-glyph" />
+                <h2 className="queue-empty__title">{book.empty}</h2>
+                <DropZone
+                  limits={workspace.limits}
+                  onFiles={drop}
+                  large
+                  title="Drop quotes to compare"
+                  accept={acceptOf(workspace.limits)}
+                  limitsLine="PDF, Word and Excel quotes, proposals and summaries"
+                />
+                <a href={checkHref(line)} className="btn btn--secondary queue-empty__alt">
                   <ShieldCheck size={18} aria-hidden /> Check a renewal instead
                 </a>
               </div>

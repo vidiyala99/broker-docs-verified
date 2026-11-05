@@ -16,9 +16,9 @@ import {
   FileText,
 } from "@phosphor-icons/react";
 import { api, ApiError, downloadExport, type ExportFormat } from "../api/client";
-import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW } from "../config";
+import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "../config";
 import { useRunEvents } from "../api/useRunEvents";
-import type { Artifact, Chip, EditResult, Line, Run, RunDocument, Workspace } from "../api/types";
+import type { Artifact, Chip, EditResult, Line, Run, RunDocument, SourceFormat, Workspace } from "../api/types";
 import { Accordion } from "../ui/Accordion";
 import { useToast } from "../ui/Toast";
 import { Tip } from "../ui/Tip";
@@ -29,7 +29,9 @@ import { Discrepancies } from "../policy/Discrepancies";
 import { ROLE_INFO } from "../policy/draft";
 import { Outline, warningSummary, type TrustFilter } from "../report/Outline";
 import type { CellRef } from "../report/Table";
-import { hueOf } from "../report/Chip";
+import { hueOf, SourceFormats } from "../report/Chip";
+import { FormatGlyph } from "../launch/Upload";
+import { compareHref } from "../launch/LaunchView";
 import type { PdfTarget } from "../pdf/PdfViewer";
 import { keyboardAction } from "../ui/input";
 import { tokenMs, usePresence } from "../ui/motion";
@@ -425,6 +427,15 @@ export function RunView({
   };
 
   // ------------------------------------------------------------------ derived
+  // Slice 6: each document's uploaded format, for the Compare column labels, the chips' "Rendered from" line and the
+  // source pane's Download original. Older payloads omit it (= PDF).
+  const formats = useMemo(() => {
+    const m: Record<number, SourceFormat | undefined> = {};
+    for (const d of run?.documents ?? []) m[d.document_id] = d.source_format ?? "pdf";
+    return m;
+  }, [run?.documents]);
+  const isCompare = run?.workflow_name === WORKFLOW_NAME;
+
   const actions: ReportActions | null = useMemo(
     () =>
       artifact && run
@@ -438,9 +449,10 @@ export function RunView({
             onRegenerate: () => void regenerate(),
             onRetryProse: () => void regenerate(),
             regenerating,
+            compare: isCompare ? { formats } : null,
           }
         : null,
-    [artifact, run, openSource, retryRun, onSave, filter, regenerate, regenerating],
+    [artifact, run, openSource, retryRun, onSave, filter, regenerate, regenerating, isCompare, formats],
   );
 
   if (loadError) {
@@ -454,7 +466,7 @@ export function RunView({
                 Retry
               </button>
               <a href="#/" className="link-btn">
-                Back to Compare Quotes
+                Back to Commercial
               </a>
             </div>
           </div>
@@ -501,6 +513,7 @@ export function RunView({
   );
 
   return (
+    <SourceFormats.Provider value={formats}>
     <div className="workspace">
       <LeftPanel
         viewport={viewport}
@@ -530,15 +543,22 @@ export function RunView({
               <ProposalParams parameters={run.parameters} />
             ) : isPolicy && run ? (
               <RoleParams run={run} />
+            ) : typeof run?.parameters.additional_context === "string" && run.parameters.additional_context ? (
+              <dl className="params">
+                <div className="params__row">
+                  <dt>Additional context</dt>
+                  <dd>{run.parameters.additional_context}</dd>
+                </div>
+              </dl>
             ) : (
-              <p className="hint">Compare Quotes has no parameters. Column order follows the upload order.</p>
+              <p className="hint">No additional context. Column order follows the upload order.</p>
             )}
           </Accordion>
           <Accordion title="Recent work" count={runs?.length}>
             {runs && <RecentRuns runs={runs} compact currentId={runId} />}
           </Accordion>
           <a
-            href={isProposal ? "#/proposals/new" : `${isPolicy ? "#/policy-check/new" : "#/"}${personal ? "?line=personal" : ""}`}
+            href={isProposal ? "#/proposals/new" : isPolicy ? `#/policy-check/new${personal ? "?line=personal" : ""}` : compareHref(personal ? "personal" : "commercial")}
             className="btn btn--ghost btn--block new-run"
           >
             <Plus size={16} aria-hidden /> {isProposal ? "New proposal" : isPolicy ? "New check" : "New comparison"}
@@ -593,7 +613,7 @@ export function RunView({
                   setSplitAnim(false);
                 }}
               >
-                <FilePdf size={16} aria-hidden />
+                <FormatGlyph format={formats[p.documentId]} size={16} />
                 <span className="tab__label">
                   {p.letter}. {p.filename}
                 </span>
@@ -760,6 +780,17 @@ export function RunView({
                   {shownPdf.letter}
                 </span>
                 <span className="source-pane__name">{shownPdf.filename}</span>
+                {/* Slice 6: a Word or Excel quote is shown as the PDF we drew from it; the file itself is one click away. */}
+                {(formats[shownPdf.documentId] === "docx" || formats[shownPdf.documentId] === "xlsx") && (
+                  <a
+                    className="btn btn--ghost btn--sm source-pane__original"
+                    href={api.originalUrl(shownPdf.documentId)}
+                    download
+                    aria-label={`Download original ${formats[shownPdf.documentId] === "docx" ? "Word" : "Excel"} file, ${shownPdf.filename}`}
+                  >
+                    <FormatGlyph format={formats[shownPdf.documentId]} size={16} /> Download original
+                  </a>
+                )}
                 <button type="button" className="btn btn--ghost btn--sm" onClick={exitSplit}>
                   {split || paneLeaving ? "Exit" : "Back to report"} <kbd>Esc</kbd>
                 </button>
@@ -773,6 +804,7 @@ export function RunView({
         </p>
       </main>
     </div>
+    </SourceFormats.Provider>
   );
 }
 

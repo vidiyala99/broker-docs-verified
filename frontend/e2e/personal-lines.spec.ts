@@ -73,7 +73,8 @@ test("Personal lines lists runs 7 and 8 and no Compare runs; Workflows lists nei
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { level: 1, name: "Personal lines" })).toBeVisible();
   await expect(main.getByText("Homeowners, auto and other household policies.")).toBeVisible();
-  await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveAttribute("href", "#/?line=personal");
+  // Slice 6 (lane B, allowed edit): Compare opens its own upload page.
+  await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveAttribute("href", "#/compare/new?line=personal");
   await expect(main.getByRole("link", { name: "Check a renewal" })).toHaveAttribute("href", "#/policy-check/new?line=personal");
 
   // Work queue lane (D7 allowed edit): rows are named by client, not "Policy check, run N"; the count is the
@@ -104,12 +105,12 @@ test("Each entry action lands with Personal preselected and keeps it on reload; 
 
   await page.goto("/#/personal-lines");
   await page.getByRole("main").getByRole("link", { name: "Compare homeowners quotes" }).click();
-  await expect(page).toHaveURL(/#\/\?line=personal$/);
+  // Slice 6 (lane B, allowed edit): the entry is the upload page (#/compare/new), which files the run in the book.
+  await expect(page).toHaveURL(/#\/compare\/new\?line=personal$/);
   await expect(line("Personal")).toBeChecked();
-  await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes$/);
+  await expect(crumbs(page)).toHaveText(/^Personal lines.*Compare Quotes.*New comparison$/);
   await expect(railPersonal(page)).toHaveAttribute("aria-current", "page");
-  // The launch list follows the entry: the personal runs.
-  await expect(runLink(page, 7)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "New comparison" })).toBeVisible();
   await page.reload();
   await expect(line("Personal")).toBeChecked();
   await shot(page, "1440-compare-personal");
@@ -131,7 +132,9 @@ test("Each entry action lands with Personal preselected and keeps it on reload; 
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Policy check, new check" }).click();
   await expect(page).toHaveURL(/#\/policy-check\/new$/);
   await expect(line("Commercial")).toBeChecked();
+  // Slice 6: rail Workflows opens the Commercial home; its Compare quotes opens the upload page in Commercial.
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Workflows" }).click();
+  await page.getByRole("main").getByRole("link", { name: "Compare quotes" }).click();
   await expect(line("Commercial")).toBeChecked();
   // Keyboard: arrow keys move the choice (native radios, one tab stop).
   await line("Commercial").focus();
@@ -143,8 +146,8 @@ test("Starting a comparison and a check from Personal lines makes personal runs"
   // Compare Quotes: line sent on POST /api/runs; the new run is personal and listed under Personal lines.
   await page.goto("/#/personal-lines");
   await page.getByRole("main").getByRole("link", { name: "Compare homeowners quotes" }).click();
-  await page.locator(".upload input[type=file]").setInputFiles([path.join(QUOTES, "carrier_a_clean.pdf"), path.join(QUOTES, "carrier_c_clean.pdf")]);
-  await expect(page.locator(".file-row--ready")).toHaveCount(2);
+  await page.locator(".compare-new input[type=file]").setInputFiles([path.join(QUOTES, "carrier_a_clean.pdf"), path.join(QUOTES, "carrier_c_clean.pdf")]);
+  await expect(page.locator(".quote-row--ready")).toHaveCount(2);
   const [post] = await Promise.all([
     page.waitForRequest((r) => r.method() === "POST" && /\/api\/runs$/.test(r.url())),
     page.getByRole("button", { name: "Compare 2 quotes" }).click(),
@@ -293,8 +296,10 @@ test("Empty state when no run is personal", async ({ page }) => {
     // Work queue lane (D7 allowed edit): the queue's empty state replaces the run list's.
     await expect(main.getByRole("heading", { name: "No personal-lines work yet." })).toBeVisible();
     await expect(main.locator("li[data-run-id]")).toHaveCount(0);
-    // The two actions appear once, in the empty state.
-    await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveCount(1);
+    // The two actions appear once, in the empty state. Slice 6 (lane B, allowed edit, spec 4.2): the comparison starts
+    // from the empty state's drop zone, which hands its files to the upload page.
+    await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveCount(0);
+    await expect(main.getByText("Drop quotes to compare")).toBeVisible();
     await expect(main.getByRole("link", { name: "Check a renewal" })).toHaveCount(1);
     await expect(main.locator(".queue-empty").getByRole("link", { name: "Check a renewal" })).toBeVisible();
     await shot(page, "1440-empty");
@@ -336,8 +341,8 @@ for (const vp of [
     await noSideScroll(page);
     await axe(page, `check personal ${vp.w}`);
 
-    await page.goto("/#/?line=personal");
-    await expect(page.getByRole("heading", { name: "Compare Quotes" })).toBeVisible();
+    await page.goto("/#/compare/new?line=personal"); // slice 6: the Compare entry screen
+    await expect(page.getByRole("heading", { name: "New comparison" })).toBeVisible();
     await noSideScroll(page);
     await axe(page, `compare personal ${vp.w}`);
   });

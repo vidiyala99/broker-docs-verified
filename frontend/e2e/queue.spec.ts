@@ -113,7 +113,8 @@ test("both pages show the seeded runs in the right groups, named by client", asy
   await axe(page, "personal 1440");
 
   await page.goto("/#/");
-  await expect(page.getByRole("heading", { level: 1, name: "Compare Quotes" })).toBeVisible();
+  // Slice 6 (lane B, allowed edit; Activity/queue change 2): the home lists all commercial work under the book's name.
+  await expect(page.getByRole("heading", { level: 1, name: "Commercial" })).toBeVisible();
   await expect(inGroup(page, "ready", 6)).toBeVisible();
   await expect(inGroup(page, "ready", 4)).toHaveCount(0);
   await expect(row(page, 6).getByRole("button", { name: /^Build proposal/ })).toBeVisible();
@@ -314,7 +315,9 @@ test("all-empty queue: one calm empty state carrying the start actions", async (
   await page.goto("/#/personal-lines");
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { name: "No personal-lines work yet." })).toBeVisible();
-  await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveCount(1);
+  // Slice 6 (lane B, allowed edit, spec 4.2): both books' empty states start a comparison from the drop zone.
+  await expect(main.getByRole("link", { name: "Compare homeowners quotes" })).toHaveCount(0);
+  await expect(main.getByText("Drop quotes to compare")).toBeVisible();
   await expect(main.getByRole("link", { name: "Check a renewal" })).toHaveCount(1);
   await expect(main.locator("section[data-group]")).toHaveCount(0);
   await shot(page, "1440-empty-personal");
@@ -322,7 +325,7 @@ test("all-empty queue: one calm empty state carrying the start actions", async (
 
   await page.goto("/#/");
   await expect(main.getByRole("heading", { name: "No commercial work yet." })).toBeVisible();
-  await expect(main.getByText("Drop quote PDFs to compare")).toBeVisible();
+  await expect(main.getByText("Drop quotes to compare")).toBeVisible();
   await expect(main.getByRole("link", { name: "Check a renewal instead" })).toHaveAttribute("href", "#/policy-check/new");
   await shot(page, "1440-empty-workflows");
   await axe(page, "empty workflows 1440");
@@ -352,10 +355,11 @@ test("an error shows the notice with Retry and stops polling", async ({ page }) 
 });
 
 test("Client field: set on Compare and Policy Check start, edited and cleared in the run header", async ({ page }) => {
-  // Compare upload panel: the name goes out as client_name (the POST answer is intercepted, nothing is created).
-  await page.goto("/#/");
-  await page.locator(".upload input[type=file]").setInputFiles([path.join(QUOTES, "carrier_a_clean.pdf")]);
-  await expect(page.locator(".file-row--ready")).toHaveCount(1);
+  // Compare upload page (slice 6: #/compare/new, two quotes minimum): the name goes out as client_name (the POST answer
+  // is intercepted, nothing is created).
+  await page.goto("/#/compare/new");
+  await page.locator(".compare-new input[type=file]").setInputFiles([path.join(QUOTES, "carrier_a_clean.pdf"), path.join(QUOTES, "carrier_c_clean.pdf")]);
+  await expect(page.locator(".quote-row--ready")).toHaveCount(2);
   await page.getByLabel(/^Client/).fill("  Harbor   Lights Marina ");
   await page.route(/\/api\/runs$/, (route) =>
     route.request().method() === "POST"
@@ -364,7 +368,7 @@ test("Client field: set on Compare and Policy Check start, edited and cleared in
   );
   const [post] = await Promise.all([
     page.waitForRequest((r) => r.method() === "POST" && /\/api\/runs$/.test(r.url())),
-    page.getByRole("button", { name: "Compare 1 quote" }).click(),
+    page.getByRole("button", { name: "Compare 2 quotes" }).click(),
   ]);
   expect(post.postDataJSON()).toMatchObject({ workflow: "compare-quotes", client_name: "Harbor   Lights Marina" });
 

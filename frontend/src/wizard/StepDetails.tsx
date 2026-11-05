@@ -390,7 +390,10 @@ export function UploadedPicker({
                       />
                       <span className="picker__name">{d.filename}</span>
                       <span className="picker__meta">
-                        {d.kind === "ams" ? "AMS export" : `${d.page_count ?? "?"} pages`}, {formatWhen(d.created_at)}
+                        {d.kind === "ams"
+                          ? "AMS export"
+                          : `${d.source_format === "docx" ? "Word, " : d.source_format === "xlsx" ? "Excel, " : ""}${d.page_count ?? "?"} pages`}
+                        , {formatWhen(d.created_at)}
                       </span>
                     </label>
                   </li>

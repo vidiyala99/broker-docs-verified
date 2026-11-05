@@ -78,26 +78,17 @@ test("Failed, cancelled and partial runs keep Upload open", async ({ page }) => 
   await expect(page.locator(".doc-row--failed .doc-row__news").first()).toBeVisible();
 });
 
-test("Long file list folds past six; rejected rows never fold", async ({ page }) => {
-  await page.goto("/");
+// Slice 6 (lane B, allowed edit): the launch panel's file list moved to the full-width upload page (#/compare/new),
+// which lists every file in column order without folding; the ninth and tenth are refused in place with the cap.
+test("New comparison lists every file in column order; past eight are refused in place", async ({ page }) => {
+  await page.goto("/#/compare/new");
   const names = ["a_clean", "b_clean", "c_clean", "d_clean", "a_multicol", "b_multicol", "c_multicol", "d_multicol", "a_scanned", "b_scanned"];
-  await page.locator(".upload input[type=file]").setInputFiles(names.map((n) => path.join(FIX, `carrier_${n}.pdf`)));
-  await expect(page.locator(".file-row--rejected")).toHaveCount(2);
-  const more = page.locator(".more-row__btn");
-  await expect(more).toHaveText("+3 more");
-  await expect(more).toHaveAttribute("aria-expanded", "false");
-  await expect(page.locator(".file-row--ready")).toHaveCount(5);
-  // The fold sits where the folded rows are, before the rejected ones.
-  const rows = await page.locator(".file-rows > li").evaluateAll((ls) => ls.map((l) => l.className));
-  expect(rows.indexOf("more-row")).toBe(5);
-  await axe(page, "launch, 10 files folded");
-
-  await more.focus();
-  await page.keyboard.press("Enter");
-  await expect(more).toHaveText("Show fewer");
-  await expect(more).toHaveAttribute("aria-expanded", "true");
-  await expect(more).toBeFocused();
-  await expect(page.locator(".file-row--ready")).toHaveCount(8);
+  await page.locator(".compare-new input[type=file]").setInputFiles(names.map((n) => path.join(FIX, `carrier_${n}.pdf`)));
+  await expect(page.locator(".quote-row--rejected")).toHaveCount(2);
+  await expect(page.locator(".quote-row--rejected").first()).toContainText("A comparison takes at most 8 files");
+  await expect(page.locator(".quote-row--ready")).toHaveCount(8);
+  await expect(page.locator(".quote-row--ready .doc-letter")).toHaveText(["A", "B", "C", "D", "E", "F", "G", "H"]);
+  await axe(page, "new comparison, 10 files");
 });
 
 test("Under 1280 the strip's Show chat and Show uploads open that section", async ({ page }) => {
