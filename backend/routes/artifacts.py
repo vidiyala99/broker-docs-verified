@@ -17,6 +17,7 @@ from backend import db, export, export_docx, models
 from backend.context import AppContext
 from backend.edits import EditError, regenerate_prose, restore, save_cell_edit
 from backend.routes.common import ApiError, get_ctx, not_found
+from backend.schemas import KEY_DIFFERENCE_SECTION_ID
 from backend.views import artifact_out, chips, version_out
 
 log = logging.getLogger("brokerdocs.api")
@@ -85,8 +86,13 @@ class CellEdit(BaseModel):
 
 
 def _saved(ctx: AppContext, saved) -> dict[str, Any]:
-    return {"artifact": artifact_json(ctx, saved.artifact_id), "version": saved.version,
-            "previous_version": saved.previous_version, "stale_sections": saved.stale_sections}
+    artifact = artifact_json(ctx, saved.artifact_id)
+    stale = list(saved.stale_sections)
+    # Slice 6 (R3): a Compare Key difference goes stale on read when the edit moved the marks.
+    if KEY_DIFFERENCE_SECTION_ID in artifact["stale_sections"] and KEY_DIFFERENCE_SECTION_ID not in stale:
+        stale.append(KEY_DIFFERENCE_SECTION_ID)
+    return {"artifact": artifact, "version": saved.version,
+            "previous_version": saved.previous_version, "stale_sections": stale}
 
 
 @router.patch("/artifacts/{artifact_id}/cells")

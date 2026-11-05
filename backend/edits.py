@@ -39,6 +39,7 @@ from backend.schemas import (
     ArtifactContent,
     Cell,
     IssueBlock,
+    KeyDifferenceBlock,
     ListBlock,
     ParagraphBlock,
     Row,
@@ -73,8 +74,9 @@ def edited_cells(content: ArtifactContent) -> list[tuple[TableBlock, Row, str, C
     return [(b, r, k, c) for _, b, r, k, c in iter_cells(content) if c.edited]
 
 
-def prose_passage_ids(section: Section) -> set[int]:
-    """Passages cited by the section's prose (tables excluded)."""
+def prose_passage_ids(section: Section, content: ArtifactContent | None = None) -> set[int]:
+    """Passages cited by the section's prose (tables excluded). A Key difference (slice 6, R10) cites cells:
+    with `content` given, the cited cells' current passages count (the cells live in other sections' tables)."""
     found: set[int] = set()
 
     def segs(segments: list[Segment]) -> None:
@@ -89,6 +91,8 @@ def prose_passage_ids(section: Section) -> set[int]:
                 segs(item)
         elif isinstance(block, IssueBlock):
             segs(block.impact)
+        elif isinstance(block, KeyDifferenceBlock) and content is not None:
+            found.update(content.key_difference_passage_ids(block))
     return found
 
 
@@ -113,7 +117,7 @@ def mark_stale(content: ArtifactContent, passage_ids: set[int]) -> list[str]:
     if not passage_ids:
         return hit
     for section in content.sections:
-        if prose_passage_ids(section) & passage_ids:
+        if prose_passage_ids(section, content) & passage_ids:
             section.stale = True
             hit.append(section.id)
     return hit

@@ -150,6 +150,8 @@ def _certificate_schema_gaps(insp, names: set[str]) -> list[str]:
     if "run_document" in names:
         columns = {c["name"] for c in insp.get_columns("run_document")}
         missing += [f"the run_document.{c} column" for c in CACHE_COLUMNS if c not in columns]
+        if "document_kind" not in columns:  # slice 6, Compare Quotes column label
+            missing.append("the run_document.document_kind column")
         if CACHE_INDEX not in {i.get("name") for i in insp.get_indexes("run_document")}:
             missing.append(f"the run_document extraction_key index ({CACHE_INDEX})")
     if "page" in names and "ocr_key" not in {c["name"] for c in insp.get_columns("page")}:
@@ -290,6 +292,34 @@ _FIELDS = [
               description="Date the quote expires or must be bound by."),
 ]
 
+# Slice 6 (R1, R9): Compare Quotes only (Proposal Builder keeps _FIELDS). The three endorsement terms are the
+# printed wording, classified in code (pipeline.compare_rules); notable_exclusions asks the same call for the
+# printed exclusion titles, the schedule heading and the document kind. They open the Endorsements section.
+_COMPARE_TERM_FIELDS = [
+    FactField(key="additional_insured", label="Additional insured", section="endorsements",
+              description=("How the quote grants additional insured status, copied as printed together with its "
+                           "label, for example 'Additional Insured: Blanket where required by written contract', "
+                           "'Additional Insured - Designated Person or Organization' or 'Additional Insured: Not "
+                           "included'. Null when the document does not mention additional insureds.")),
+    FactField(key="waiver_of_subrogation", label="Waiver of subrogation", section="endorsements",
+              description=("Waiver of subrogation (waiver of transfer of rights of recovery), copied as printed "
+                           "together with its label, for example 'Blanket Waiver of Subrogation', 'Waiver of "
+                           "Subrogation: Scheduled' or 'Waiver of Subrogation: Not included'. Null when the "
+                           "document does not mention it.")),
+    FactField(key="primary_noncontributory", label="Primary & non-contributory", section="endorsements",
+              description=("Primary and non-contributory wording, copied as printed together with its label, for "
+                           "example 'Primary and Non-Contributory: Included' or 'Primary & Non-Contributory - Not "
+                           "available'. Null when the document does not mention it.")),
+    FactField(key="notable_exclusions", label="Notable exclusions", section="endorsements", kind="exclusions",
+              description="The exclusion titles the document prints and the heading of its exclusions schedule."),
+]
+
+
+def _compare_fields() -> list[FactField]:
+    at = next(i for i, f in enumerate(_FIELDS) if f.key == "key_endorsements")
+    return [*_FIELDS[:at], *_COMPARE_TERM_FIELDS, *_FIELDS[at:]]
+
+
 _SECTIONS = [
     SectionPlanItem(id="executive_summary", number="1", title="Executive Summary",
                     guidance="Which quotes were compared and the main differences."),
@@ -324,7 +354,7 @@ COMPARE_QUOTES: dict = {
         "stated in the documents, each with the page and an exact quote."
     ),
     "section_plan": [s.model_dump() for s in _SECTIONS],
-    "fact_schema": [f.model_dump() for f in _FIELDS],
+    "fact_schema": [f.model_dump() for f in _compare_fields()],
 }
 
 

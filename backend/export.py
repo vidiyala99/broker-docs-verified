@@ -36,6 +36,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from backend.schemas import (
+    KEY_DIFFERENCE_SECTION_ID,
     ArtifactContent,
     Cell,
     CertificateBlock,
@@ -130,6 +131,8 @@ def front_matter(content: ArtifactContent) -> FrontMatter:
     cover = toc = None
     body: list[Section] = []
     for section in content.sections:
+        if section.id == KEY_DIFFERENCE_SECTION_ID:
+            continue  # slice 6: the Compare Key difference is a screen callout, not exported (spec 3.3)
         kind = _front_kind(section)
         if kind == COVER_ID and cover is None:
             cover = section

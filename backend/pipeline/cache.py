@@ -47,9 +47,11 @@ from backend.pipeline import extract
 from backend.providers import CallRole, ProviderConfig
 from backend.schemas import FactField, RunDocumentStatus
 
-EXTRACTION_VERSION = "2026-11-04.2"  # .1 (slice 5a): loss-run rows, sheets and printed totals join the read
+# Before slice 6: "2026-11-04.2". .1 (slice 5a): loss-run rows, sheets and printed totals join the read
 # .2: loss-run PDF verify places rows read twice / miscopied on their printed line, reads total lines in code
 #     and re-attributes a total's metric by its column (stored rows and totals from .1 would differ)
+EXTRACTION_VERSION = "2026-11-05.1"  # slice 6: Compare Quotes reads endorsement wording, exclusion titles, the
+#     schedule heading and the document kind in the same call (COMPARE_TERMS_NOTE, R1/R9)
 ENV_SWITCH = "BROKERDOCS_EXTRACTION_CACHE"
 _OFF = {"off", "0", "false", "no", "disabled"}
 
@@ -75,7 +77,8 @@ def extraction_key(fields: Sequence[FactField], instructions: str, config: Provi
     keeps the key exactly as before for every other workflow."""
     payload = {
         "fields": [f.model_dump(mode="json") for f in fields],
-        "prompts": [extract.SYSTEM_PROMPT, extract.WINDOW_NOTE, extract.FORMS_NOTE, extract.ENDORSEMENTS_NOTE],
+        "prompts": [extract.SYSTEM_PROMPT, extract.WINDOW_NOTE, extract.FORMS_NOTE, extract.ENDORSEMENTS_NOTE,
+                    extract.COMPARE_TERMS_NOTE],
         "instructions": instructions or "",
         "extract_model": config.model_for(CallRole.EXTRACT),
         "ocr": ocr_key(config),
@@ -174,6 +177,7 @@ def copy_read(session: Session, source: Source, target_rd: models.RunDocument, *
                  RunDocumentStatus.DONE):
         models.transition_run_document(target_rd, step)
     target_rd.option_count, target_rd.option_label = src_rd.option_count or 1, src_rd.option_label
+    target_rd.document_kind = src_rd.document_kind
     target_rd.extraction_key = src_rd.extraction_key
     target_rd.reused_from_run_id = src_rd.run_id
     target_rd.read_at = src_rd.read_at

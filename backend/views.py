@@ -16,8 +16,9 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.edits import all_passage_ids, iter_cells
-from backend.pipeline.runner import is_retryable
-from backend.schemas import ArtifactContent, RunStatus
+from backend.pipeline import compare_rules
+from backend.pipeline.runner import is_compare, is_retryable
+from backend.schemas import ArtifactContent, KeyDifferenceBlock, RunStatus
 
 TERMINAL_RUN_STATUSES = {str(RunStatus.DONE), str(RunStatus.PARTIAL), str(RunStatus.FAILED),
                          str(RunStatus.CANCELLED)}
@@ -49,7 +50,7 @@ def run_document_out(rd: models.RunDocument) -> dict[str, Any]:
         "letter": rd.letter, "slot": rd.slot, "filename": rd.document.filename,
         "source_format": rd.document.source_format or "pdf", "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
-        "option_count": rd.option_count, "option_label": rd.option_label,
+        "option_count": rd.option_count, "option_label": rd.option_label, "document_kind": rd.document_kind,
         "reused_from_run_id": rd.reused_from_run_id, "read_at": _ts(rd.read_at),  # slice 4 extraction cache
     }
 
@@ -172,11 +173,38 @@ def cell_counts(content: ArtifactContent) -> dict[str, int]:
             for k in ("verified", "scan_read", "not_found", "absent", "failed", "conflicting", "edited")}
 
 
+def compare_marks_out(content: ArtifactContent, out: dict[str, Any]) -> list[str]:
+    """Slice 6, Compare Quotes (R2, R3): marks computed from the cells as they are now, written into the dumped
+    content (`mark` and `mark_reason` on every table cell), and the Key difference flagged `stale` when the marks
+    or a cited cell changed since it was written. Returns the ids of the sections that became stale. Nothing is
+    stored."""
+    marks = compare_rules.mark_cells(compare_rules.content_tables(content))
+    stale: list[str] = []
+    for section, sec_out in zip(content.sections, out["sections"], strict=True):
+        for block, block_out in zip(section.blocks, sec_out["blocks"], strict=True):
+            if block_out.get("type") == "table":
+                for row in block_out["rows"]:
+                    for col, cell in row["cells"].items():
+                        mark = marks.get((row["key"], col))
+                        cell["mark"] = mark.kind if mark else None
+                        cell["mark_reason"] = mark.reason if mark else None
+            elif isinstance(block, KeyDifferenceBlock):
+                block_out["stale"] = compare_rules.key_difference_stale(block, content, marks)
+                if block_out["stale"] and not sec_out.get("stale"):
+                    sec_out["stale"] = True
+                    stale.append(section.id)
+    return stale
+
+
 def artifact_out(session: Session, art: models.Artifact, version: int | None = None) -> dict[str, Any]:
     number = art.current_version if version is None else version
     row = art.version_row(number)  # LookupError for an unknown version
     content = ArtifactContent.model_validate(row.content)
     fb = next((f for f in art.feedback if f.version == number), None)
+    dumped = content.model_dump(mode="json")
+    if is_compare(art.run):
+        compare_marks_out(content, dumped)
+    stale = [s["id"] for s in dumped["sections"] if s.get("stale")]
     return {
         "id": art.id,
         "run_id": art.run_id,
@@ -187,10 +215,10 @@ def artifact_out(session: Session, art: models.Artifact, version: int | None = N
         "is_current": number == art.current_version,
         "note": row.note,
         "created_at": _ts(row.created_at),
-        "content": content.model_dump(mode="json"),
+        "content": dumped,
         "chips": chips(session, art.run, content),
         "counts": cell_counts(content),
-        "stale_sections": [s.id for s in content.sections if s.stale],
+        "stale_sections": stale,
         "feedback": {"rating": fb.rating, "comment": fb.comment} if fb else None,
     }
 

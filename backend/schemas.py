@@ -90,13 +90,17 @@ class FactField(BaseModel):
     keyed form:<normalized number> (see the policy check fact schema below).
     "endorsements" (slice 4, certificates) asks the same call for an endorsements array; each
     endorsement becomes facts keyed cert:endorsement:<normalized number>:<attribute> (see below).
+    "exclusions" (slice 6, Compare Quotes) asks the same call for the exclusion titles the document prints,
+    the heading of its exclusions or forms schedule and the document's kind; each title becomes a fact keyed
+    exclusion:<normalized title>, the heading the fact exclusions_schedule (see below). The field's own row
+    (notable_exclusions) is built from them in code (pipeline.compare_rules).
     """
 
     key: str
     label: str
     description: str = ""
     section: str | None = None  # section-plan id the field is usually reported in
-    kind: Literal["scalar", "forms", "endorsements"] = "scalar"
+    kind: Literal["scalar", "forms", "endorsements", "exclusions"] = "scalar"
 
 
 class SectionPlanItem(BaseModel):
@@ -528,6 +532,32 @@ CERTIFICATE_FIELDS: list[FactField] = [
 ]
 
 
+# --------------------------------------------------------------------- Compare Quotes terms (slice 6, R1/R9)
+#
+# A field of kind "exclusions" expands to dynamic facts: one per printed exclusion title, keyed
+# exclusion:<title without case, spacing or punctuation> (value = the title as printed), and the printed
+# heading of the document's exclusions / forms schedule (key exclusions_schedule), which is the evidence that
+# the document's list is complete (R9). Each verifies like any fact; the watch-list match is code.
+
+EXCLUSION_KEY_PREFIX = "exclusion:"
+EXCLUSIONS_SCHEDULE_KEY = "exclusions_schedule"
+MAX_EXCLUSION_KEY_CHARS = 80
+DOCUMENT_KINDS = ("quote", "proposal", "summary", "other")  # display only (column label), never a fact
+
+
+def exclusion_key(title: str | None) -> str | None:
+    """exclusion:<title> with case, spacing and punctuation removed (cut to 80 characters), or None for a
+    title with no letters or digits."""
+    compact = _FORM_NUMBER_JUNK.sub("", unicodedata.normalize("NFKC", title or "").upper())
+    if not compact:
+        return None
+    return EXCLUSION_KEY_PREFIX + compact[:MAX_EXCLUSION_KEY_CHARS]
+
+
+def is_exclusion_key(key: str | None) -> bool:
+    return bool(key) and key.startswith(EXCLUSION_KEY_PREFIX) and len(key) > len(EXCLUSION_KEY_PREFIX)
+
+
 # Slice 5a loss runs: document facts of a loss-run PDF (spreadsheets read the same keys from labelled cells in
 # code). Claim rows and printed totals are NOT facts: they have their own tables (D9).
 LOSS_RUN_FIELDS: list[FactField] = [
@@ -588,6 +618,9 @@ class Cell(BaseModel):
     notice: Notice | None = None
     # T14: state `conflicting` only: every value the document states, earliest page first.
     conflicts: list[ConflictValue] = Field(default_factory=list)
+    # Slice 6 (R9), Compare Quotes notable_exclusions cells only: True when the document prints a verified
+    # exclusions / forms schedule heading, so what it does not list it does not exclude. None elsewhere.
+    complete: bool | None = None
 
 
 class Column(BaseModel):
@@ -595,6 +628,9 @@ class Column(BaseModel):
     label: str
     document_id: int | None = None
     warning: str | None = None  # column-level notice (failed doc, multi-option)
+    # Slice 6, Compare Quotes: quote | proposal | summary | other as the extraction call read it (display only,
+    # the column's muted label); None for other workflows and runs read before slice 6.
+    document_kind: str | None = None
 
 
 class Row(BaseModel):
@@ -931,9 +967,63 @@ class LossCheckBlock(BaseModel):
     changed_since_resolved: bool = False
 
 
+# --------------------------------------------------------------------- Key difference (slice 6, review D1, R3, R10)
+#
+# One or two sentences at the top of a Compare Quotes report about the marked cells (pipeline.compare_rules).
+# Written by the compose call or by the template; every segment cites table cells (row key, column letter), not
+# passages (R10): a chip opens the cell's current source, or reads "edited by you" for an edited cell. The block
+# keeps the marks and cited cell values it was written against; the API sets `stale` on read when they differ
+# from the current ones (R3). Marks themselves are never stored (R2).
+
+KEY_DIFFERENCE_SECTION_ID = "key_difference"
+KEY_DIFFERENCE_BLOCK_ID = "key-difference"
+
+
+class CellRef(BaseModel):
+    row: str  # row key (fact field key), unique across a Compare report's tables
+    column: str  # document letter
+
+
+class CellSegment(BaseModel):
+    """A run of Key difference text and the cells it talks about."""
+
+    text: str
+    cells: list[CellRef] = Field(default_factory=list)
+
+
+class MarkRef(BaseModel):
+    row: str
+    column: str
+    kind: Literal["worse", "best"]
+
+
+class CitedValue(BaseModel):
+    row: str
+    column: str
+    value: str | None = None
+    edited: bool = False
+
+
+class KeyDifferenceBlock(BaseModel):
+    type: Literal["key_difference"] = "key_difference"
+    id: str = KEY_DIFFERENCE_BLOCK_ID
+    title: str = "Key difference"
+    segments: list[CellSegment] = Field(default_factory=list)
+    source: Literal["model", "template"] = "template"
+    marks: list[MarkRef] = Field(default_factory=list)  # the marks it was written against (R3)
+    cited_values: list[CitedValue] = Field(default_factory=list)  # each cited cell's value when written (R3)
+
+    def cell_refs(self) -> list[CellRef]:
+        seen: dict[tuple[str, str], CellRef] = {}
+        for s in self.segments:
+            for c in s.cells:
+                seen.setdefault((c.row, c.column), c)
+        return list(seen.values())
+
+
 Block = Annotated[
     HeadingBlock | ParagraphBlock | ListBlock | TableBlock | IssueBlock | DiscrepancyBlock | ClaimBlock
-    | CertificateBlock | LossTotalsBlock | LossCheckBlock,
+    | CertificateBlock | LossTotalsBlock | LossCheckBlock | KeyDifferenceBlock,
     Field(discriminator="type"),
 ]
 
@@ -983,6 +1073,24 @@ class ArtifactContent(BaseModel):
                 return row.cells[column_key]
         raise KeyError(f"no row {row_key!r} in table {block_id!r}")
 
+    def find_row_cell(self, row_key: str, column_key: str) -> Cell | None:
+        """The table cell of a Key difference reference (slice 6): the first table row with that key."""
+        for _, block in self.iter_blocks():
+            if isinstance(block, TableBlock):
+                for row in block.rows:
+                    if row.key == row_key:
+                        return row.cells.get(column_key)
+        return None
+
+    def key_difference_passage_ids(self, block: KeyDifferenceBlock) -> set[int]:
+        """R10: a Key difference cites cells; its chips are the cited cells' current passages."""
+        found: set[int] = set()
+        for ref in block.cell_refs():
+            cell = self.find_row_cell(ref.row, ref.column)
+            if cell is not None:
+                found.update(cell.passage_ids)
+        return found
+
     def passage_ids(self) -> set[int]:
         """Every passage id cited anywhere in the current content."""
         found: set[int] = set()
@@ -1005,6 +1113,8 @@ class ArtifactContent(BaseModel):
                         found.update(cell.passage_ids)
             elif isinstance(block, DiscrepancyBlock | ClaimBlock | CertificateBlock):
                 found.update(block.passage_ids())
+            elif isinstance(block, KeyDifferenceBlock):
+                found.update(self.key_difference_passage_ids(block))
         return found
 
     # ---- edits (return a new object; the receiver is never mutated)

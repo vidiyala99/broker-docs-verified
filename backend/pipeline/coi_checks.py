@@ -196,10 +196,11 @@ class Evidence:
 
 MISSING = Evidence()
 
-_PNC_RE = re.compile(r"primary\s+(?:and|&)\s+non\s*-?\s*contributory", re.I)
-_WAIVER_RE = re.compile(r"waiver|transfer\s+of\s+rights\s+of\s+recovery|right\s+to\s+recover", re.I)
-_AI_RE = re.compile(r"additional\s+insureds?", re.I)
-_SCHEDULED_RE = re.compile(r"schedul|designated", re.I)
+# Public (slice 6, R1): pipeline.compare_rules classifies a Compare quote's printed endorsement wording with these.
+PNC_RE = re.compile(r"primary\s+(?:and|&)\s+non\s*-?\s*contributory", re.I)
+WAIVER_RE = re.compile(r"waiver|transfer\s+of\s+rights\s+of\s+recovery|right\s+to\s+recover", re.I)
+AI_RE = re.compile(r"additional\s+insureds?", re.I)
+SCHEDULED_RE = re.compile(r"schedul|designated", re.I)
 
 # ISO forms by number (compact), used only when the title is not cited.
 FORM_KINDS: dict[str, frozenset[str]] = {
@@ -231,11 +232,11 @@ class Endorsement:
         if self.type.cited:
             text = self.type.value or ""
             found = set()
-            if _AI_RE.search(text):
+            if AI_RE.search(text):
                 found.add(ADDITIONAL_INSURED)
-            if _WAIVER_RE.search(text):
+            if WAIVER_RE.search(text):
                 found.add(WAIVER)
-            if _PNC_RE.search(text):
+            if PNC_RE.search(text):
                 found.add(PRIMARY_NONCONTRIBUTORY)
             if found:
                 return frozenset(found)
@@ -255,7 +256,7 @@ class Endorsement:
         if self.named_party.stated:
             return True
         if self.type.cited:
-            return bool(_SCHEDULED_RE.search(self.type.value or ""))
+            return bool(SCHEDULED_RE.search(self.type.value or ""))
         return self.number in SCHEDULED_FORMS
 
     def passage_ids(self) -> list[int]:
@@ -531,7 +532,7 @@ def applicable_wording(line: str | None, request: Request) -> list[str]:
     return [w for w in WORDINGS if w in request.wording and (line or OTHER) in WORDING_LINES[w]]
 
 
-__all__ = ["ADDITIONAL_INSURED", "LINE_LABELS", "LINE_LIMITS", "PRIMARY_NONCONTRIBUTORY", "WAIVER", "WORDINGS",
+__all__ = ["ADDITIONAL_INSURED", "AI_RE", "PNC_RE", "SCHEDULED_RE", "WAIVER_RE", "LINE_LABELS", "LINE_LIMITS", "PRIMARY_NONCONTRIBUTORY", "WAIVER", "WORDINGS",
            "WORDING_LABELS", "Endorsement", "Evidence", "Joined", "PolicyDoc", "Request", "applicable_wording",
            "classify_line", "description_claim", "edited_claim", "in_force_claim", "insured_claim", "join",
            "normalize_name", "normalize_policy_number", "parse_date", "wording_claim"]

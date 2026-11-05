@@ -243,6 +243,8 @@ class RunDocument(Base):
     error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     option_count: Mapped[int] = mapped_column(Integer, default=1)  # D8
     option_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Slice 6, Compare Quotes: quote | proposal | summary | other as the extraction call read it (display only).
+    document_kind: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # Extraction cache (slice 4, D3/D8/D9): the key the facts were read under (set when the document is
     # DONE), the run whose read was copied (None for a live read) and when the facts were first read.
     extraction_key: Mapped[str | None] = mapped_column(String(64), nullable=True)

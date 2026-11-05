@@ -137,6 +137,7 @@ class WindowedExtraction:
     option_label: str | None
     usage: CallUsage
     model: str
+    document_kind: str | None = None  # slice 6: the first window's reading (the document's start)
 
     def candidates(self) -> list[verify.CandidateFact]:
         """Every non-empty fact of every window, with its page hint, in window order."""
@@ -251,8 +252,9 @@ async def extract_windows(
     for r in finished:
         if r.result.option_count > count:
             count, option = r.result.option_count, r.result.option_label
+    kind = next((r.result.document_kind for r in finished if r.result.document_kind), None)
     return WindowedExtraction(tuple(fields), tuple(finished), count, option, usage,
-                              finished[0].result.model if finished else "")
+                              finished[0].result.model if finished else "", kind)
 
 
 def _first_error(group: BaseExceptionGroup) -> BaseException:

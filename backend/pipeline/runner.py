@@ -226,6 +226,12 @@ class ComposePlan:
     outline: tuple[OutlineBlock, ...] = ()
     fact_sections: tuple[SectionPlanItem, ...] = ()
     brief: compose.ProposalBrief | None = None
+    compare: bool = False  # slice 6: Compare Quotes (marks and the Key difference)
+    additional_context: str = ""  # slice 6: the broker's Additional context (Compare Quotes, BRIEF channel only)
+
+
+def is_compare(run: models.Run) -> bool:
+    return run.workflow is not None and run.workflow.slug == db.COMPARE_QUOTES_SLUG
 
 
 def is_policy_check(run: models.Run) -> bool:
@@ -257,6 +263,10 @@ def compose_plan(run: models.Run) -> ComposePlan:
     fields = [FactField.model_validate(f) for f in wf.fact_schema]
     static = [SectionPlanItem.model_validate(x) for x in wf.section_plan]
     params = run.parameters or {}
+    if wf.slug == db.COMPARE_QUOTES_SLUG:
+        context = params.get("additional_context")
+        return ComposePlan(title=wf.name, fields=fields, sections=static, instructions=wf.instructions or "",
+                           compare=True, additional_context=context if isinstance(context, str) else "")
     if wf.slug != db.PROPOSAL_BUILDER_SLUG or "outline" not in params:
         return ComposePlan(title=wf.name, fields=fields, sections=static, instructions=wf.instructions or "")
     stored = StoredProposal.model_validate(params)
@@ -473,7 +483,7 @@ def _doc_payload(rd: models.RunDocument) -> dict[str, Any]:
         "source_format": rd.document.source_format or "pdf",  # slice 6: pdf | docx | xlsx column label
         "status": str(rd.status),
         "progress": rd.progress, "error": rd.error, "error_code": rd.error_code,
-        "option_count": rd.option_count, "option_label": rd.option_label,
+        "option_count": rd.option_count, "option_label": rd.option_label, "document_kind": rd.document_kind,
         # slice 4 extraction cache: the run whose read was copied, and when the facts were first read
         "reused_from_run_id": rd.reused_from_run_id,
         "read_at": rd.read_at.isoformat() if rd.read_at is not None else None,
@@ -526,7 +536,8 @@ def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactFie
                         sections: Sequence[SectionPlanItem], instructions: str,
                         edits: Sequence[compose.ComposeEdit] = (), outline: Sequence[OutlineBlock] = (),
                         fact_sections: Sequence[SectionPlanItem] = (),
-                        brief: compose.ProposalBrief | None = None) -> compose.ComposeInput:
+                        brief: compose.ProposalBrief | None = None, compare: bool = False,
+                        additional_context: str = "") -> compose.ComposeInput:
     """Compose input from a run's documents and persisted facts (shared by the run and by
     Regenerate prose, which passes the user's cell edits, D9)."""
     facts_by_doc: dict[int, list[models.Fact]] = defaultdict(list)
@@ -550,7 +561,7 @@ def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactFie
         columns.append(compose.ComposeColumn(
             key=rd.letter, label=label, document_id=rd.document_id, filename=rd.document.filename,
             slot=rd.slot, failed=failed, failure_message=rd.error, option_count=rd.option_count or 1,
-            option_label=rd.option_label))
+            option_label=rd.option_label, document_kind=rd.document_kind if compare else None))
         facts.extend(compose.ComposeFact(column_key=rd.letter, field=f.field, value=f.value,
                                          state=EvidenceState(f.state), passage_id=f.passage_id,
                                          page_no=f.page_no, fact_id=f.id,
@@ -568,14 +579,16 @@ def build_compose_input(run: models.Run, *, title: str, fields: Sequence[FactFie
     return compose.ComposeInput(title=title, fields=list(fields), sections=list(sections),
                                 columns=columns, facts=facts, instructions=instructions,
                                 notices=notices, edits=list(edits), outline=tuple(outline),
-                                fact_sections=tuple(fact_sections), brief=brief)
+                                fact_sections=tuple(fact_sections), brief=brief, compare=compare,
+                                additional_context=additional_context)
 
 
 def _input_from_plan(run: models.Run, plan: ComposePlan,
                      edits: Sequence[compose.ComposeEdit] = ()) -> compose.ComposeInput:
     return build_compose_input(run, title=plan.title, fields=plan.fields, sections=plan.sections,
                                instructions=plan.instructions, edits=edits, outline=plan.outline,
-                               fact_sections=plan.fact_sections, brief=plan.brief)
+                               fact_sections=plan.fact_sections, brief=plan.brief, compare=plan.compare,
+                               additional_context=plan.additional_context)
 
 
 def compose_input_for_run(run: models.Run, edits: Sequence[compose.ComposeEdit] = ()) -> compose.ComposeInput:
@@ -1088,6 +1101,7 @@ class RunManager:
             self._store_facts(run_id, ref.id, verified)
             self._update_doc(run_id, rd_id, RunDocumentStatus.DONE, progress=None,
                              option_count=result.option_count, option_label=result.option_label,
+                             document_kind=getattr(result, "document_kind", None),
                              # Off means no reuse either way: a read made with the cache off stores no
                              # key, so it never serves a later run (keeps dev-seed reads out of e2e).
                              extraction_key=plan.cache_key if self.cache_enabled() else None,

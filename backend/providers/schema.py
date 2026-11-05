@@ -209,6 +209,10 @@ class StructuredSchema:
     name: str
     json_schema: dict[str, Any]
     model: Any = field(default=None, compare=False)  # pydantic model class, if any
+    # Top-level properties a reply may leave out (slice 6): strict mode still sends them to the model as
+    # required, but a scripted reply or recording made before they were added is not rejected for lacking one;
+    # the caller reads a missing one as empty. Every property that is present is still validated.
+    tolerate_missing: frozenset[str] = field(default=frozenset(), compare=False)
 
     def __post_init__(self) -> None:
         if not _NAME_RE.match(self.name):
@@ -228,6 +232,9 @@ class StructuredSchema:
 
     def validate(self, data: Any) -> list[str]:
         errors = validate_instance(data, self.json_schema)
+        if self.tolerate_missing:
+            skip = {f"$: missing required '{name}'" for name in self.tolerate_missing}
+            errors = [e for e in errors if e not in skip]
         if not errors and self.model is not None:
             try:
                 self.model.model_validate(data)

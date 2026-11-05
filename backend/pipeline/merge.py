@@ -192,7 +192,15 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from backend.pipeline import verify
-from backend.schemas import FORM_KEY_PREFIX, EvidenceState, FactField, is_endorsement_key, is_form_key
+from backend.schemas import (
+    EXCLUSIONS_SCHEDULE_KEY,
+    FORM_KEY_PREFIX,
+    EvidenceState,
+    FactField,
+    is_endorsement_key,
+    is_exclusion_key,
+    is_form_key,
+)
 
 log = logging.getLogger("brokerdocs.merge")
 
@@ -621,6 +629,7 @@ def merge_document(fields: Sequence[FactField | str], candidates: Iterable[verif
         by_field.setdefault(c.field, []).append(c)
     form_keys = sorted({k for k in [*by_field, *dynamic_keys] if is_form_key(k)})
     endorsement_keys = sorted({k for k in [*by_field, *dynamic_keys] if is_endorsement_key(k)})
+    exclusion_keys = sorted({k for k in [*by_field, *dynamic_keys] if is_exclusion_key(k)})
     out = []
     for f in fields:
         if isinstance(f, FactField) and f.kind == "forms":
@@ -629,9 +638,24 @@ def merge_document(fields: Sequence[FactField | str], candidates: Iterable[verif
         if isinstance(f, FactField) and f.kind == "endorsements":  # slice 4: cert:end:<number>[:attribute]
             out.extend(merge_field(k, by_field.get(k, []), page_text) for k in endorsement_keys)
             continue
+        if isinstance(f, FactField) and f.kind == "exclusions":  # slice 6: schedule heading, then exclusion:<title>
+            out.append(merge_field(EXCLUSIONS_SCHEDULE_KEY, _first_heading(by_field.get(EXCLUSIONS_SCHEDULE_KEY, [])),
+                                   page_text))
+            out.extend(merge_field(k, by_field.get(k, []), page_text) for k in exclusion_keys)
+            continue
         k = f.key if isinstance(f, FactField) else str(f)
         out.append(merge_field(f, by_field.get(k, []), page_text))
     return out
+
+
+def _first_heading(candidates: Sequence[verify.VerifyResult]) -> list[verify.VerifyResult]:
+    """Slice 6 (R9): any one verified schedule heading proves the list is printed, so two different headings
+    (a forms schedule and an exclusions page) are not a conflict: keep the candidates of the earliest cited one."""
+    cited = sorted((c for c in candidates if c.cited and c.value), key=lambda c: (c.page_no or 0))
+    if not cited:
+        return list(candidates)
+    first = cited[0].value
+    return [c for c in candidates if c.value == first]
 
 
 # Form facts (D13): value "<number> <edition>" as printed, key form:<compact number>.

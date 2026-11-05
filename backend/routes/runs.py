@@ -112,6 +112,35 @@ def certificate_parameters(raw: Any) -> dict[str, Any]:
         raise ApiError(422, "invalid_request", f"Check these certificate fields: {detail}.", fields=fields) from None
 
 
+MAX_ADDITIONAL_CONTEXT_CHARS = 1000  # slice 6, Compare Quotes upload page
+
+
+def compare_parameters(raw: dict[str, Any] | None) -> dict[str, Any]:
+    """Compare Quotes parameters (slice 6): `additional_context` is optional text, control characters dropped and
+    trimmed, at most 1,000 characters (422 invalid_request naming the field); empty is left out, so a run without
+    it keys exactly as before. It reaches only the compose prompt's delimited BRIEF block, never extraction.
+    Other keys pass through unchanged."""
+    params = dict(raw or {})
+    if "additional_context" not in params:
+        return params
+    value = params.pop("additional_context")
+    if value is None:
+        return params
+    if not isinstance(value, str):
+        raise ApiError(422, "invalid_request", "Additional context must be text.",
+                       fields=[{"loc": ["body", "parameters", "additional_context"], "message": "must be text"}])
+    cleaned = _NOTE_CONTROL.sub("", value).strip()
+    if len(cleaned) > MAX_ADDITIONAL_CONTEXT_CHARS:
+        raise ApiError(422, "invalid_request",
+                       f"Additional context can be at most {MAX_ADDITIONAL_CONTEXT_CHARS:,} characters.",
+                       fields=[{"loc": ["body", "parameters", "additional_context"],
+                                "message": f"at most {MAX_ADDITIONAL_CONTEXT_CHARS} characters"}],
+                       limit=MAX_ADDITIONAL_CONTEXT_CHARS)
+    if cleaned:
+        params["additional_context"] = cleaned
+    return params
+
+
 def _run_json(ctx: AppContext, run_id: int) -> dict[str, Any]:
     with ctx.factory() as s:
         run = s.get(models.Run, run_id)
@@ -150,6 +179,8 @@ async def create_run(body: RunCreate, ctx: AppContext = Depends(get_ctx)) -> JSO
                                fields=fields) from None
         if wf.slug == db.CERTIFICATE_SLUG:
             parameters = certificate_parameters(body.parameters)  # D6: bounds, 422 naming the field
+        if wf.slug == db.COMPARE_QUOTES_SLUG:
+            parameters = compare_parameters(body.parameters)  # slice 6: Additional context, 1,000 characters
         if wf.slug == db.LOSS_RUN_SLUG:
             from backend.loss_runs.sheets import DEFAULT_SHEET_LIMITS  # noqa: PLC0415
             from backend.routes.loss_runs import review_row_count  # noqa: PLC0415
