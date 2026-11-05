@@ -24,7 +24,8 @@ const indicatorX = (page: Page) =>
   page.locator(".line-choice__seg").first().evaluate((el) => new DOMMatrix(getComputedStyle(el, "::after").transform).m41);
 
 test("segmented control: the indicator slides to the picked option; reduced motion has no transform transition", async ({ page }) => {
-  await page.goto("/#/");
+  // Slice 6: the Commercial home has no line toggle; the shared segment now lives on the new comparison page.
+  await page.goto("/#/compare/new");
   const seg = page.locator(".line-choice__seg").first();
   await expect(seg.getByRole("radio", { name: "Commercial" })).toBeChecked();
   expect(await indicatorX(page)).toBeCloseTo(0, 0);
@@ -77,7 +78,8 @@ test("390: the Compare queue has no sideways overflow and the row menus are insi
       .map((e) => `${e.className} ${e.scrollWidth}/${e.clientWidth}`),
   );
   expect(overflow).toEqual([]);
-  const pane = await page.locator(".pane__body--launch").boundingBox();
+  // Slice 6: the home is one LaunchView pane (main.pane); the old launch body wrapper is gone.
+  const pane = await page.locator("main.pane").boundingBox();
   for (const menu of await page.locator(".queue-row__actions .row-menu").all()) {
     const box = await menu.boundingBox();
     expect(box!.x + box!.width).toBeLessThanOrEqual(pane!.x + pane!.width);
