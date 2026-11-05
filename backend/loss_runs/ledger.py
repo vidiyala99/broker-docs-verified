@@ -643,7 +643,7 @@ def _total_check(t: LedgerTotal, doc: LedgerDocument, scoped: Sequence[LedgerRow
     if t.scope_detail:
         filt["scope_detail"] = dict(t.scope_detail)
     return LossCheckBlock(
-        id=total_id(t), kind="total", verdict=verdict, title=title, message=message,
+        id=total_id(t), kind="total", verdict=verdict, title=title, message=message, label=t.label or None,
         document_id=t.document_id, metric=t.metric, scope_kind=t.scope_kind, scope_value=t.scope_value,
         printed=t.amount, computed=computed, difference=diff, filter=filt,
         evidence=[LossEvidence(document_id=t.document_id, page_no=t.page_no, sheet_name=t.sheet_name,

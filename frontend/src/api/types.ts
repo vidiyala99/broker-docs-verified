@@ -706,6 +706,8 @@ export interface LossCheck {
   decided_by: "broker" | "rows";
   title: string;
   message: string;
+  /** A printed total's label as printed ("Total, all policies"); null when none or not a total. */
+  label?: string | null;
   document_id: number | null;
   metric: LossMoney | "claim_count" | null;
   scope_kind: "all" | "policy_year" | "policy_number" | "carrier" | "page_subtotal" | "sheet" | null;

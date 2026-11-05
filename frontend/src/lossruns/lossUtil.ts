@@ -113,17 +113,37 @@ export type CardGroup = "to_resolve" | "handled" | "matches";
 export const groupOf = (card: CheckCard): CardGroup =>
   card.checks.some((c) => c.needs_action) ? "to_resolve" : card.status === "resolved" ? "handled" : "matches";
 
-/** "All claims", "Policy DSI-GL-2301", "Policy year 2024": the scope part of the API's check title. */
+/** The printed line's own label ("Total, all policies", "Page subtotal, page 2"), else the API's scope ("All claims"). */
 export function scopeLabel(c: LossCheck): string {
-  const head = c.title.split(":")[0];
-  return head || "All claims";
+  const scope = c.title.split(":")[0] || "All claims";
+  if (!c.label) return scope;
+  return c.scope_kind === "page_subtotal" && !/page \d/i.test(c.label) ? `${c.label}, page ${c.scope_value}` : c.label;
 }
 
-/** The file a check or row belongs to, named for people: "Driftwood 2025 (lr_main_driftwood_2025.pdf)" is too long, so the
- * file name without its extension, and the letter that travels with its chips. */
+type DocLike = { document_id: number; carrier: string | null; valuation_date: string | null; filename: string };
+
+function baseName(d: DocLike): string {
+  const who = d.carrier?.trim().split(/\s+/)[0] ?? d.filename.replace(/\.(pdf|xlsx|csv)$/i, "");
+  return `${who} ${d.valuation_date ? d.valuation_date.slice(0, 4) : "undated"}`;
+}
+
+const KIND: Record<string, string> = { pdf: "PDF", xlsx: "workbook", csv: "CSV" };
+
+/**
+ * A file named for people (coordinator note, round 3): the carrier's first word and the valuation year, "Driftwood
+ * 2025"; when two files of the review would read the same, the file type follows ("Ashgrove 2025 workbook", "Ashgrove
+ * 2025 CSV"), then the letter. The file name stays in the chip's tooltip and accessible name.
+ */
 export function docName(review: LossReview | null, documentId: number | null | undefined): string {
-  const d = review?.totals?.documents.find((x) => x.document_id === documentId);
-  return d ? d.filename.replace(/\.(pdf|xlsx|csv)$/i, "") : "";
+  const docs = review?.totals?.documents ?? [];
+  const d = docs.find((x) => x.document_id === documentId);
+  if (!d) return "";
+  const base = baseName(d);
+  const same = docs.filter((x) => baseName(x) === base);
+  if (same.length < 2) return base;
+  const ext = (f: DocLike) => /\.(pdf|xlsx|csv)$/i.exec(f.filename)?.[1]?.toLowerCase() ?? "";
+  const withKind = `${base} ${KIND[ext(d)] ?? ext(d)}`.trim();
+  return same.filter((x) => ext(x) === ext(d)).length > 1 ? `${withKind} (${d.letter})` : withKind;
 }
 
 export function docLetter(review: LossReview | null, documentId: number | null | undefined): string {

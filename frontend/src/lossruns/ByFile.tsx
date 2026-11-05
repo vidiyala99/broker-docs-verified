@@ -7,7 +7,7 @@ import { keyboardAction } from "../ui/input";
 import { Collapse } from "../ui/motion";
 import { CardWord, LossChip } from "./Checks";
 import { ClaimLine, type RowActions } from "./ClaimsTable";
-import { checkCards, day, groupOf, METRIC_LABEL, scopeLabel, usd, type CheckCard } from "./lossUtil";
+import { checkCards, day, docName, groupOf, METRIC_LABEL, scopeLabel, usd, type CheckCard } from "./lossUtil";
 
 const STEP = 200;
 
@@ -41,7 +41,7 @@ function Footing({ card, openChip, act }: { card: CheckCard; openChip: (c: LossC
     <>
       <tr className={`lrB-foot lrB-foot--${match ? "matches" : card.verdict}`}>
         <th scope="row" colSpan={4}>
-          <span className="lrB-foot__label">{scopeLabel(card.lead)}, as printed</span>
+          <span className="lrB-foot__label">Printed: {scopeLabel(card.lead)}</span>
           {chip && <LossChip chip={chip} onOpen={openChip} />}
           {(match || groupOf(card) === "handled") && <CardWord card={card} />}
         </th>
@@ -92,8 +92,9 @@ export interface FileActions {
   toChecks: (card: CheckCard) => void;
 }
 
-function Schedule({ runId, doc, cards, open, toggle, version, act, rowAct, pending }: {
+function Schedule({ runId, review, doc, cards, open, toggle, version, act, rowAct, pending }: {
   runId: number;
+  review: LossReview;
   doc: LossDocumentSummary;
   cards: CheckCard[];
   open: boolean;
@@ -142,7 +143,7 @@ function Schedule({ runId, doc, cards, open, toggle, version, act, rowAct, pendi
           <h3 id={`lrf-${doc.document_id}`} className="lrB-sched__title">{doc.carrier ?? doc.filename}</h3>
         </button>
         <span className="lrB-sched__meta">
-          <span className={`chip lr-chip hue-${hueOf(doc.letter)} lr-chip--static`}><span className="lr-chip__letter">{doc.letter}</span>{doc.filename}</span>
+          <span className={`chip lr-chip hue-${hueOf(doc.letter)} lr-chip--static`}><span className="lr-chip__letter">{doc.letter}</span> {docName(review, doc.document_id)}</span>
           {doc.valuation_date ? `valued ${day(doc.valuation_date)}` : "no valuation date"}, {doc.rows.toLocaleString("en-US")} lines
         </span>
         <span className="lrB-sched__state">
@@ -210,6 +211,7 @@ export function ByFile({ runId, review, version, act, rowAct, pending }: {
         <Schedule
           key={d.document_id}
           runId={runId}
+          review={review}
           doc={d}
           cards={cardsOf(d.document_id)}
           open={open.has(d.document_id)}

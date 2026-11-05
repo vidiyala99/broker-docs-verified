@@ -25,12 +25,13 @@ export function LossChip({ chip, onOpen, scan = false }: { chip: LossChipData; o
     <button
       type="button"
       className={`chip lr-chip hue-${hueOf(chip.letter)}${scan ? " chip--scan" : ""}`}
-      aria-label={`Source ${chip.letter}, ${chip.label}${scan ? ". Read from scan, unverified" : ""}`}
+      title={`${chip.filename}, ${chip.label}`}
       onClick={() => onOpen(chip)}
     >
       {scan && <Scan size={12} weight="bold" aria-hidden />}
-      <span className="lr-chip__letter">{chip.letter}</span>
+      <span className="lr-chip__letter">{chip.letter}</span>{" "}
       <span className="lr-chip__text">{chipText(chip)}</span>
+      <span className="sr-only">. Source: {chip.filename}, {chip.label}{scan ? ". Read from scan, unverified" : ""}</span>
     </button>
   );
 }

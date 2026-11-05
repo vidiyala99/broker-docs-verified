@@ -170,7 +170,7 @@ function PhoneStatus({ review }: { review: LossReview }) {
   const t = review.totals;
   const cards = checkCards(review.checks).filter((c) => groupOf(c) !== "matches");
   return (
-    <div className="lr-phone">
+    <div className="lr-phone" tabIndex={0} role="region" aria-label="Loss review status">
       {t && (
         <section aria-labelledby="lr-ph-t">
           <h2 id="lr-ph-t" className="lr-h2">Totals</h2>
