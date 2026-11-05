@@ -70,6 +70,8 @@ export interface RunDocument {
   error_code: string | null;
   option_count: number;
   option_label: string | null;
+  /** Slice 6, Compare Quotes: what the document is (display only; the column's muted label). */
+  document_kind?: DocumentKind | null;
   /** Slice 4 extraction cache: the run whose read was copied (null = read live), and when it was first read. */
   reused_from_run_id?: number | null;
   read_at?: string | null;
@@ -184,6 +186,11 @@ export interface Cell {
   original_passage_ids: number[];
   notice?: Notice | null;
   conflicts?: ConflictValue[];
+  /** Slice 6, Compare notable_exclusions cells only: the document prints a verified exclusions schedule. */
+  complete?: boolean | null;
+  /** Slice 6, Compare Quotes responses only: computed on read, never stored (API.md "Compare Quotes"). */
+  mark?: CellMark | null;
+  mark_reason?: string | null;
 }
 
 export interface Column {
@@ -191,6 +198,37 @@ export interface Column {
   label: string;
   document_id: number | null;
   warning: string | null;
+  /** Slice 6, Compare Quotes only. */
+  document_kind?: DocumentKind | null;
+}
+
+// ---------------------------------------------------------------- compare quotes match (slice 6)
+
+export type DocumentKind = "quote" | "proposal" | "summary" | "other";
+export type CellMark = "worse" | "best";
+
+/** A Key difference cites table cells (row key + document letter), not passages (R10). */
+export interface CellRef {
+  row: string;
+  column: string;
+}
+
+export interface CellSegment {
+  text: string;
+  cells: CellRef[];
+}
+
+/** Section "key_difference" (number ""), first in a Compare report when any cell is marked. */
+export interface KeyDifferenceBlock {
+  type: "key_difference";
+  id: string;
+  title: string;
+  segments: CellSegment[];
+  source: "model" | "template";
+  marks: { row: string; column: string; kind: CellMark }[];
+  cited_values: { row: string; column: string; value: string | null; edited: boolean }[];
+  /** Read time: the marks or a cited cell changed since it was written (offer Rewrite). */
+  stale?: boolean;
 }
 
 export interface Row {
@@ -217,7 +255,8 @@ export type Block =
     }
   | DiscrepancyBlock
   | ClaimBlock
-  | CertificateBlock;
+  | CertificateBlock
+  | KeyDifferenceBlock;
 
 // ---------------------------------------------------------------- policy check (slice 3)
 

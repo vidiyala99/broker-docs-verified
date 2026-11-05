@@ -394,7 +394,8 @@ type by `source_format`); a PDF returns itself. `404 not_found`,
 
 `workflow` (slug or id) and `parameters` are optional. Order of
 `document_ids` is the column order (A, B, ...). For `compare-quotes`,
-`parameters` is stored as sent and not used. For `proposal-builder`, see
+`parameters` is stored as sent, except `additional_context` (slice 6, see
+"Compare Quotes: terms, marks and Key difference"). For `proposal-builder`, see
 "Proposal runs" below: the parameters are validated and stored with the
 template snapshot.
 
@@ -557,6 +558,8 @@ reason and `error_code` is one of: `not_pdf`, `empty`, `corrupt`, `encrypted`,
 `request_error`, `missing_key`, `cancelled`, `interrupted`, `internal_error`.
 `option_count > 1` means only the first option was compared (D8); the column
 header shows the warning from the artifact table.
+`document_kind` (slice 6, Compare Quotes): `quote`, `proposal`, `summary`, `other`
+or `null` (other workflows, or read before slice 6); display only.
 
 ### `GET /api/runs?limit=20&line=personal`
 
@@ -1217,6 +1220,63 @@ to show (checked by the route, so these are never `422`):
 | `discrepancy_item_id` | not a string id; sent without a run; the run has no report yet; the item is not in the run's current report |
 | the field's own name | a key that is not a task field (for example `status` on create, or `note`) |
 | absent | the body is not an object, or a PATCH body is empty |
+
+## Compare Quotes: terms, marks and Key difference (slice 6)
+
+**Extraction (same call, `EXTRACTION_VERSION` 2026-11-05.1).** Compare Quotes adds four rows at the top of
+the `endorsements-table`: `additional_insured`, `waiver_of_subrogation`, `primary_noncontributory` (scalar
+facts whose value is the printed wording) and `notable_exclusions` (field kind `exclusions`: no fact of its
+own). The same call returns printed exclusion titles (facts keyed `exclusion:<TITLE WITHOUT CASE, SPACING OR
+PUNCTUATION>`, cut to 80 characters), the schedule heading (fact `exclusions_schedule`) and `document_kind`
+(stored on `RunDocument.document_kind`, never a fact). Every value verifies like any fact; categories are
+code (`pipeline/compare_rules.py`). Proposal Builder's schema is unchanged.
+
+Cell `value` in the new rows:
+
+| Row | Values |
+|---|---|
+| `additional_insured`, `waiver_of_subrogation` | `Blanket`, `Scheduled only`, `Not included`, `Not stated` |
+| `primary_noncontributory` | `Included`, `Not included`, `Not stated` |
+| `notable_exclusions` | watch-list labels joined by `, ` (`Action over`, `Residential / habitational work`, `Subsidence / earth movement`, `Designated ongoing operations`, `Wrap-up / OCIP`), `None of these`, or `Not stated` |
+
+`Not stated` (state `absent`, no chip) means silent or wording that states no category. A classified cell keeps
+its wording's chip. `None of these` needs a verified schedule heading and at least one verified title.
+`notable_exclusions` cells carry `complete` (true when the schedule heading verified; `null` on every other
+cell). Table `Column` gains `document_kind` (Compare only, else `null`).
+
+**Marks (computed on every artifact read, never stored).** In Compare Quotes responses every table `Cell`
+has `mark` (`"worse"`, `"best"` or `null`) and `mark_reason` (`"Others: Blanket"`, `"Excludes action over"`,
+`"Lowest premium"`, or `null`). Other workflows' cells have neither key. Rules: a cell counts when verified
+or edited; endorsement rows rank Blanket > Scheduled only > Not included (P&NC Included > Not included) and
+need two counted values; an exclusion is worse only against a cell that is `complete` (or edited);
+`total_premium` is `best` only when every column has a counted premium stating one amount and it is strictly
+lowest. No other row is marked.
+
+**Key difference.** When any cell is marked, `content.sections[0]` is
+`{"id": "key_difference", "number": "", "title": "Key difference", ...}` holding one block:
+
+```json
+{"type": "key_difference", "id": "key-difference", "title": "Key difference", "source": "model",
+ "segments": [{"text": "A (Harborline) has the lowest premium ($12,500)",
+               "cells": [{"row": "total_premium", "column": "A"}]},
+              {"text": " but only scheduled additional insured.", "cells": [{"row": "additional_insured", "column": "A"}]}],
+ "marks": [{"row": "total_premium", "column": "A", "kind": "best"}],
+ "cited_values": [{"row": "total_premium", "column": "A", "value": "$12,500", "edited": false}],
+ "stale": false}
+```
+
+A segment cites cells, not passages: render one chip per cited cell, opening the cell's current
+`passage_ids` (chips are in `chips`), or "edited by you" when the cell is `edited`. `source` is `model` (the
+compose call's sentence, checked per segment) or `template` (written from the marks; also after a compose
+fallback). `stale` (read time only) is true when the current marks differ from `marks` or a cited cell's
+value or edited flag differs from `cited_values`; the section then has `stale: true` and its id is in
+`stale_sections` (also in the cell-edit response's `stale_sections`). Rewrite is `POST /regenerate`. No marks:
+no section. Exports (PDF, XLSX, DOCX) leave the section out.
+
+**`parameters.additional_context`** (`POST /api/runs`, Compare Quotes, optional): text, control characters
+dropped, trimmed, at most 1,000 characters; stored on the run (left out when empty). It reaches only the
+compose prompt's delimited BRIEF block (tone and emphasis, never facts). Not text, or longer:
+`422 invalid_request` with `fields` naming `parameters.additional_context` (`limit: 1000` when too long).
 
 ## Artifacts
 
