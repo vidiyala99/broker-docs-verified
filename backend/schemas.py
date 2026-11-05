@@ -907,6 +907,9 @@ class LossCheckBlock(BaseModel):
     decided_by: Literal["broker", "rows"] = "broker"
     title: str
     message: str
+    #: A printed total's own label as printed ("Total, all policies", "Subtotal policy BCC 22 77310"); None when the
+    #: line has none or the check is not a total. Display only: not part of the fingerprint.
+    label: str | None = None
     document_id: int | None = None
     metric: str | None = None
     scope_kind: str | None = None

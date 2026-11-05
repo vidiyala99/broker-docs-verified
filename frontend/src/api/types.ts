@@ -31,6 +31,8 @@ export interface DocumentInfo {
   created_at: string;
   /** Only on the POST /api/documents/ams response. */
   ams?: AmsSummary;
+  /** Only on spreadsheet uploads (POST /api/documents/spreadsheets, slice 5a). */
+  spreadsheet?: SpreadsheetSummary;
 }
 
 export interface Rejection {
@@ -610,6 +612,7 @@ export type LossRole = "counted" | "superseded" | "conflicting" | "left_out";
 export type LossClaimStatus = "open" | "closed" | "reopened" | "unknown";
 export type LossMoney = "paid" | "reserve" | "incurred" | "recovery" | "deductible";
 export type LossAmounts = Record<LossMoney, number | null>;
+export type LossQuickFilter = "over_100k" | "open_only" | "last_3_months" | "open_reserve";
 
 export interface SheetMapping {
   index: number;
@@ -703,6 +706,8 @@ export interface LossCheck {
   decided_by: "broker" | "rows";
   title: string;
   message: string;
+  /** A printed total's label as printed ("Total, all policies"); null when none or not a total. */
+  label?: string | null;
   document_id: number | null;
   metric: LossMoney | "claim_count" | null;
   scope_kind: "all" | "policy_year" | "policy_number" | "carrier" | "page_subtotal" | "sheet" | null;
@@ -735,6 +740,8 @@ export interface LossReview {
   totals: LossTotals | null;
   checks: LossCheck[];
   check_counts?: { to_resolve: number; handled: number; matches: number };
+  /** Claims each quick filter opens (distinct claims, effective values, D10); null before the review is built. */
+  filter_counts?: Record<"all" | LossQuickFilter, number> | null;
   notices: Notice[];
   counts: Record<string, number> | null;
   /** document id -> per sheet: header row and mapped / unmapped columns (after the read). */

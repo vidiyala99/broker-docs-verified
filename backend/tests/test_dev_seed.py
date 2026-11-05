@@ -183,6 +183,50 @@ def test_seeded_certificates_show_every_claim_state_and_a_past_holder(tmp_path, 
         s.close()
 
 
+def test_seeded_loss_review_shows_the_planted_states(tmp_path, monkeypatch):
+    """Slice 5a T9: run 12 reads the eight lr_main files live (cache off) with the scripted model and is labelled
+    synthetic: the Driftwood 2025 total is off by $12,400.00, AG-2307 conflicts, the 8 Fairhaven scan rows are not
+    verified, and BW-23-111 is confirmed with a note (Handled by you). Totals follow the fixture truth."""
+    from backend.pipeline import cache
+
+    monkeypatch.setenv("BROKERDOCS_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv(cache.ENV_SWITCH, raising=False)
+    dev_seed.scenario_environment()
+    s = dev_seed.Seeder()
+    try:
+        run_id = dev_seed.seed_loss_review(s)
+        review = s.client.get(f"/api/loss-runs/{run_id}").json()
+        assert review["run"]["status"] == "done", review["run"]
+        assert review["synthetic"] and review["client"] == dev_seed.LOSS_CLIENT
+        assert all(d["reused_from_run_id"] is None for d in review["run"]["documents"])  # read live
+        t = review["totals"]
+        # lr_main.case.json totals (55 claims, incurred $857,897.48) plus BW-23-111's $8,000.00, now confirmed
+        assert (t["claims"], t["open_claims"], t["incurred"]["cents"]) == (56, 33, 86_589_748), t
+        assert t["unreconciled"]
+        open_ = [c for c in review["checks"] if c["needs_action"]]
+        off = [c for c in open_ if c["verdict"] == "off"]
+        assert {c["metric"] for c in off} == {"paid", "reserve", "incurred"}
+        assert next(c for c in off if c["metric"] == "incurred")["difference"] == 12_400_00
+        assert any(c["kind"] == "conflict" and c["claim_key"] == "AG-2307" for c in open_)
+        unv = [c for c in open_ if c["kind"] == "unverified"]
+        assert len(unv) == 1 and unv[0]["rows"] == 8
+        assert review["filter_counts"]["all"] == 65
+        # one open check per printed line (owner, 2026-11-04): Driftwood's off line (3 metrics), the conflict, Fairhaven
+        assert len(open_) == 5 and review["check_counts"]["to_resolve"] == 3
+        listed = s.client.get("/api/loss-runs").json()["reviews"]
+        assert next(r for r in listed if r["run_id"] == run_id)["open_checks"] == 3
+        rows = s.client.get(f"/api/loss-runs/{run_id}/claims", params={"q": "BW-23-111"}).json()["rows"]
+        assert rows[0]["decision"]["kind"] == "confirmed" and rows[0]["counted"]
+    finally:
+        s.close()
+
+
+def test_loss_truth_ignores_a_tag_suffix_so_e2e_can_upload_fresh_copies():
+    assert dev_seed._loss_truth("lr_main_driftwood_2025--e2e123.pdf")["fixture_id"] == "lr_main_driftwood_2025"
+    assert dev_seed._loss_truth("carrier_a_clean.pdf") is None
+
+
 def test_cert_truth_ignores_a_tag_suffix_so_e2e_can_upload_fresh_copies():
     """certificates.spec.ts uploads cert_written_contract_gl--e2e<ms>.pdf (own name and bytes, so every run makes the
     first read itself); the scripted reply must still be that fixture's truth."""

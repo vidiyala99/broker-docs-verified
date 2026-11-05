@@ -157,7 +157,7 @@ def review_out(ctx: AppContext, s, run: models.Run) -> dict[str, Any]:
     art = run.artifact
     if art is None:
         out.update({"artifact_id": None, "version": None, "totals": None, "checks": [], "notices": [],
-                    "counts": None})
+                    "counts": None, "filter_counts": None})
         return out
     content = art.latest_content()
     totals = next((b for _, b in content.iter_blocks() if isinstance(b, LossTotalsBlock)), None)
@@ -171,11 +171,12 @@ def review_out(ctx: AppContext, s, run: models.Run) -> dict[str, Any]:
         "artifact_id": art.id, "version": art.current_version,
         "totals": totals.model_dump(mode="json") if totals else None,
         "checks": sorted(checks, key=lambda c: (order.get(c["status"], 3), 0 if c["kind"] != "total" else 1)),
-        "check_counts": {"to_resolve": sum(1 for c in checks if c["needs_action"]),
+        "check_counts": {"to_resolve": models.loss_open_checks(blocks),  # one per printed line (owner, 2026-11-04)
                          "handled": sum(1 for c in checks if c["status"] == "resolved"),
                          "matches": sum(1 for c in checks if c["status"] == "match")},
         "notices": [n.model_dump(mode="json") for n in content.notices],
         "counts": totals.counts if totals else None,
+        "filter_counts": filter_counts(s, run),
     })
     return out
 
@@ -194,7 +195,7 @@ async def list_loss_reviews(ctx: AppContext = Depends(get_ctx)) -> dict[str, Any
             if run.artifact is not None:
                 content = run.artifact.latest_content()
                 totals = next((b for _, b in content.iter_blocks() if isinstance(b, LossTotalsBlock)), None)
-                open_checks = sum(1 for b in models.loss_check_blocks(content) if b.needs_action)
+                open_checks = models.loss_open_checks(models.loss_check_blocks(content))
             items.append({"run_id": run.id, "client": client, "client_source": source, "status": str(run.status),
                           "active": ctx.manager.is_active(run.id), "queue_state": run.queue_state,
                           "files": len(run.documents), "created_at": _ts(run.created_at),
@@ -230,6 +231,43 @@ def _months_before(iso: str, months: int) -> str:
         except ValueError:
             continue
     return d.isoformat()  # pragma: no cover
+
+
+QUICK_FILTERS = ("over_100k", "open_only", "last_3_months", "open_reserve")
+
+
+def _as_of(run: models.Run) -> str | None:
+    """The review's latest valuation date, from its totals block (the anchor of Last 3 months)."""
+    if run.artifact is None:
+        return None
+    totals = next((b for _, b in run.artifact.latest_content().iter_blocks() if isinstance(b, LossTotalsBlock)), None)
+    return totals.as_of if totals else None
+
+
+def _quick_conditions(name: str, as_of: str | None) -> list:
+    """One quick filter as SQL conditions on the ledger's claim-level effective values (D10). Shared by the claims
+    page and the review's `filter_counts`, so a filter's count always matches the rows it opens."""
+    if name == "over_100k":
+        return [CR.claim_incurred > OVER_100K_CENTS]
+    if name == "open_only":
+        return [CR.claim_open.is_(True)]
+    if name == "open_reserve":
+        return [CR.claim_reserve > 0]
+    if name == "last_3_months":
+        anchor = as_of or dt.date.today().isoformat()
+        return [CR.claim_date.is_not(None), CR.claim_date >= _months_before(anchor, 3), CR.claim_date <= anchor]
+    raise ValueError(name)  # pragma: no cover
+
+
+def filter_counts(s, run: models.Run) -> dict[str, int]:
+    """Claims (distinct claim groups, superseded valuations excluded) each quick filter would show, plus `all`."""
+    as_of = _as_of(run)
+    base = [CR.run_id == run.id, CR.role != "superseded"]
+
+    def count(extra: list) -> int:
+        return s.scalar(select(func.count(func.distinct(CR.group_key))).where(and_(*base, *extra))) or 0
+
+    return {"all": count([]), **{name: count(_quick_conditions(name, as_of)) for name in QUICK_FILTERS}}
 
 
 def _row_out(r: models.ClaimRow, chips: _Chips) -> dict[str, Any]:
@@ -271,20 +309,11 @@ async def list_claims(
     with ctx.factory() as s:
         run = _loss_run(s, run_id)
         conds = [CR.run_id == run.id]
-        if over_100k:
-            conds.append(CR.claim_incurred > OVER_100K_CENTS)
-        if open_only:
-            conds.append(CR.claim_open.is_(True))
-        if open_reserve:
-            conds.append(CR.claim_reserve > 0)
-        as_of = None
-        if run.artifact is not None:
-            totals = next((b for _, b in run.artifact.latest_content().iter_blocks()
-                           if isinstance(b, LossTotalsBlock)), None)
-            as_of = totals.as_of if totals else None
-        if last_3_months:
-            anchor = as_of or dt.date.today().isoformat()
-            conds += [CR.claim_date.is_not(None), CR.claim_date >= _months_before(anchor, 3), CR.claim_date <= anchor]
+        as_of = _as_of(run)
+        for name, on in (("over_100k", over_100k), ("open_only", open_only), ("last_3_months", last_3_months),
+                         ("open_reserve", open_reserve)):
+            if on:
+                conds += _quick_conditions(name, as_of)
         if document_id is not None:
             conds.append(CR.document_id == document_id)
         if role is not None:

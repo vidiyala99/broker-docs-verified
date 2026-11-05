@@ -1011,8 +1011,18 @@ finished_at, latest_valuation_date, claims, incurred, open_checks}]}`, newest fi
                            // deductible: {cents, from_claims}, unreconciled, as_of, counts, documents[]
  checks: [LossCheckBlock + {note, updated_at, chips[]}],   // open first, then handled, then matches
  check_counts: {to_resolve, handled, matches},
+ filter_counts: {all, over_100k, open_only, last_3_months, open_reserve},  // null before the review is built
  notices: [Notice], counts, sheets: {document_id: [{sheet, index, header_row, mapped[], unmapped[]}]}}
 ```
+
+`check_counts.to_resolve`, the Analytics `open_checks` and the queue's "N checks to resolve" count open checks the way
+the broker sees them: one per printed total line (its paid, reserve and incurred checks are one card with one Accept,
+owner 2026-11-04), plus each open conflict and each file's unverified rows (`models.loss_open_checks`). `checks` still
+lists one check per printed total.
+
+`filter_counts`: how many claims (distinct claim groups; superseded valuations are not claims) each quick filter of
+`GET .../claims` opens, on the same effective, claim-level conditions (D10), so a count always matches the rows the
+filter shows. Every broker action answers with the review, so the counts follow edits and decisions.
 
 `LossCheckBlock`: `id`, `kind` (`total` | `conflict` | `unverified`), `verdict` (`matches` | `off` | `needs_review` (a printed
 total the code could not check: not verified on its page, scope not recognised, or rows on no printed line may fall

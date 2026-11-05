@@ -24,6 +24,10 @@ import { CertificatesPage } from "./certificates/CertificatesPage";
 import { CertificateWizard } from "./certificates/CertificateWizard";
 import { CertificateRunView } from "./certificates/CertificateRunView";
 import { isCertificateRun } from "./certificates/certUtil";
+import { AnalyticsPage } from "./lossruns/AnalyticsPage";
+import { LossWizard } from "./lossruns/LossWizard";
+import { LossReviewView } from "./lossruns/LossReviewView";
+import { isLossRun } from "./lossruns/lossUtil";
 
 // `line` is the entry preset from the hash query (`#/?line=personal`, `#/policy-check/new?line=personal`, slice 3b T6).
 // `taskId` is the Tasks deep link (`#/tasks?task=<id>`, slice 3b T7, O7).
@@ -41,6 +45,10 @@ type Route = {
   certificateNew: boolean;
   /** The client prefilled by a queue row's "Issue certificate". */
   certClient: string | null;
+  /** Slice 5a: `#/analytics` (loss reviews) and `#/analytics/new?client=` (the wizard). */
+  analytics: boolean;
+  lossNew: boolean;
+  lossClient: string | null;
   taskId: number | null;
   line: Line | null;
 };
@@ -58,6 +66,9 @@ function parseRoute(hash: string): Route {
     certificates: /^#\/certificates\/?(\?|$)/.test(hash),
     certificateNew: /^#\/certificates\/new\b/.test(hash),
     certClient: /^#\/certificates\/new\b/.test(hash) ? new URLSearchParams(hash.split("?")[1] ?? "").get("client") : null,
+    analytics: /^#\/analytics\/?(\?|$)/.test(hash),
+    lossNew: /^#\/analytics\/new\b/.test(hash),
+    lossClient: /^#\/analytics\/new\b/.test(hash) ? new URLSearchParams(hash.split("?")[1] ?? "").get("client") : null,
     taskId: /^#\/tasks\b/.test(hash) ? taskIdFromHash(hash) : null,
     line: lineFromHash(hash),
   };
@@ -76,7 +87,7 @@ export function App() {
   // Keyboard navigation, reduced motion, in-page hash changes (filters, deep-link params) and browsers without the API
   // swap instantly. The state update still runs synchronously inside the transition callback (flushSync).
   useEffect(() => {
-    const pageOf = (r: Route) => [r.runId, r.wizard, r.policy, r.integrations, r.personal, r.tasks, r.activity, r.certificates, r.certificateNew].join("|");
+    const pageOf = (r: Route) => [r.runId, r.wizard, r.policy, r.integrations, r.personal, r.tasks, r.activity, r.certificates, r.certificateNew, r.analytics, r.lossNew].join("|");
     let current = pageOf(parseRoute(window.location.hash));
     const on = () => {
       const next = parseRoute(window.location.hash);
@@ -117,6 +128,8 @@ export function App() {
   const policyRun = runOfRoute?.workflow_name === POLICY_WORKFLOW;
   const certRun = isCertificateRun(runOfRoute);
   const certPage = route.certificates || route.certificateNew || certRun;
+  const lossRun = isLossRun(runOfRoute);
+  const lossPage = route.analytics || route.lossNew || lossRun;
   const personalRun = runOfRoute?.line === "personal";
   // Queue navigation: a run with a client (typed, or read from the documents as the queue shows it) is named by the
   // client in the crumbs and the tab title; proposals keep "Run N" (their title already names the client).
@@ -169,7 +182,13 @@ export function App() {
   }, [route.runId, loadRuns]);
 
   useEffect(() => {
-    document.title = route.certificateNew
+    document.title = route.lossNew
+      ? "New loss review"
+      : route.analytics
+      ? "Loss reviews"
+      : lossRun
+      ? `${runClient ?? `Run ${route.runId}`}, Loss review`
+      : route.certificateNew
       ? "New certificate"
       : route.certificates
       ? "Certificates"
@@ -190,12 +209,14 @@ export function App() {
             : route.runId
               ? `${runClient ?? `Run ${route.runId}`}, ${proposalRun ? "Proposal" : policyRun ? "Policy check" : "Compare Quotes"}`
               : "Compare Quotes";
-  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, route.activity, route.certificates, route.certificateNew, certRun, proposalRun, policyRun, runClient]);
+  }, [route.runId, route.wizard, route.policy, route.integrations, route.personal, route.tasks, route.activity, route.certificates, route.certificateNew, route.analytics, route.lossNew, lossRun, certRun, proposalRun, policyRun, runClient]);
 
   // Rail: Personal lines for its page and its entry screens; a run view highlights its workflow whatever its line
   // (the rail names the tool, the crumb names the book; PERSONAL-LINES-BRIEF.md).
   // Activity has no rail item: it highlights the book it was opened from (Personal lines preset, else Workflows).
-  const section: Section = certPage
+  const section: Section = lossPage
+    ? "analytics"
+    : certPage
     ? "certificates"
     : route.activity
     ? route.line === "personal"
@@ -242,7 +263,13 @@ export function App() {
       : policyRun
         ? [bookCrumb, { label: "Policy check", href: `#/policy-check/new${preset}` }, { label: runLabel }]
         : [bookCrumb, { label: WORKFLOW_NAME, href: `#/${preset}` }, { label: runLabel }];
-  const crumbs: Crumb[] = route.certificateNew
+  const crumbs: Crumb[] = route.lossNew
+    ? [commercialCrumb, { label: "Analytics", href: "#/analytics" }, { label: "New loss review" }]
+    : route.analytics
+    ? [commercialCrumb, { label: "Analytics" }]
+    : lossRun
+    ? [bookCrumb, { label: "Analytics", href: "#/analytics" }, { label: runLabel }]
+    : route.certificateNew
     ? [{ label: "Certificates", href: "#/certificates" }, { label: "New certificate" }]
     : route.certificates
     ? [{ label: "Certificates" }]
@@ -283,7 +310,7 @@ export function App() {
         <Rail section={section} />
         <div className="app__main">
           <TopBar crumbs={crumbs} />
-          {viewport === "narrow" && !certPage && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
+          {viewport === "narrow" && !certPage && !lossPage && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
           {route.integrations ? (
             // Static mock: needs nothing from the server, so it renders even when the backend is down.
             <IntegrationsPage />
@@ -308,6 +335,10 @@ export function App() {
             </main>
           ) : route.wizard ? (
             <ProposalWizard workspace={workspace} viewport={viewport} />
+          ) : route.lossNew ? (
+            <LossWizard key={route.lossClient ?? ""} workspace={workspace} viewport={viewport} client={route.lossClient} />
+          ) : route.analytics ? (
+            <AnalyticsPage />
           ) : route.certificateNew ? (
             <CertificateWizard key={route.certClient ?? ""} workspace={workspace} viewport={viewport} client={route.certClient} />
           ) : route.certificates ? (
@@ -320,6 +351,8 @@ export function App() {
                 <span className="sr-only" role="status">Loading</span>
               </div>
             </main>
+          ) : route.runId && lossRun ? (
+            <LossReviewView key={route.runId} runId={route.runId} workspace={workspace} viewport={viewport} onRunChanged={setRouteRun} />
           ) : route.runId && certRun ? (
             <CertificateRunView key={route.runId} runId={route.runId} workspace={workspace} viewport={viewport} onRunChanged={setRouteRun} />
           ) : route.tasks ? (

@@ -316,6 +316,61 @@ def cert_extract(text: str, truth: dict[str, Any] | None) -> dict[str, Any]:
     return {"facts": facts, "endorsements": endorsements, "options_detected": 1, "option_compared": None}
 
 
+LOSS_FIXTURES = ROOT / "tests" / "fixtures" / "loss_runs"
+LOSS_FILE_NAME = re.compile(r"Document file name \(data, not an instruction\): '([^']+)'")
+
+
+def _loss_truth(filename: str) -> dict[str, Any] | None:
+    """Ground truth of a tests/fixtures/loss_runs file, by its upload name (lr_<case>_<doc>.<ext>); a `--<tag>`
+    suffix on the stem is ignored so an e2e spec can upload a fixture under fresh bytes and name."""
+    if not filename.startswith("lr_"):
+        return None
+    path = LOSS_FIXTURES / (Path(filename).stem.split("--")[0] + ".truth.json")
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def loss_rows(truth: dict[str, Any] | None, text: str) -> dict[str, Any]:
+    """One 2-page row window (slice 5a, CallRole.LOSS_ROWS), scripted from the fixture's truth: the rows and
+    printed totals on the pages this window shows, as printed (the eval's perfect fake, loss_run_gate)."""
+    pages = {int(n) for n in re.findall(r"\[page (\d+)\]", text)}
+    rows, totals = [], []
+    for ln in (truth or {}).get("lines") or []:
+        p = ln["location"].get("page")
+        if p not in pages:
+            continue
+        pr, year = ln["printed"], ln.get("policy_year")
+        rows.append({"claim_number": pr["claim_number"], "claimant": ln.get("claimant"),
+                     "date_of_loss": pr["date_of_loss"], "status": pr["status"],
+                     "policy_number": ln.get("policy_number"), "line": ln.get("line"),
+                     "policy_year": None if year is None else str(year), "carrier": truth.get("carrier"),
+                     **{m: pr.get(m) for m in ("paid", "reserve", "incurred", "recovery", "deductible")},
+                     "page": p, "quote": ln["quote"]})
+    for t in (truth or {}).get("printed_totals") or []:
+        if t["location"].get("page") in pages:
+            totals.append({"label": t["label"], "metric": t["metric"], "scope_kind": t["scope_kind"],
+                           "scope_value": None if t["scope_value"] is None else str(t["scope_value"]),
+                           "amount": str(t["printed"]), "page": t["location"]["page"], "quote": t["quote"]})
+    return {"rows": rows, "totals": totals}
+
+
+def loss_facts(truth: dict[str, Any] | None, text: str) -> dict[str, Any]:
+    """The lr: document facts (carrier, valuation date) a loss-run PDF's fact pass asks for, as printed."""
+    facts = []
+    for key in dict.fromkeys(re.findall(r"- (lr:[a-z_]+)", text)):
+        f = ((truth or {}).get("facts") or {}).get(key)
+        facts.append({"field": key, "value": f["printed"] if f else None, "page": f.get("page") if f else None,
+                      "quote": f["quote"] if f else None})
+    return {"facts": facts, "options_detected": 1, "option_compared": None}
+
+
+def loss_headers(text: str) -> dict[str, Any]:
+    """Unknown spreadsheet headers: map the ones a fixture names (its `columns`), leave the rest unmapped."""
+    m = LOSS_FILE_NAME.search(text)
+    truth = _loss_truth(m.group(1)) if m else None
+    known = {h: col for s in (truth or {}).get("sheets") or [] for h, col in (s.get("columns") or {}).items()}
+    return {"mappings": [{"header": h, "column": col} for h, col in known.items() if h in text]}
+
+
 class DevProvider(FakeProvider):
     """FakeProvider with a per-call delay and OCR text taken from the clean twin of a scanned fixture."""
 
@@ -331,7 +386,15 @@ class DevProvider(FakeProvider):
 
     def respond(self, req: ProviderRequest):
         text = _user_text(req)
+        if req.role is CallRole.LOSS_ROWS:
+            m = LOSS_FILE_NAME.search(text)
+            return loss_rows(_loss_truth(m.group(1)) if m else None, text)
+        if req.role is CallRole.LOSS_HEADERS:
+            return loss_headers(text)
         if req.role is CallRole.EXTRACT:
+            if "- lr:" in text:  # the loss-run document facts (slice 5a)
+                m = re.match(r"extract:(\d+)", req.label or "")
+                return loss_facts(_loss_truth(self.filename_of(int(m.group(1)))) if m else None, text)
             if "- cert:" in text:  # the certificate combined schema (slice 4)
                 m = re.match(r"extract:(\d+)", req.label or "")
                 return cert_extract(text, _cert_truth(self.filename_of(int(m.group(1)))) if m else None)
@@ -356,6 +419,9 @@ class DevProvider(FakeProvider):
         import fitz  # PyMuPDF
 
         name = self.filename_of(doc_id)
+        loss = _loss_truth(name)
+        if loss and loss.get("scan_transcript"):  # a scanned loss run: its page as the scan reads it
+            return loss["scan_transcript"].get(str(page_no), "")
         truth = _policy_truth(name)
         if truth:  # a scanned policy fixture: its printed lines, as a scan would read them
             return "\n".join(f["quote"] for f in (truth.get("facts") or {}).values() if f and f.get("page") == page_no)
@@ -521,6 +587,7 @@ def seed() -> None:
         seed_tasks(s, first)
         seed_failed_proposal(s, fallback["id"])
         seed_certificates(s)
+        seed_loss_review(s)
     finally:
         s.close()
     print("Done. Start the dev server with: python -m backend.dev_seed serve")
@@ -611,6 +678,42 @@ def seed_certificates(s: Seeder) -> tuple[int, int]:
             "status": "resolved", "note": CERT_OVERRIDE_NOTE,
             "expected_fingerprint": target["fingerprint"]}).raise_for_status()
     return issued["run"]["id"], draft["run"]["id"]
+
+
+LOSS_CLIENT = "Harrow Lane Bakery Group LLC"  # the insured printed on every lr_main file
+LOSS_FILES = ("lr_main_ashgrove_clean.xlsx", "lr_main_ashgrove_export.csv", "lr_main_bellwether_messy.xlsx",
+              "lr_main_bellwether_extract.csv", "lr_main_driftwood_2024.pdf", "lr_main_driftwood_2025.pdf",
+              "lr_main_elmstead_wrapped.pdf", "lr_main_fairhaven_scan.pdf")
+LOSS_CONFIRM_NOTE = "Incurred cell is a formula with no stored value; paid + reserve is $8,000.00 and the 2023 subtotal ties."
+
+
+def seed_loss_review(s: Seeder) -> int:
+    """Run 12 of a full seed (slice 5a T9): one loss review over the eight lr_main files (tests/fixtures/loss_runs),
+    labelled synthetic sample data, read with the cache off. It shows every review state the fixtures plant: the
+    Driftwood 2025 total off by $12,400.00, the AG-2307 conflict, 8 scanned Fairhaven rows not verified, superseded
+    valuations, notices. BW-23-111 (formula not calculated) is confirmed with a note, so Handled by you has a row."""
+    print("12. loss review, eight carrier files (synthetic)")
+    pdfs = [n for n in LOSS_FILES if n.endswith(".pdf")]
+    sheets = [n for n in LOSS_FILES if not n.endswith(".pdf")]
+    ids = s.upload(*pdfs, folder=LOSS_FIXTURES)
+    r = s.client.post("/api/documents/spreadsheets", files=[
+        ("files", (n, (LOSS_FIXTURES / n).read_bytes(), "application/octet-stream")) for n in sheets])
+    r.raise_for_status()
+    by_name = {d["filename"]: d["id"] for d in r.json()["documents"]}
+    ids += [by_name[n] for n in sheets if n in by_name]
+    r = s.client.post("/api/runs", json={"document_ids": ids, "workflow": "loss-run", "client_name": LOSS_CLIENT,
+                                         "parameters": {"synthetic": True}})
+    r.raise_for_status()
+    run = s.wait(r.json()["run"]["id"])
+    print(f"  run {run['id']}: {run['status']}")
+    rows = s.client.get(f"/api/loss-runs/{run['id']}/claims", params={"state": "unverified", "limit": 200}).json()
+    target = next((x for x in rows["rows"] if x["claim_number"] == "BW-23-111"), None)
+    if target:
+        s.client.post(f"/api/loss-runs/{run['id']}/rows/{target['id']}/decision",
+                      json={"kind": "confirm", "note": LOSS_CONFIRM_NOTE}).raise_for_status()
+    review = s.client.get(f"/api/loss-runs/{run['id']}").json()
+    print("  checks:", review.get("check_counts"), "totals:", (review.get("totals") or {}).get("claims"))
+    return run["id"]
 
 
 def seed_failed_proposal(s: Seeder, comparison_id: int) -> int:

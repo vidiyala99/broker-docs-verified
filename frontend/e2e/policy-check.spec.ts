@@ -57,8 +57,8 @@ test("policy check: rail entry, wizard with AMS, run, list", async ({ page }) =>
   const rail = page.getByRole("link", { name: "Policy check, new check" });
   await expect(rail).toHaveAttribute("href", "#/policy-check/new");
   // 10 before slice 3b; Integrations (T5), Personal lines (T6) and Tasks (T7) are live now (D7 allowed edits, 9 -> 8 -> 7);
-  // slice 4 C11 makes Certificates live (7 -> 6).
-  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(6);
+  // slice 4 C11 makes Certificates live (7 -> 6); slice 5a T8 makes Analytics live (6 -> 5).
+  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(5);
   await rail.click();
   await expect(page).toHaveURL(/#\/policy-check\/new/);
   await expect(rail).toHaveAttribute("aria-current", "page");

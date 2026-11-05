@@ -51,7 +51,9 @@ def test_a_loss_review_is_a_client_row_in_the_queue(tmp_path, monkeypatch):
         queue = api.client.get("/api/queue", params={"line": "commercial"}).json()
         row = next(i for i in queue["needs_review"] if i["run_id"] == run_id)
         assert row["client"] == "Calloway Build Group LLC" and row["client_source"] == "extracted"
-        assert row["action"] == "Review losses" and row["open_checks"] == 2  # printed paid and incurred 5, rows add up to 1
+        # printed paid and incurred 5, rows add up to 1: two off totals on one printed line, so one open check
+        # (one card per printed line, owner 2026-11-04 12:40)
+        assert row["action"] == "Review losses" and row["open_checks"] == 1
         for check in [c for c in api.client.get(f"/api/loss-runs/{run_id}").json()["checks"] if c["verdict"] == "off"]:
             api.client.patch(f"/api/loss-runs/{run_id}/checks/{check['id']}", json={"action": "accept", "note": "ok"})
         queue = api.client.get("/api/queue", params={"line": "commercial"}).json()

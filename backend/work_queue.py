@@ -532,7 +532,7 @@ def load_queue(session: Session, line: str, *, is_active: Callable[[int], bool] 
                                                    models.ArtifactVersion.version == models.Artifact.current_version))
                 .where(models.Artifact.run_id.in_(loss_ids))):
             blocks = models.loss_check_blocks(ArtifactContent.model_validate(content))
-            loss_open[run_id] = sum(1 for b in blocks if b.needs_action)
+            loss_open[run_id] = models.loss_open_checks(blocks)
     states: dict[int, dict[str, models.DiscrepancyState]] = defaultdict(dict)
     if reports:
         for row in session.scalars(select(models.DiscrepancyState)

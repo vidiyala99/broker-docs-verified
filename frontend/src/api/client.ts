@@ -5,6 +5,12 @@ import type {
   CertificateParameters,
   CertificateQueue,
   CertificateView,
+  ClaimRow,
+  ClaimsPage,
+  LossMoney,
+  LossReview,
+  LossReviewListItem,
+  SpreadsheetSummary,
   ClaimStatus,
   ClientDocument,
   Holder,
@@ -188,6 +194,37 @@ export const api = {
   /** D10/D15: a certificate claim decision; `resolved` needs a note (the override reason), every call sends the fingerprint. */
   patchClaim: (runId: number, itemId: string, body: { status: ClaimStatus; note?: string | null; expected_fingerprint: string }) =>
     request<unknown>(`/api/runs/${runId}/discrepancies/${encodeURIComponent(itemId)}`, { method: "PATCH", body: json(body) }),
+  // ---------------------------------------------------------------- loss reviews (slice 5a, API.md "Loss reviews")
+  startLossReview: (documentIds: number[], clientName?: string) =>
+    request<{ run: Run; created: boolean }>("/api/runs", {
+      method: "POST",
+      body: json({ document_ids: documentIds, workflow: "loss-run", ...clientBody(clientName) }),
+    }),
+  lossReviews: () => request<{ reviews: LossReviewListItem[] }>("/api/loss-runs").then((r) => r.reviews),
+  lossReview: (runId: number) => request<LossReview>(`/api/loss-runs/${runId}`),
+  /** One page of the claims table; `params` are the API's query (sort, dir, quick filters, document_id, scope...). */
+  lossClaims: (runId: number, params: Record<string, string | number | boolean | null | undefined>) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v != null && v !== false && v !== "") q.set(k, String(v));
+    return request<ClaimsPage>(`/api/loss-runs/${runId}/claims?${q}`);
+  },
+  lossRowDecision: (runId: number, rowId: number, body: { kind: "edit"; amounts: Partial<Record<LossMoney, number>> } | { kind: "confirm" | "leave_out"; note: string }) =>
+    request<{ decision: { id: number; kind: string }; review: LossReview }>(`/api/loss-runs/${runId}/rows/${rowId}/decision`, {
+      method: "POST",
+      body: json(body),
+    }),
+  lossUndoDecision: (runId: number, decisionId: number) =>
+    request<{ review: LossReview }>(`/api/loss-runs/${runId}/decisions/${decisionId}`, { method: "DELETE" }),
+  lossAddClaim: (runId: number, body: Record<string, string | number | null>) =>
+    request<{ row: ClaimRow; review: LossReview }>(`/api/loss-runs/${runId}/claims`, { method: "POST", body: json(body) }),
+  lossRemoveAdded: (runId: number, rowId: number) =>
+    request<{ review: LossReview }>(`/api/loss-runs/${runId}/claims/${rowId}`, { method: "DELETE" }),
+  lossCheck: (runId: number, itemId: string, body: { action: "accept"; note: string } | { action: "pick"; document_id: number } | { action: "reopen" }, expected?: string) =>
+    request<{ review?: LossReview } & Partial<LossReview>>(`/api/loss-runs/${runId}/checks/${encodeURIComponent(itemId)}`, {
+      method: "PATCH",
+      body: json({ ...body, ...(expected ? { expected_fingerprint: expected } : {}) }),
+    }),
+  sheetSummary: (documentId: number) => request<DocumentInfo & { spreadsheet?: SpreadsheetSummary }>(`/api/documents/${documentId}/sheets`),
   tasks: () => request<{ tasks: Task[] }>("/api/tasks").then((r) => r.tasks),
   createTask: (body: TaskInput) => request<Task>("/api/tasks", { method: "POST", body: json(body) }),
   patchTask: (id: number, body: TaskInput) => request<Task>(`/api/tasks/${id}`, { method: "PATCH", body: json(body) }),
@@ -226,7 +263,7 @@ export async function downloadExport(artifactId: number, format: ExportFormat, v
 export function uploadFile(
   file: File,
   onProgress: (fraction: number) => void,
-  path: "/api/documents" | "/api/documents/ams" = "/api/documents",
+  path: "/api/documents" | "/api/documents/ams" | "/api/documents/spreadsheets" = "/api/documents",
 ): Promise<{ documents: DocumentInfo[]; rejected: Rejection[] }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

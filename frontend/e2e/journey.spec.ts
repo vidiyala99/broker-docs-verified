@@ -33,8 +33,8 @@ test("upload, run, review, chip, edit, chat, export", async ({ page }) => {
   // Slice 3b T6 (D7 allowed edit): Personal lines is live now, so its "coming in a later slice" check became this link check.
   await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Personal lines" })).toHaveAttribute("href", "#/personal-lines");
   // 10 before slice 3b; Integrations (T5), Personal lines (T6) and Tasks (T7) are live now (D7 allowed edits, 9 -> 8 -> 7);
-  // slice 4 C11 makes Certificates live (7 -> 6).
-  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(6);
+  // slice 4 C11 makes Certificates live (7 -> 6); slice 5a T8 makes Analytics live (6 -> 5).
+  await expect(page.locator(".rail__item.is-disabled")).toHaveCount(5);
   await shot(page, "1440-01-launch");
   await axe(page, "launch");
 
