@@ -143,21 +143,26 @@ export function ClaimLine({ r, first, act, cols, history, open, onFold, pending 
       <td className="lr-c-who">
         <span className="lr-who" title={r.claimant ?? ""}>{r.claimant || <span className="lr-muted">No claimant</span>}</span>
         <span className="lr-states">
-          {r.chip && <LossChip chip={r.chip} onOpen={(c) => act.openChip(c, scan)} scan={scan} />}
-          {pending && <span className="lr-state lr-state--pending">{pending}</span>}
-          {!pending &&
-            states.map((s) => (
-              <span key={s} className={`lr-state lr-state--${s}`} title={stateTip(r, s)}>
-                <span aria-hidden>{s === "unverified" && scan ? <Scan size={14} weight="bold" /> : STATE_GLYPH[s]}</span>
-                {ROW_STATE_WORD[s]}
-                <span className="sr-only">. {stateTip(r, s)}</span>
-              </span>
-            ))}
+          {r.chip ? <LossChip chip={r.chip} onOpen={(c) => act.openChip(c, scan)} scan={scan} /> : r.source === "added" && <span className="hint">No source</span>}
         </span>
       </td>
       <td className="num lr-c-date">{day(r.date_of_loss)}</td>
       <td className="lr-c-status">
         <span className="status-word lr-status" title={r.status_raw ? `Printed "${r.status_raw}"` : undefined}>{statusWord(r)}</span>
+        <span className="lr-rowstates">
+          {pending ? (
+            <span className="lr-state lr-state--pending">{pending}</span>
+          ) : (
+            states.slice(0, 1).map((s) => (
+              <span key={s} className={`lr-state lr-state--${s}`} title={states.map((x) => stateTip(r, x)).join(" ")}>
+                <span aria-hidden>{s === "unverified" && scan ? <Scan size={14} weight="bold" /> : STATE_GLYPH[s]}</span>
+                {ROW_STATE_WORD[s]}
+                {states.length > 1 && <span aria-hidden>, +{states.length - 1}</span>}
+                <span className="sr-only">. {states.map((x) => stateTip(r, x)).join(" ")}</span>
+              </span>
+            ))
+          )}
+        </span>
       </td>
       {cols.map((c) => (
         <td key={c} className={OPTIONAL.find((o) => o.key === c)?.num ? "num" : undefined}>

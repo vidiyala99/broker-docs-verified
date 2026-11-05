@@ -6,6 +6,19 @@ import { Collapse } from "../ui/motion";
 import { keyboardAction } from "../ui/input";
 import { checkCards, docLetter, docName, groupOf, METRIC_LABEL, scopeLabel, usd, type CheckCard } from "./lossUtil";
 
+/**
+ * The chip's visible text, short enough for a table row: a PDF page reads "Driftwood p.2" (the carrier's first word; the
+ * full label is the accessible name), a sheet row "Sheet 2024, row 17", a CSV row "Row 6" (its only sheet is the file).
+ */
+export function chipText(chip: LossChipData): string {
+  if (chip.kind === "page") {
+    const m = /^(\S+).*?\s(p\.\d+)$/.exec(chip.label);
+    return m ? `${m[1]} ${m[2]}` : chip.label;
+  }
+  const stem = chip.filename.replace(/\.(xlsx|csv)$/i, "");
+  return chip.label.replace(new RegExp(`^Sheet ${stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}, row`), "Row");
+}
+
 /** A loss-run chip (D13): the letter that travels with the file's hue, then "Driftwood p.2" or "Sheet 2024, row 17". */
 export function LossChip({ chip, onOpen, scan = false }: { chip: LossChipData; onOpen: (c: LossChipData) => void; scan?: boolean }) {
   return (
@@ -17,7 +30,7 @@ export function LossChip({ chip, onOpen, scan = false }: { chip: LossChipData; o
     >
       {scan && <Scan size={12} weight="bold" aria-hidden />}
       <span className="lr-chip__letter">{chip.letter}</span>
-      {chip.label}
+      <span className="lr-chip__text">{chipText(chip)}</span>
     </button>
   );
 }
@@ -267,7 +280,8 @@ function CardBody({ card, review, act, folded = false }: { card: CheckCard; revi
 
 export function Checks({ review, act, scoped }: { review: LossReview; act: CheckActions; scoped: string | null }) {
   const cards = checkCards(review.checks);
-  const toResolve = cards.filter((c) => groupOf(c) === "to_resolve");
+  const NEED: Record<string, number> = { off: 0, needs_review: 1, conflicting: 2, unverified: 3 };
+  const toResolve = cards.filter((c) => groupOf(c) === "to_resolve").sort((a, b) => (NEED[a.verdict] ?? 9) - (NEED[b.verdict] ?? 9));
   const handled = cards.filter((c) => groupOf(c) === "handled");
   const matches = cards.filter((c) => groupOf(c) === "matches");
   const [showMatches, setShowMatches] = useState(false);

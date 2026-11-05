@@ -95,7 +95,11 @@ const VERDICT_RANK: Record<string, number> = { off: 0, needs_review: 1, conflict
 export function checkCards(checks: LossCheck[]): CheckCard[] {
   const byKey = new Map<string, LossCheck[]>();
   for (const c of checks) {
-    const key = c.kind === "total" ? c.id.replace(/:(paid|reserve|incurred|recovery|deductible|claim_count)$/, "") : c.id;
+    // One printed line = one document, one scope, one printed page or sheet page (the metric's own word position
+    // differs per amount, so the id alone does not group a scanned line's totals).
+    const key = c.kind === "total"
+      ? `total:${c.document_id}:${c.scope_kind}:${c.scope_value ?? ""}:${c.chips[0]?.kind ?? ""}${c.chips[0]?.page_no ?? ""}:${c.title.split(":")[0]}`
+      : c.id;
     byKey.set(key, [...(byKey.get(key) ?? []), c]);
   }
   return [...byKey.entries()].map(([key, cs]) => {

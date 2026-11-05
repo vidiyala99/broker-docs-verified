@@ -492,6 +492,8 @@ export function LossReviewView({ runId, viewport, onRunChanged }: { runId: numbe
   const files = run?.documents.length ?? 0;
   const carriers = new Set(review?.totals?.documents.map((d) => d.carrier ?? d.filename)).size;
   const asOf = review?.totals?.as_of;
+  // The scoped card follows the review: after an action its figures (and verdict) are the server's new ones.
+  const liveScope = scope && review ? (checkCards(review.checks).find((c) => c.key === scope.key) ?? null) : null;
 
   return (
     <div className="workspace lr-ws">
@@ -609,7 +611,7 @@ export function LossReviewView({ runId, viewport, onRunChanged }: { runId: numbe
                     }}
                     version={version}
                     act={rowAct}
-                    scope={scope}
+                    scope={liveScope}
                     recounting={recounting}
                     pending={pending}
                     narrow={viewport !== "wide"}

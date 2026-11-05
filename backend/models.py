@@ -959,6 +959,19 @@ def loss_check_blocks(content: ArtifactContent, *, broker_only: bool = False) ->
             if isinstance(b, LossCheckBlock) and (not broker_only or b.decided_by == "broker")]
 
 
+def loss_check_line(block: LossCheckBlock) -> str:
+    """The printed line a check belongs to. A printed total line carries one check per metric (paid, reserve,
+    incurred); the broker sees and decides one card per line (owner, 2026-11-04 12:40), so counts use this key."""
+    if block.kind != "total":
+        return block.id
+    return f"{block.document_id}|{block.scope_kind}|{block.scope_value}|{block.title.split(':')[0]}"
+
+
+def loss_open_checks(blocks: list[LossCheckBlock]) -> int:
+    """Open checks as the broker sees them: one per printed line, plus each conflict and each file's unverified rows."""
+    return len({loss_check_line(b) for b in blocks if b.needs_action})
+
+
 def item_fingerprint(block: DiscrepancyBlock | ClaimBlock | LossCheckBlock) -> str:
     if isinstance(block, LossCheckBlock):
         return block.fingerprint  # computed by loss_runs.ledger over what the check compares

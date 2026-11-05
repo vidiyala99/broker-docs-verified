@@ -171,7 +171,7 @@ def review_out(ctx: AppContext, s, run: models.Run) -> dict[str, Any]:
         "artifact_id": art.id, "version": art.current_version,
         "totals": totals.model_dump(mode="json") if totals else None,
         "checks": sorted(checks, key=lambda c: (order.get(c["status"], 3), 0 if c["kind"] != "total" else 1)),
-        "check_counts": {"to_resolve": sum(1 for c in checks if c["needs_action"]),
+        "check_counts": {"to_resolve": models.loss_open_checks(blocks),  # one per printed line (owner, 2026-11-04)
                          "handled": sum(1 for c in checks if c["status"] == "resolved"),
                          "matches": sum(1 for c in checks if c["status"] == "match")},
         "notices": [n.model_dump(mode="json") for n in content.notices],
@@ -195,7 +195,7 @@ async def list_loss_reviews(ctx: AppContext = Depends(get_ctx)) -> dict[str, Any
             if run.artifact is not None:
                 content = run.artifact.latest_content()
                 totals = next((b for _, b in content.iter_blocks() if isinstance(b, LossTotalsBlock)), None)
-                open_checks = sum(1 for b in models.loss_check_blocks(content) if b.needs_action)
+                open_checks = models.loss_open_checks(models.loss_check_blocks(content))
             items.append({"run_id": run.id, "client": client, "client_source": source, "status": str(run.status),
                           "active": ctx.manager.is_active(run.id), "queue_state": run.queue_state,
                           "files": len(run.documents), "created_at": _ts(run.created_at),

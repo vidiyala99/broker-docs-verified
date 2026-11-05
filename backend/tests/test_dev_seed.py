@@ -212,6 +212,10 @@ def test_seeded_loss_review_shows_the_planted_states(tmp_path, monkeypatch):
         unv = [c for c in open_ if c["kind"] == "unverified"]
         assert len(unv) == 1 and unv[0]["rows"] == 8
         assert review["filter_counts"]["all"] == 65
+        # one open check per printed line (owner, 2026-11-04): Driftwood's off line (3 metrics), the conflict, Fairhaven
+        assert len(open_) == 5 and review["check_counts"]["to_resolve"] == 3
+        listed = s.client.get("/api/loss-runs").json()["reviews"]
+        assert next(r for r in listed if r["run_id"] == run_id)["open_checks"] == 3
         rows = s.client.get(f"/api/loss-runs/{run_id}/claims", params={"q": "BW-23-111"}).json()["rows"]
         assert rows[0]["decision"]["kind"] == "confirmed" and rows[0]["counted"]
     finally:
