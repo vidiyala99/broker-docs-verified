@@ -317,6 +317,52 @@ See `frontend/CERTIFICATES-BRIEF.md`. No new tokens.
   translateY 6px, `--dur-base`); keyboard decisions and reloads are still. The Supported fold and the reason editor use
   `Collapse` (pointer only).
 
+## Loss runs (slice 5a, owner-approved 2026-11-04 12:40, direction A "Register and ledger" with B's footing)
+See `frontend/LOSS-RUNS-BRIEF.md`. No new tokens.
+- **Analytics** (`#/analytics`, rail item live, "Analytics: loss reviews"): loss reviews by client in the work-queue row
+  pattern (analytics mark, serif client link, "8 files, valued as of 09/30/2025", "3 checks to resolve", claims and
+  incurred, "Review losses"); groups In progress, Needs review, Needs attention, Ready, Done recently (folded). New loss
+  review opens the wizard (Who, Files, Read); a queue row's menu offers "Review losses" with the client filled in, and a
+  loss review's own queue row carries "Review losses" as its primary. Activity titles it "Loss review, run N".
+- **Review page**: header names the client ("<client> · Loss review"), files, carriers, valuation date, run and version;
+  "Synthetic sample data" as a stale-tinted tag; an "All claims / By file" switch (one joined track, the segmented
+  look); "Mark review done" is the one primary, `aria-disabled` with "N checks to resolve" under it.
+- **Register** (main column): the counted totals are the table's own footing row, pinned under the column names, each
+  figure under its column, "56 claims, 33 open, valued as of ..." and an UNRECONCILED tag (stale tag colours); while a
+  slow rebuild runs the figures dim and the tag reads "Recounting..." (primary tint). Recoveries and deductibles are one
+  sentence above. Quick filters are toggle buttons with the server's counts (`filter_counts`); an empty filter says
+  what it checked. Rows: one fixed 56px height (two lines: claimant and source chip; status word and row state), a
+  window over server pages of 100, sort on every column head, older valuations folded under their claim (struck
+  amounts on canvas), a row menu with the broker's decisions. Under 1280 the checks come first in two columns and the
+  register takes the full width with Loss date hidden: no sideways scroll at 1024.
+- **Chips** (D13): the letter and its hue, then a short label ("Driftwood p.2", "Sheet 2024, row 17", "Row 6" for a
+  CSV); the full file and page are the tooltip and part of the accessible name. A chip swaps the check ledger for the
+  cited page (a sheet chip opens its rendered sheet page) with "Back to checks" (Esc).
+- **Check ledger** (right column, 380px): To resolve (need order: Off, Couldn't check, Conflicting, Not verified),
+  Handled by you, Matches (folded, "14 printed lines, 46 totals"), notices. One card per printed line: its metrics as a
+  small Printed / Rows add up to / Off by table and one Accept with a note. States, silhouette first:
+  Off = not-equals glyph, "OFF BY $12,400.00", `--severity-critical-fg`, 3px solid rule; **Couldn't check**
+  (`needs_review`) = dashed-circle glyph, "COULDN'T CHECK", `--severity-high-fg`, 3px *dashed* rule, "Not checked" where
+  the sum would be and no difference; Conflicting = scales, text colour, the two files' figures side by side with
+  "Use <file>"; Not verified = triangle (scan glyph on scanned rows); handled = stamp ("Accepted by you", "Picked by
+  you") or signature ("Handled row by row"). Files are named for people: carrier word and valuation year ("Driftwood
+  2025"), the file type only when two would read the same ("Ashgrove 2025 workbook" / "Ashgrove 2025 CSV").
+- **A check's rows** (B's footing in A): "Show the rows" scopes the register and foots the printed line under the rows,
+  pinned to the table's bottom: Rows above add up to / Printed with its chip / Printed minus rows.
+- **By file**: one schedule per file (serif carrier name, need first, folded when it ties), rows in printed order and
+  every printed total footed after the last row it covers ("Printed: Total, all policies" with MATCHES, or its sum,
+  difference and actions).
+- **Row states** under the status word: Not verified, Conflicting (and a 3px rule on the claim cell), Confirmed by you,
+  Edited by you (the value read from the file struck beside the new one), Added by you ("No source"), Left out of
+  totals, Incurred differs, Printed twice, Changed since you decided; more than one reads "+N" with all in the tooltip.
+- **Actions**: Add a missed claim, Fix amounts, Confirm, Leave out (notes required for confirm and leave out) open one
+  docked editor under the register, never a modal; Accept opens an inline note under its card. Every action applies at
+  once (the row reads "Confirming..."), the toast names the result and offers Undo.
+- **Phone (<720px)**: status only: header, the totals as a two-column list with "from N claims", and the open checks
+  by word and title; no table, no actions, no Mark done button (its count stays).
+- **Motion**: Collapse for the Matches fold and the note editor (pointer only); totals dim during a recount (opacity,
+  150ms); keyboard changes are instant; reduced motion keeps the fades.
+
 ## Open item: collapsed-outline warning mark (recommendation, not decided)
 Recommend: when the outline is collapsed and any value is scan-read,
 couldn't verify, or failed, the collapse handle shows the triangle glyph from

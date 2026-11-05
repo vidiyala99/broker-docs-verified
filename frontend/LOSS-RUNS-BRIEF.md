@@ -1,7 +1,8 @@
-# LOSS-RUNS-BRIEF.md: slice 5a UI (T8), phase A
+# LOSS-RUNS-BRIEF.md: slice 5a UI (T8)
 
-Status: phase A (directions only), 2026-11-04. Nothing in `src/` changed; no routes, no API calls. Phase B starts when the
-owner picks a direction. Spec: `docs/specs/2026-11-03-loss-runs-design.md` sections 1, 2, 5, 6 read against the ledger
+Status: phase B built in direction A with B's per-file footing (owner, 2026-11-04 12:40); see section 10. Sections 1 to
+9 are the phase A record (the comps under `frontend/comps/loss-runs/` are deleted; their screenshots stay in
+`qa-screenshots/loss-runs/directions/`). Spec: `docs/specs/2026-11-03-loss-runs-design.md` sections 1, 2, 5, 6 read against the ledger
 (R1 to R8, O1 to O7, D1 to D13) and the fix-lane `needs_review` verdict (HANDOFF 2026-11-04 10:50). Contract:
 `backend/API.md` "Loss reviews"; types in `frontend/src/api/types.ts` (`LossTotals`, `LossCheck`, `ClaimRow`, `ClaimsPage`).
 Precedent: `frontend/CERTIFICATES-BRIEF.md` (direction A "Proof and ledger", check list To resolve / Handled by you /
@@ -232,3 +233,84 @@ sub-skill fit phase A.
 - Not run in phase A: axe and e2e (comps only; phase B adds e2e and axe at 1440, 1024 and 390).
 - Known comp roughness: A at 1024 has a small sideways scroll in the stacked register; C's paper strip is a redrawing.
 - The comps and `build_data.py` are phase A only; delete `frontend/comps/loss-runs/` in phase B, keep the screenshots.
+
+## 10. Phase B: built (direction A with B's footing)
+
+Owner decisions (2026-11-04 12:40): direction A "Register and ledger" with B's per-file footing as a view; state word
+"COULDN'T CHECK" for `needs_review`; one check card per printed line with one Accept (note) for all its metrics; backend
+`filter_counts`; optimistic UI with "Recounting..." while a slow rebuild runs; incremental ledger rebuild stays a TODO
+(TODOS.md "Incremental loss-run ledger rebuild").
+
+**Backend** (small): `filter_counts` on `GET /api/loss-runs/{id}` (claims per quick filter, distinct claim groups,
+effective values; the claims page and the counts share one condition source, `_quick_conditions`); open checks counted
+per printed line (`models.loss_open_checks`) in the review's `check_counts.to_resolve`, the Analytics `open_checks` and
+the queue summary, so every count matches the cards; `LossCheckBlock.label` (the printed total's own label, display
+only, not in the fingerprint). API.md, types.ts. Tests: `test_filter_counts_match_the_claims_each_quick_filter_opens`,
+the seed test, the queue test updated to one check per printed line.
+
+**T9 seed** (`backend/dev_seed.py`, run 12): the eight lr_main files for Harrow Lane Bakery Group LLC, `synthetic: true`,
+read live with the scripted model (rows, totals, `lr:` facts, header map and the scan transcript from the fixture
+truth; a `--<tag>` suffix keeps the truth for e2e uploads), BW-23-111 confirmed with a note. Test
+`test_seeded_loss_review_shows_the_planted_states`.
+
+**Frontend** (`frontend/src/lossruns/`): `AnalyticsPage` (`#/analytics`, rail item live), `LossWizard`
+(`#/analytics/new?client=`; Who with past clients, Files with PDF/.xlsx/.csv upload, sheets and mapped columns,
+the client's earlier files; Read on the review page), `LossReviewView` (header, view switch, gate, reading state,
+docked row editor, actions with toasts and Undo, source pane, phone status), `Checks` (ledger cards, chips),
+`ClaimsTable` (virtual window over server pages, sort, quick filters with counts, column picker, folds, row states, row
+menu, counted-totals footing, scope footing), `ByFile` (schedules with footings), `lossUtil`, `lossruns.css`. Hooks:
+queue row primary and menu "Review losses", Activity "Loss review, run N", workflow mark (`loss-run` = analytics),
+`PdfViewer` takes an optional `url` so a sheet chip opens its rendered sheet page.
+
+**What each skill said for the phase B decisions**
+
+| Decision | gstack | ui-ux-pro-max | taste-core | taste-redesign | impeccable | emil-design-eng | frontend-design |
+|---|---|---|---|---|---|---|---|
+| One card per printed line, one Accept | Plain verbs, no em dashes | Group related controls; one decision per item | Same intent, one action | Consistent affordances | Cognitive load: one next action per item (PRODUCT.md) | | The card counts real things: one printed line |
+| Counts per printed line in backend | Name the file and the effect | | | | Every count the broker sees agrees | | Copy and numbers say the same thing |
+| Fixed-height virtual rows, two lines | | Virtualize long lists; reserve space | Long lists need structure, not one divided list | Tabular figures | Operate: density where the task needs it | No animation on scroll or row load | |
+| Row state under the status word | | Never colour alone: glyph + word | No decorative dots | | Honest states, always shown (spec 6) | | Status words carry information |
+| Readable file names ("Driftwood 2025") | Plain words | Labels people understand | No raw system names in copy | Real copy, not placeholders | Name things by what users understand | | Name by the user's understanding, not the system's |
+| Docked editor, inline note, toast + Undo | | Inline editing; error at the field | Label above input | Modals for everything is a tell | Modal as first thought is laziness | Toast enter 250ms, exit faster; keyboard instant | The action keeps its name in the toast |
+| "Recounting..." on the totals | | Loading feedback on the thing that changes | | Loading states required | Honest about a slow step | Opacity 150ms only; no count-up on frequent actions | |
+| Chip name = visible text + source | | Accessible names | | | axe 0 (label-content-name-mismatch fixed) | | |
+| Phone: status only, no Mark done | | No horizontal scroll at 390, 44px targets | Explicit collapse per width | | Phone is for status (PRODUCT.md) | | |
+
+**Design rounds** (Playwright MCP on the live page, 3 rounds):
+- Round 1 (1440, 1024, By file, Analytics): table overflowed at 1440 (long chips: shortened to "Driftwood p.2" / "Row 6",
+  claimant narrowed); checks not in need order (sorted); conflict options cramped (one column); a scanned file's three
+  totals showed as three footings (grouping by document, scope and printed page); the scoped footing kept stale figures
+  after an action (it now follows the review); Analytics said 5 checks where the page showed 3 (backend counts per
+  printed line).
+- Round 2 (390, wizard): row states clipped in the claimant cell (moved under the status word, "+N" with a tooltip);
+  phone Mark done hidden; wizard fieldset border removed. axe: chip names did not contain their visible text (fixed),
+  the phone status region was scrollable without focus (made a named, focusable region).
+- Round 3 (coordinator note, e2e screenshots on a fresh seed): file stems in titles and buttons replaced by readable
+  names ("Driftwood 2025: Total, all policies", "Use Ashgrove 2025 workbook"); printed labels used where the backend has
+  them. No blocking findings left.
+
+**Screenshots** (written by `e2e/loss-runs.spec.ts` on a fresh seed): `frontend/qa-screenshots/loss-runs/`
+`1440-01-analytics`, `1024-01-analytics`, `390-01-analytics`, `1440-02-review`, `1024-02-review`, `390-02-review`,
+`1440-03-scope`, `1440-04-source`, `1440-05-by-file`, `1440-06-confirmed`, `1440-07-wizard-files`. Before (phase A
+directions): `qa-screenshots/loss-runs/directions/a-1440.png`, `a-1024.png`, `a-390.png`. Round shots: `rounds/`.
+
+**Choices the owner may veto**
+- The seed uses all eight lr_main files and the fixture's own client (Harrow Lane Bakery Group LLC), not 4 files for an
+  existing seeded client (spec section 8): it shows every review state in one demo.
+- A decided row leaves "the rows behind" an unverified check (that filter lists what is still undecided); it stays in
+  All claims, and the toast offers Undo.
+- Loss date is hidden under 1280px (the column picker cannot bring it back there); the register then fits 1024.
+- Readable file names are carrier word + valuation year, with the file type only on a clash; the file name is in the
+  chip tooltip and accessible name.
+- Accept on a By-file footing takes you to its check card (one note editor, in the ledger).
+- The docked editor shortens the table while it is open.
+- "Show the rows" carries no count (the API sends `rows` only for unverified checks).
+- Recounting shows after 350ms, so fast actions do not flicker.
+
+**Not built / known gaps**
+- `needs_review` (Couldn't check) has no seeded instance (the scripted model reads every line perfectly): the card,
+  footing and row are built and typed, but only checked visually in phase A's comp, not in e2e.
+- Edited / left-out rows are exercised in e2e (edit, confirm); a left-out row and "Changed since you decided" have no
+  seeded instance.
+- Column picker columns (policy, year, line, carrier, recovery, deductible) are not in the counted-totals footing except
+  recovery and deductible.
