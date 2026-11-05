@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "case_id": "docx_variant",
+  "workflow": "compare-quotes",
+  "description": "Synthetic sample data. A second account: a PDF proposal (A), a Word quote (B) and a PDF quote (C).",
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "documents": [
+    "cmp_docx_a_proposal",
+    "cmp_docx_b_quote",
+    "cmp_docx_c_quote"
+  ],
+  "expected_marks": [
+    {
+      "document": "cmp_docx_a_proposal",
+      "row": "additional_insured",
+      "kind": "worse",
+      "reason": "Others: Blanket"
+    },
+    {
+      "document": "cmp_docx_b_quote",
+      "row": "waiver_of_subrogation",
+      "kind": "worse",
+      "reason": "Others: Blanket"
+    },
+    {
+      "document": "cmp_docx_c_quote",
+      "row": "waiver_of_subrogation",
+      "kind": "worse",
+      "reason": "Others: Blanket"
+    },
+    {
+      "document": "cmp_docx_a_proposal",
+      "row": "notable_exclusions",
+      "kind": "worse",
+      "reason": "Excludes wrap-up / OCIP"
+    },
+    {
+      "document": "cmp_docx_c_quote",
+      "row": "total_premium",
+      "kind": "best",
+      "reason": "Lowest premium"
+    }
+  ],
+  "notes": "Expected marks are written by hand (R12, D13), never computed by compare_rules."
+}

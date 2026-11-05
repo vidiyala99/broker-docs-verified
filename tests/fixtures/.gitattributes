@@ -1,3 +1,5 @@
 # Fixture PDFs are byte-exact (sha256 in manifest.json); never convert line endings.
 *.pdf binary
+*.docx binary
+*.xlsx binary
 *.json text eol=lf

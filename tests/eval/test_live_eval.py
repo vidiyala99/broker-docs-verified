@@ -13,6 +13,11 @@ The Proposal Builder gate is its own test; run only it with
 
 The Policy Check gate (slice 3, T7) is its own test too:
 ``pytest -m live tests/eval/test_live_eval.py -k policy_check``.
+
+Slice 6 (Compare Quotes match): ``tests/eval/test_compare_eval.py -k live_compare`` runs the same
+23 documents in the same groups plus the PDF / Word / Excel scenarios, and gates both the facts
+(R6, as here) and the new terms and marks (R7, R12); it supersedes ``test_live_eval_gates`` for a
+release run (one paid run, not two).
 """
 
 from __future__ import annotations

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "description": "Hand-written expected Compare Quotes marks (slice 6, R7 + R12/D13) for each eval run of these fixtures (tests/eval/eval_adapter.py LIVE_RUNS). Written from what the fixtures print, never computed by compare_rules. The gate compares them with the marks in the run's artifact response; any missing, extra or different worse/best mark is a hard fail. Synthetic sample data.",
+  "runs": {
+    "clean": {
+      "documents": ["carrier_a_clean", "carrier_b_clean", "carrier_c_clean", "carrier_d_clean"],
+      "notes": "No document prints an endorsement term or an exclusion title. Total Payable: A $26,391.14, B $29,675.00, C $19,025.00, D $9,300.59; D is the strictly lowest.",
+      "expected_marks": [
+        {"document": "carrier_d_clean", "row": "total_premium", "kind": "best", "reason": "Lowest premium"}
+      ]
+    },
+    "multi_column": {
+      "documents": ["carrier_a_multicol", "carrier_b_multicol", "carrier_c_multicol", "carrier_d_multicol"],
+      "notes": "Same quotes as clean in a two-column layout; D is the strictly lowest Total Payable ($9,300.59).",
+      "expected_marks": [
+        {"document": "carrier_d_multicol", "row": "total_premium", "kind": "best", "reason": "Lowest premium"}
+      ]
+    },
+    "scanned": {
+      "documents": ["carrier_a_scanned", "carrier_b_scanned", "carrier_c_scanned", "carrier_d_scanned"],
+      "notes": "Every value is read from a scan (scan_read, unverified): no cell counts for a mark.",
+      "expected_marks": []
+    },
+    "adversarial": {
+      "documents": ["multi_option", "conflicting_endorsement", "injection"],
+      "notes": "Total Payable: multi_option $14,490.00 (option 1, the compared option), conflicting_endorsement $14,525.00, injection $18,325.00 (the injected $1.00 is a canary, never a value); multi_option is the strictly lowest.",
+      "expected_marks": [
+        {"document": "multi_option", "row": "total_premium", "kind": "best", "reason": "Lowest premium"}
+      ]
+    },
+    "long": {
+      "documents": ["long_120", "long_300"],
+      "notes": "Additional insured: both Blanket (no mark). Waiver: wording names no category in both (Not stated). Primary and non-contributory: both Included (no mark). Exclusions: both None of these against a printed schedule (no mark). Total Payable: long_120 $23,225.00, long_300 $9,405.44; long_300 is the strictly lowest.",
+      "expected_marks": [
+        {"document": "long_300", "row": "total_premium", "kind": "best", "reason": "Lowest premium"}
+      ]
+    },
+    "parse": {
+      "documents": ["parse_sparse", "parse_mixed", "password_protected", "corrupt_garbage", "corrupt_truncated", "not_a_pdf"],
+      "notes": "Four documents fail to parse, parse_sparse's premium is read from a scan and parse_mixed prints no Total Payable: no column set has a counted premium in every column, and no terms are printed.",
+      "expected_marks": []
+    }
+  }
+}

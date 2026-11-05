@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "generator": "compare_generator",
+  "generator_version": 1,
+  "seed": 20261105,
+  "fixture_id": "cmp_tri_b_quote",
+  "file": "cmp_tri_b_quote.docx",
+  "format": "docx",
+  "document_kind": "quote",
+  "variant": "compare_formats",
+  "gate_bucket": "compare_formats",
+  "description": "Synthetic sample data. Word quote. Lowest Total Payable of the three; additional insured scheduled only, primary and non-contributory not included; its full schedule lists action over and residential construction exclusions.",
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "carrier": "Brackwater Specialty Insurance Company",
+  "page_count": 2,
+  "size_bytes": 37702,
+  "record_sha256": "32086f32efd5db0f937afeddb090ca8adb39a9b16a29f868a5405fe4b298097b",
+  "expect": {
+    "parse": "ok",
+    "failure_reason": null,
+    "ocr_pages": [],
+    "option_count": 1
+  },
+  "primary_option": null,
+  "facts": {
+    "named_insured": {
+      "value": "Larchmont Tile and Stone LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Named Insured: Larchmont Tile and Stone LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "address": {
+      "value": "742 Ferrous Way, Unit 4, Wilmington, DE 19801",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Mailing Address: 742 Ferrous Way, Unit 4, Wilmington, DE 19801",
+      "source": "text",
+      "accepted_values": []
+    },
+    "carrier_name": {
+      "value": "Brackwater Specialty Insurance Company",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Carrier: Brackwater Specialty Insurance Company",
+      "source": "text",
+      "accepted_values": []
+    },
+    "admitted_status": {
+      "value": "Non-Admitted",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Admitted Status: Non-Admitted",
+      "source": "text",
+      "accepted_values": [
+        "Non-Admitted (Surplus Lines)",
+        "Surplus Lines",
+        "Nonadmitted"
+      ]
+    },
+    "am_best_rating": {
+      "value": "A- (Excellent), VIII",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "AM Best Rating: A- (Excellent), VIII",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_term": {
+      "value": "March 1, 2027 to March 1, 2028",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Period: March 1, 2027 to March 1, 2028",
+      "source": "text",
+      "accepted_values": []
+    },
+    "territory": {
+      "value": "United States of America, its territories and possessions",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Coverage Territory: United States of America, its territories and possessions",
+      "source": "text",
+      "accepted_values": []
+    },
+    "producer": {
+      "value": "Copperline Insurance Advisors LLC",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Producer: Copperline Insurance Advisors LLC",
+      "source": "text",
+      "accepted_values": []
+    },
+    "policy_form": {
+      "value": "CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Policy Form: CG 00 01 04 13 Commercial General Liability Coverage Form (Occurrence)",
+      "source": "text",
+      "accepted_values": []
+    },
+    "total_premium": {
+      "value": "$16,975.00",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Total Payable: $16,975.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "taxes_and_fees": {
+      "value": "$1,075.00",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Taxes and Fees: $1,075.00",
+      "source": "text",
+      "accepted_values": []
+    },
+    "each_occurrence_limit": {
+      "value": "$1,000,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Each Occurrence Limit: $1,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "aggregate_limit": {
+      "value": "$2,000,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "General Aggregate Limit: $2,000,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "retention": {
+      "value": "$5,000",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Deductible: $5,000",
+      "source": "text",
+      "accepted_values": []
+    },
+    "rate": null,
+    "quote_expiration": {
+      "value": "February 15, 2027",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Quote Valid Until: February 15, 2027",
+      "source": "text",
+      "accepted_values": []
+    }
+  },
+  "compare_terms": {
+    "additional_insured": {
+      "value": "Scheduled only",
+      "printed": "Scheduled additional insureds only, as listed in the schedule",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Additional Insured: Scheduled additional insureds only, as listed in the schedule",
+      "accepted_values": []
+    },
+    "waiver_of_subrogation": {
+      "value": "Blanket",
+      "printed": "Blanket where required by written contract",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Waiver of Subrogation: Blanket where required by written contract",
+      "accepted_values": []
+    },
+    "primary_noncontributory": {
+      "value": "Not included",
+      "printed": "Not included",
+      "page": 1,
+      "pages": [
+        1
+      ],
+      "quote": "Primary and Non-Contributory: Not included",
+      "accepted_values": []
+    },
+    "notable_exclusions": {
+      "value": "Action over, Residential / habitational work",
+      "complete": true,
+      "schedule": {
+        "value": "Schedule of Forms and Endorsements",
+        "title": "Schedule of Forms and Endorsements",
+        "page": 1,
+        "pages": [
+          1
+        ],
+        "quote": "Schedule of Forms and Endorsements"
+      },
+      "titles": [
+        {
+          "value": "Exclusion: Action Over",
+          "title": "Exclusion: Action Over",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "quote": "Exclusion: Action Over"
+        },
+        {
+          "value": "Exclusion: Residential Construction",
+          "title": "Exclusion: Residential Construction",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "quote": "Exclusion: Residential Construction"
+        },
+        {
+          "value": "Total Pollution Exclusion Endorsement",
+          "title": "Total Pollution Exclusion Endorsement",
+          "page": 1,
+          "pages": [
+            1
+          ],
+          "quote": "Total Pollution Exclusion Endorsement"
+        }
+      ],
+      "pages": [
+        1
+      ],
+      "accepted_values": []
+    }
+  },
+  "decoys": [],
+  "injection": null,
+  "password": null,
+  "notes": "Truth written by hand from the printed text; pages are those of the rendered record."
+}

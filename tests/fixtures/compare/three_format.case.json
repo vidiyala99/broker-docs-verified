@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "case_id": "three_format",
+  "workflow": "compare-quotes",
+  "description": "Synthetic sample data. One account quoted as a PDF quote (A), a Word quote (B) and an Excel coverage summary (C).",
+  "synthetic": true,
+  "synthetic_label": "Synthetic sample data",
+  "documents": [
+    "cmp_tri_a_quote",
+    "cmp_tri_b_quote",
+    "cmp_tri_c_summary"
+  ],
+  "expected_marks": [
+    {
+      "document": "cmp_tri_b_quote",
+      "row": "additional_insured",
+      "kind": "worse",
+      "reason": "Others: Blanket"
+    },
+    {
+      "document": "cmp_tri_c_summary",
+      "row": "waiver_of_subrogation",
+      "kind": "worse",
+      "reason": "Others: Blanket"
+    },
+    {
+      "document": "cmp_tri_b_quote",
+      "row": "primary_noncontributory",
+      "kind": "worse",
+      "reason": "Others: Included"
+    },
+    {
+      "document": "cmp_tri_b_quote",
+      "row": "notable_exclusions",
+      "kind": "worse",
+      "reason": "Excludes action over and residential / habitational work"
+    },
+    {
+      "document": "cmp_tri_c_summary",
+      "row": "notable_exclusions",
+      "kind": "worse",
+      "reason": "Excludes subsidence / earth movement"
+    },
+    {
+      "document": "cmp_tri_b_quote",
+      "row": "total_premium",
+      "kind": "best",
+      "reason": "Lowest premium"
+    }
+  ],
+  "notes": "Expected marks are written by hand (R12, D13), never computed by compare_rules."
+}

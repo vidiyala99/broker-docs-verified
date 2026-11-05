@@ -171,6 +171,40 @@
       "accepted_values": []
     }
   },
+  "compare_terms": {
+    "additional_insured": {
+      "value": "Not stated",
+      "printed": null,
+      "page": null,
+      "pages": [],
+      "quote": null,
+      "accepted_values": []
+    },
+    "waiver_of_subrogation": {
+      "value": "Not stated",
+      "printed": null,
+      "page": null,
+      "pages": [],
+      "quote": null,
+      "accepted_values": []
+    },
+    "primary_noncontributory": {
+      "value": "Not stated",
+      "printed": null,
+      "page": null,
+      "pages": [],
+      "quote": null,
+      "accepted_values": []
+    },
+    "notable_exclusions": {
+      "value": "Not stated",
+      "complete": false,
+      "schedule": null,
+      "titles": [],
+      "pages": [],
+      "accepted_values": []
+    }
+  },
   "decoys": [],
   "injection": null,
   "password": null,

@@ -254,6 +254,96 @@ def _accepted(profile: dict[str, str | None]) -> dict[str, list[str]]:
     return acc
 
 
+# ---------------------------------------------------------------------------
+# Compare Quotes terms (slice 6, R6): hand-written truth for the four new rows
+# ---------------------------------------------------------------------------
+#
+# Truth for the cells of the rows additional_insured, waiver_of_subrogation, primary_noncontributory and
+# notable_exclusions, as a reader of each PDF states them (API.md "Compare Quotes: terms, marks and Key difference").
+# Written by hand from what each fixture prints, never computed by backend code (O6). The three-page quotes and the
+# parse fixtures print none of these terms ("subject to the terms, conditions and exclusions" is not an exclusion
+# title), so every value is Not stated. The long documents print endorsement titles (Endorsement No. N: <title>) and
+# a "Schedule of Forms and Endorsements" heading on page 4; their pages are listed below as printed.
+#
+# Per term: value (the cell category), printed (the wording a reader would quote, or None), page/pages/quote.
+# A printed wording can still state no category (long documents: "Waiver of Transfer of Rights of Recovery
+# Against Others" names the waiver but not who it covers): the value is then Not stated.
+# notable_exclusions: value (watch-list labels joined by ", ", "None of these" or "Not stated"), complete (the
+# document prints a schedule heading, R9/D10), schedule (heading as printed) and titles (exclusion titles as printed).
+
+COMPARE_TERM_KEYS = ("additional_insured", "waiver_of_subrogation", "primary_noncontributory", "notable_exclusions")
+NOT_STATED = "Not stated"
+
+
+def _term(value: str = NOT_STATED, printed: str | None = None, pages: list[int] | None = None,
+          quote: str | None = None) -> dict:
+    pages = list(pages or [])
+    return {"value": value, "printed": printed, "page": pages[0] if pages else None, "pages": pages,
+            "quote": quote if quote is not None else printed, "accepted_values": []}
+
+
+def _exclusions(value: str = NOT_STATED, *, schedule: dict | None = None, titles: list[dict] | None = None) -> dict:
+    titles = list(titles or [])
+    pages = sorted({p for t in titles for p in t["pages"]} | set(schedule["pages"] if schedule else []))
+    return {"value": value, "complete": schedule is not None, "schedule": schedule, "titles": titles,
+            "pages": pages, "accepted_values": []}
+
+
+def _printed(text: str, pages: list[int], quote: str | None = None) -> dict:
+    return {"value": text, "title": text, "page": pages[0], "pages": list(pages), "quote": quote or text}
+
+
+def _endorsement(no: int, title: str) -> str:
+    return f"Endorsement No. {no}: {title}"
+
+
+_SCHEDULE_P4 = _printed("Schedule of Forms and Endorsements", [4])
+COMPARE_TERMS: dict[str, dict[str, dict]] = {
+    "long_120": {
+        "additional_insured": _term("Blanket", "Blanket Additional Insured: Managers or Lessors of Premises", [110],
+                                    _endorsement(14, "Blanket Additional Insured: Managers or Lessors of Premises")),
+        "waiver_of_subrogation": _term(NOT_STATED, "Waiver of Transfer of Rights of Recovery Against Others", [84],
+                                       _endorsement(1, "Waiver of Transfer of Rights of Recovery Against Others")),
+        "primary_noncontributory": _term("Included", "Primary and Noncontributory: Other Insurance Condition", [96],
+                                         _endorsement(7, "Primary and Noncontributory: Other Insurance Condition")),
+        "notable_exclusions": _exclusions("None of these", schedule=_SCHEDULE_P4, titles=[
+            _printed("Exclusion: Designated Work", [86], _endorsement(2, "Exclusion: Designated Work")),
+            _printed("Exclusion: Access or Disclosure of Confidential Information", [94],
+                     _endorsement(6, "Exclusion: Access or Disclosure of Confidential Information")),
+            _printed("Exclusion: Total Pollution with Building Heating Equipment Exception", [98],
+                     _endorsement(8, "Exclusion: Total Pollution with Building Heating Equipment Exception"))]),
+    },
+    "long_300": {
+        # Two additional insured grants: blanket (managers or lessors, Nos. 13 and 29) and designated persons
+        # (Nos. 15 and 31). The broadest printed grant is blanket; "Scheduled only" would be wrong.
+        "additional_insured": _term("Blanket", "Blanket Additional Insured: Managers or Lessors of Premises",
+                                    [234, 264],
+                                    _endorsement(13, "Blanket Additional Insured: Managers or Lessors of Premises")),
+        "waiver_of_subrogation": _term(NOT_STATED, "Waiver of Transfer of Rights of Recovery Against Others",
+                                       [240, 270],
+                                       _endorsement(16, "Waiver of Transfer of Rights of Recovery Against Others")),
+        "primary_noncontributory": _term("Included", "Primary and Noncontributory: Other Insurance Condition",
+                                         [220, 252],
+                                         _endorsement(6, "Primary and Noncontributory: Other Insurance Condition")),
+        "notable_exclusions": _exclusions("None of these", schedule=_SCHEDULE_P4, titles=[
+            _printed("Exclusion: Designated Work", [210, 242, 272], _endorsement(1, "Exclusion: Designated Work")),
+            _printed("Exclusion: Access or Disclosure of Confidential Information", [218, 250],
+                     _endorsement(5, "Exclusion: Access or Disclosure of Confidential Information")),
+            _printed("Exclusion: Total Pollution with Building Heating Equipment Exception", [222, 254],
+                     _endorsement(7, "Exclusion: Total Pollution with Building Heating Equipment Exception")),
+            _printed("Exclusion: Unmanned Aircraft", [228, 260], _endorsement(10, "Exclusion: Unmanned Aircraft"))]),
+    },
+}
+
+
+def compare_terms_truth(fixture_id: str) -> dict[str, dict]:
+    """The four Compare term rows of one fixture: the hand-written entry, else Not stated for every row."""
+    given = COMPARE_TERMS.get(fixture_id, {})
+    out = {k: given.get(k) or _term() for k in COMPARE_TERM_KEYS[:3]}
+    out["notable_exclusions"] = given.get("notable_exclusions") or _exclusions()
+    return out
+
+
 LABELS = {
     "named_insured": "Named Insured",
     "address": "Mailing Address",
@@ -593,6 +683,7 @@ def build_truth(fx: Fixture, seed: int, pdf_bytes: bytes) -> dict:
         },
         "primary_option": fx.primary_option,
         "facts": facts,
+        "compare_terms": compare_terms_truth(fx.fixture_id),
         "decoys": fx.decoys,
         "injection": fx.injection,
         "password": fx.password,

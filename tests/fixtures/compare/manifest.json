@@ -1,0 +1,106 @@
+{
+  "generator": "compare_generator",
+  "generator_version": 1,
+  "seed": 20261105,
+  "synthetic_label": "Synthetic sample data",
+  "libraries": {
+    "pymupdf": "1.28.0",
+    "python_docx": "1.2.0",
+    "openpyxl": "3.1.5",
+    "reportlab": "4.5.1"
+  },
+  "documents": [
+    {
+      "fixture_id": "cmp_tri_a_quote",
+      "file": "cmp_tri_a_quote.pdf",
+      "truth": "cmp_tri_a_quote.truth.json",
+      "format": "pdf",
+      "document_kind": "quote",
+      "gate_bucket": "compare_formats",
+      "sha256": "59edb0eec5dadfa838233744aa9352b74779d0ad508abf0bc39637bd6fc17e17",
+      "record_sha256": "59edb0eec5dadfa838233744aa9352b74779d0ad508abf0bc39637bd6fc17e17",
+      "deterministic_bytes": true,
+      "description": "Synthetic sample data. PDF quote, 2 pages. Blanket additional insured and waiver, primary and non-contributory included; prints its full Schedule of Forms and Endorsements with three exclusions, none on the watch list (None of these)."
+    },
+    {
+      "fixture_id": "cmp_tri_b_quote",
+      "file": "cmp_tri_b_quote.docx",
+      "truth": "cmp_tri_b_quote.truth.json",
+      "format": "docx",
+      "document_kind": "quote",
+      "gate_bucket": "compare_formats",
+      "sha256": "b8b7f59aaefb0948828a1bc3e0d0d4c7a6b1920253348cbeb95e0d8ec41e13d8",
+      "record_sha256": "32086f32efd5db0f937afeddb090ca8adb39a9b16a29f868a5405fe4b298097b",
+      "deterministic_bytes": true,
+      "description": "Synthetic sample data. Word quote. Lowest Total Payable of the three; additional insured scheduled only, primary and non-contributory not included; its full schedule lists action over and residential construction exclusions."
+    },
+    {
+      "fixture_id": "cmp_tri_c_summary",
+      "file": "cmp_tri_c_summary.xlsx",
+      "truth": "cmp_tri_c_summary.truth.json",
+      "format": "xlsx",
+      "document_kind": "summary",
+      "gate_bucket": "compare_formats",
+      "sha256": "22a7a6805afb8dc684df337bf6afe98e6bcd072b9253dedf7ca872d5457d15e6",
+      "record_sha256": "d02ded29a6ff8b351dc15b6a0374f2bafd18663c417a08b3d725ce6daf4526c9",
+      "deterministic_bytes": true,
+      "description": "Synthetic sample data. Excel coverage summary, one sheet of term and value rows. Waiver scheduled only; lists one key exclusion (subsidence) and no schedule, so its list is partial."
+    },
+    {
+      "fixture_id": "cmp_docx_a_proposal",
+      "file": "cmp_docx_a_proposal.pdf",
+      "truth": "cmp_docx_a_proposal.truth.json",
+      "format": "pdf",
+      "document_kind": "proposal",
+      "gate_bucket": "compare_formats",
+      "sha256": "02ae08a769c2dc5495f672b9abfb28e1c52dca5b0ae695843804933dd3d9609f",
+      "record_sha256": "02ae08a769c2dc5495f672b9abfb28e1c52dca5b0ae695843804933dd3d9609f",
+      "deterministic_bytes": true,
+      "description": "Synthetic sample data. PDF proposal, 2 pages. Additional insured not included; blanket waiver; silent on primary and non-contributory; prints only selected exclusions (wrap-up), no schedule."
+    },
+    {
+      "fixture_id": "cmp_docx_b_quote",
+      "file": "cmp_docx_b_quote.docx",
+      "truth": "cmp_docx_b_quote.truth.json",
+      "format": "docx",
+      "document_kind": "quote",
+      "gate_bucket": "compare_formats",
+      "sha256": "efb47436a46e450125c6357735858cecd88bcb3005468d9f417fb8f11cf1d885",
+      "record_sha256": "06c72ba578261161833884527587cd319ea09758edbf5b653df33fcef9de7ea3",
+      "deterministic_bytes": true,
+      "description": "Synthetic sample data. Word quote. Blanket additional insured, no waiver, primary and non-contributory included; its full schedule lists a designated ongoing operations exclusion."
+    },
+    {
+      "fixture_id": "cmp_docx_c_quote",
+      "file": "cmp_docx_c_quote.pdf",
+      "truth": "cmp_docx_c_quote.truth.json",
+      "format": "pdf",
+      "document_kind": "quote",
+      "gate_bucket": "compare_formats",
+      "sha256": "fc120a8573d4f059217ea7cc01963a92309b206b3933963b10b6e5764834ffc3",
+      "record_sha256": "fc120a8573d4f059217ea7cc01963a92309b206b3933963b10b6e5764834ffc3",
+      "deterministic_bytes": true,
+      "description": "Synthetic sample data. PDF quote, 2 pages. Lowest Total Payable of the three; waiver scheduled only; silent on additional insured and primary and non-contributory; prints one selected exclusion and no schedule (Not stated, never None of these)."
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "three_format",
+      "truth": "three_format.case.json",
+      "documents": [
+        "cmp_tri_a_quote",
+        "cmp_tri_b_quote",
+        "cmp_tri_c_summary"
+      ]
+    },
+    {
+      "case_id": "docx_variant",
+      "truth": "docx_variant.case.json",
+      "documents": [
+        "cmp_docx_a_proposal",
+        "cmp_docx_b_quote",
+        "cmp_docx_c_quote"
+      ]
+    }
+  ]
+}

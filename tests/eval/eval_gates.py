@@ -70,7 +70,8 @@ RUN_INPUT_TOKEN_BUDGET = 1_500_000
 
 GATED_BUCKETS = {"clean": FIELD_ACCURACY_CLEAN_MIN, "multi_column": FIELD_ACCURACY_MULTI_COLUMN_MIN,
                  "long": FIELD_ACCURACY_LONG_MIN}
-REPORTED_BUCKETS = ("scanned", "report_only", "parse_only")
+# compare_formats: the slice 6 PDF / Word / Excel scenarios (tests/fixtures/compare, compare_gate.py).
+REPORTED_BUCKETS = ("scanned", "report_only", "parse_only", "compare_formats")
 
 STATES = ("verified", "scan_read", "not_found", "failed")
 DISPLAYED = ("verified", "scan_read")

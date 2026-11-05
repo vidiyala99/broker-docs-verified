@@ -184,6 +184,87 @@
       "accepted_values": []
     }
   },
+  "compare_terms": {
+    "additional_insured": {
+      "value": "Blanket",
+      "printed": "Blanket Additional Insured: Managers or Lessors of Premises",
+      "page": 110,
+      "pages": [
+        110
+      ],
+      "quote": "Endorsement No. 14: Blanket Additional Insured: Managers or Lessors of Premises",
+      "accepted_values": []
+    },
+    "waiver_of_subrogation": {
+      "value": "Not stated",
+      "printed": "Waiver of Transfer of Rights of Recovery Against Others",
+      "page": 84,
+      "pages": [
+        84
+      ],
+      "quote": "Endorsement No. 1: Waiver of Transfer of Rights of Recovery Against Others",
+      "accepted_values": []
+    },
+    "primary_noncontributory": {
+      "value": "Included",
+      "printed": "Primary and Noncontributory: Other Insurance Condition",
+      "page": 96,
+      "pages": [
+        96
+      ],
+      "quote": "Endorsement No. 7: Primary and Noncontributory: Other Insurance Condition",
+      "accepted_values": []
+    },
+    "notable_exclusions": {
+      "value": "None of these",
+      "complete": true,
+      "schedule": {
+        "value": "Schedule of Forms and Endorsements",
+        "title": "Schedule of Forms and Endorsements",
+        "page": 4,
+        "pages": [
+          4
+        ],
+        "quote": "Schedule of Forms and Endorsements"
+      },
+      "titles": [
+        {
+          "value": "Exclusion: Designated Work",
+          "title": "Exclusion: Designated Work",
+          "page": 86,
+          "pages": [
+            86
+          ],
+          "quote": "Endorsement No. 2: Exclusion: Designated Work"
+        },
+        {
+          "value": "Exclusion: Access or Disclosure of Confidential Information",
+          "title": "Exclusion: Access or Disclosure of Confidential Information",
+          "page": 94,
+          "pages": [
+            94
+          ],
+          "quote": "Endorsement No. 6: Exclusion: Access or Disclosure of Confidential Information"
+        },
+        {
+          "value": "Exclusion: Total Pollution with Building Heating Equipment Exception",
+          "title": "Exclusion: Total Pollution with Building Heating Equipment Exception",
+          "page": 98,
+          "pages": [
+            98
+          ],
+          "quote": "Endorsement No. 8: Exclusion: Total Pollution with Building Heating Equipment Exception"
+        }
+      ],
+      "pages": [
+        4,
+        86,
+        94,
+        98
+      ],
+      "accepted_values": []
+    }
+  },
   "decoys": [
     {
       "field": "retention",

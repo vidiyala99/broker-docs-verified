@@ -45,6 +45,63 @@ def request_key(request) -> str:
     return h.hexdigest()
 
 
+# A compose request lists facts with database passage ids, assigned in the order documents finish (concurrent), so
+# two runs of the same case can number the same passages differently. Such a request also gets a canonical key, with
+# each id replaced by its order of first appearance; replay falls back to it and renumbers the recorded reply's
+# passage_ids (slice 6, Compare Quotes replay). Recordings made before this have no canonical key: exact keys only.
+_PASSAGE_ID = re.compile(r'"passage_id":\s*(\d+)')
+
+
+def _passage_order(request) -> list[int]:
+    order: list[int] = []
+    for m in request.messages:
+        for part in m.parts():
+            for n in _PASSAGE_ID.findall(getattr(part, "text", "") or ""):
+                if int(n) not in order:
+                    order.append(int(n))
+    return order
+
+
+def canonical_key(request) -> str | None:
+    """request_key with passage ids replaced by their order of first appearance; None without passage ids."""
+    order = _passage_order(request)
+    if not order:
+        return None
+    rank = {pid: i for i, pid in enumerate(order)}
+    h = hashlib.sha256(b"canonical/1")
+    h.update(request.role.value.encode())
+    for m in request.messages:
+        h.update(b"\x00msg\x00" + m.role.encode())
+        for part in m.parts():
+            if hasattr(part, "text"):
+                text = _PASSAGE_ID.sub(lambda mo: f'"passage_id": <p{rank[int(mo.group(1))]}>', _stable(part.text))
+                h.update(b"\x00text\x00" + text.encode("utf-8"))
+            else:
+                h.update(b"\x00image\x00" + hashlib.sha256(part.data).hexdigest().encode())
+    return h.hexdigest()
+
+
+def _renumber(content, recorded_order: list[int], current_order: list[int]):
+    """The reply with every passage id in a passage_ids list moved from the recorded run's numbering to this run's."""
+    as_text = isinstance(content, str)
+    try:
+        data = json.loads(content) if as_text else copy.deepcopy(content)
+    except ValueError:
+        return content
+    mapping = {old: current_order[i] for i, old in enumerate(recorded_order) if i < len(current_order)}
+
+    def walk(x):
+        if isinstance(x, dict):
+            return {k: ([mapping.get(v, v) for v in val] if k == "passage_ids" and isinstance(val, list)
+                        else walk(val)) for k, val in x.items()}
+        if isinstance(x, list):
+            return [walk(v) for v in x]
+        return x
+
+    data = walk(data)
+    return json.dumps(data) if as_text else data
+
+
 def _reply_dict(raw) -> dict[str, Any]:
     return {"content": raw.content, "refusal": raw.refusal, "finish_reason": raw.finish_reason,
             "prompt_tokens": raw.prompt_tokens, "completion_tokens": raw.completion_tokens,
@@ -57,7 +114,11 @@ def record_into(provider, store: dict[str, list[dict]]):
 
     async def _send(request):
         raw = await send(request)
-        store.setdefault(request_key(request), []).append(_reply_dict(raw))
+        entry = _reply_dict(raw)
+        canon = canonical_key(request)
+        if canon is not None:
+            entry["canonical_key"], entry["passage_order"] = canon, _passage_order(request)
+        store.setdefault(request_key(request), []).append(entry)
         return raw
 
     provider._send = _send
@@ -91,18 +152,29 @@ def replay_provider(replies: dict[str, list[dict]]):
     from backend.providers.fake import FakeReply
 
     queues = {k: list(v) for k, v in copy.deepcopy(replies).items()}
+    canonical: dict[str, list[dict]] = defaultdict(list)
+    for v in queues.values():
+        for r in v:
+            if r.get("canonical_key"):
+                canonical[r["canonical_key"]].append(r)
     served: dict[str, int] = defaultdict(int)
 
     def respond(request):
         key = request_key(request)
         queue = queues.get(key)
+        renumber = False
+        if not queue:
+            canon = canonical_key(request)
+            queue = canonical.get(canon) if canon else None
+            key, renumber = (canon, True) if queue else (key, False)
         if not queue:
             raise AssertionError(f"no recorded reply for a {request.role.value} request ({key[:12]}); "
                                  "the prompt, the page render or the window plan changed since recording")
         i = min(served[key], len(queue) - 1)  # identical requests beyond the recorded count reuse the last
         served[key] += 1
         r = queue[i]
-        return FakeReply(content=r["content"], refusal=r["refusal"], finish_reason=r["finish_reason"] or "stop",
+        content = _renumber(r["content"], r["passage_order"], _passage_order(request)) if renumber else r["content"]
+        return FakeReply(content=content, refusal=r["refusal"], finish_reason=r["finish_reason"] or "stop",
                          prompt_tokens=r["prompt_tokens"], completion_tokens=r["completion_tokens"],
                          cached_tokens=r.get("cached_tokens", 0), reasoning_tokens=r.get("reasoning_tokens", 0))
 
