@@ -257,8 +257,32 @@ partial).
 ```
 
 Rejection codes: `not_pdf` (no `%PDF-` magic bytes, whatever the name or
-type), `empty`, `too_large` (`limit` in bytes), `too_many_pages` (`limit` in
+type, unless the name ends `.docx` or `.xlsx`), `empty`, `too_large` (`limit` in bytes), `too_many_pages` (`limit` in
 pages), `too_many_documents` (more than 8 files in one request; `limit` 8).
+
+**Word and Excel quotes (slice 6).** A file named `.docx` or `.xlsx` whose
+content is an Office zip is accepted as a quote: it is rendered at upload to a
+PDF record (paragraphs and tables in document order for Word, every cell's full
+text wrapped for Excel, sheet name, header row and row numbers printed) that is
+served, parsed and verified like any PDF, and the original is kept for
+`GET /api/documents/{id}/original`. Headers, footers, images, text boxes and
+comments of a Word file are not drawn; tracked changes show the accepted text.
+Such documents go only in Compare Quotes and Proposal Builder runs (see `slots`
+below). Extra rejection codes, each with a plain message:
+`legacy_format` (`.doc`/`.xls`: "Save it as .docx/.xlsx and upload again."),
+`macros` (`vbaProject.bin`, a macro-enabled content type, or a `.docm`/`.xlsm`
+name), `external_links` (a relationship with `TargetMode="External"` other than
+a plain hyperlink, or `xl/externalLinks/`), `format_mismatch` (the content is
+not the format the name says, for example an Excel file named `.docx`),
+`encrypted` (password-protected Office file), `unpacked_too_large` (zip bomb:
+more than 300 MB unpacked, or an XML part over 32 MB; `limit` in bytes),
+`too_many_entries` (more than 2,000 zip entries), `unsafe_xml` (a DTD or entity
+declaration), `unreadable` ("Couldn't read this file. ...": a damaged Word or
+Excel file), `empty` (a Word file with no text), and for Excel
+`cell_too_long` (`limit` 2,000 characters per cell), `too_many_columns` (a
+value beyond column 80), `too_many_rows` (20,000), `too_many_cells`
+(400,000), `too_many_sheets` (20). The page cap (`too_many_pages`) is checked
+on the planned pages before anything is drawn.
 A request whose `Content-Length` exceeds every cap combined gets
 `413 request_too_large` before anything is read.
 
@@ -270,20 +294,25 @@ A damaged or password-protected PDF is **accepted** with `parse_error` and a
 
 ```json
 {"id": 3, "filename": "harborline.pdf", "size_bytes": 10781, "page_count": 3,
- "sha256": "9f2c...", "kind": "quote", "parse_error": null, "warning": null,
+ "sha256": "9f2c...", "kind": "quote", "source_format": "pdf", "parse_error": null, "warning": null,
  "created_at": "2026-11-01T21:04:05.123456+00:00"}
 ```
 
 `filename` is display text only (base name, control and path characters
 removed). Files are stored under generated UUID names. `kind` is `quote` for a
 PDF uploaded here and `ams` for an AMS export (next route).
+`source_format` (slice 6) is the uploaded file's format: `pdf`, `docx` or
+`xlsx` for this route, `json` or `csv` for an AMS export, `xlsx` or `csv` for a
+spreadsheet loss run. For a Word or Excel quote `page_count` and `sha256` are
+those of the rendered PDF record (what is read and cached on); `size_bytes` is
+the uploaded file's.
 
 ### `POST /api/documents/ams` (multipart, slice 3)
 
 Form field `files`, repeated once per file; same `200` envelope as
 `POST /api/documents` (`documents` and `rejected`, so good files stay and bad
 ones get an inline rejection). Use it for the AMS export of a Policy Check run;
-`POST /api/documents` stays PDF-only.
+`POST /api/documents` takes PDFs (and, from slice 6, Word and Excel quotes), never JSON or CSV.
 
 - **Formats.** Only `.json` and `.csv`, and the content must agree with the
   extension (JSON opens with `{` or `[`). JSON is one flat object of field names
@@ -344,6 +373,13 @@ The PDF bytes (`application/pdf`, `Content-Disposition: inline`). Feed this
 URL to pdf.js for the source viewer. `404 file_missing` if the file is gone
 ("Couldn't open this file" state).
 
+### `GET /api/documents/{id}/original` (slice 6)
+
+Download: the file as uploaded, `Content-Disposition: attachment`. A Word or
+Excel quote, an AMS export or a spreadsheet returns its kept original (content
+type by `source_format`); a PDF returns itself. `404 not_found`,
+`404 file_missing`.
+
 ### `DELETE /api/documents/{id}`
 
 `204`. `409 document_in_use` (with `run_id`) when a run uses the document.
@@ -371,7 +407,7 @@ workflow's `input_slots` (`GET /api/workflows/{id_or_slug}`):
 
 | Workflow | Slot key | Accepts | Min | Max |
 |---|---|---|---|---|
-| `compare-quotes`, `proposal-builder` | `quotes` | `application/pdf` | 1 | 8 |
+| `compare-quotes`, `proposal-builder` | `quotes` | `application/pdf`, plus the `.docx` and `.xlsx` types (slice 6) | 1 | 8 |
 | `policy-check` | `expiring` | `application/pdf` | 1 | 1 |
 | `policy-check` | `renewal` | `application/pdf` | 1 | 1 |
 | `policy-check` | `quote` | `application/pdf` | 0 | 1 |
@@ -390,6 +426,11 @@ workflow and documents are found:
   `POST /api/documents/ams`) can only go in a slot that accepts `text/csv` or
   `application/json`; any other document only in a slot that accepts
   `application/pdf`. An AMS export therefore cannot enter a Compare Quotes run.
+  A Word or Excel quote (`source_format` `docx` or `xlsx`, slice 6) goes only
+  in a slot that lists its type (Compare Quotes, Proposal Builder); elsewhere
+  `400 invalid_run` "<slot label> takes PDF documents." (a loss review: "Loss
+  runs reads spreadsheets as loss runs; upload this file again as a loss run.").
+  A Certificate's Add document applies the same rule.
 - A slot a run leaves empty is simply absent (`min` 0 slots only).
 
 **`line` (slice 3b, optional).** `"commercial"` or `"personal"` (household
@@ -495,9 +536,12 @@ it to show the Retry button.
 
 ```json
 {"run_document_id": 31, "document_id": 3, "position": 0, "letter": "A", "slot": "quotes",
- "filename": "harborline.pdf", "status": "reading", "progress": "Reading pages 4/10",
+ "filename": "harborline.pdf", "source_format": "pdf", "status": "reading", "progress": "Reading pages 4/10",
  "error": null, "error_code": null, "option_count": 1, "option_label": null}
 ```
+
+`source_format` (slice 6): the document's uploaded format (`pdf`, `docx`, `xlsx`, ...), as on `Document`; the
+comparison's column label reads it.
 
 `slot` (slice 3) is the input slot key the document was assigned to in
 `POST /api/runs`: `quotes` for Compare Quotes and Proposal Builder runs, and
@@ -978,7 +1022,8 @@ has `kind: "spreadsheet"`, `page_count` = its sheet pages (40 rows a page, heade
 header, column, label, by: "synonym"}], unmapped: [{index, header}]}]}`. Refused with the reason (`rejected[].code`):
 `not_spreadsheet` (e.g. `.xls`), `empty`, `corrupt`, `encrypted`, `not_text` (CSV not UTF-8 or cp1252),
 `too_large` (file, or more than 300 MB unpacked), `too_many_sheets` (20), `too_many_rows` (100,000 claim rows per
-file), `too_many_cells`. `POST /api/documents` stays PDF-only.
+file), `too_many_cells`. `POST /api/documents` reads no loss-run spreadsheet: an `.xlsx` sent there is a Compare
+quote rendered to a PDF record (slice 6), which a loss review refuses.
 
 - `GET /api/documents/{id}/sheets`: the document plus its `spreadsheet` summary.
 - `GET /api/documents/{id}/sheet-pages/{n}`: one sheet page rendered on demand as a one-page PDF (landscape

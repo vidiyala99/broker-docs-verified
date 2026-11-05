@@ -26,6 +26,9 @@ export interface DocumentInfo {
   page_count: number | null;
   sha256: string;
   kind: string;
+  /** Slice 6: the uploaded file's format. Word/Excel quotes are stored as a rendered PDF plus the original
+   * (GET /api/documents/{id}/original). AMS exports: "json" | "csv"; spreadsheet loss runs: "xlsx" | "csv". */
+  source_format?: SourceFormat;
   parse_error: string | null;
   warning: string | null;
   created_at: string;
@@ -35,8 +38,14 @@ export interface DocumentInfo {
   spreadsheet?: SpreadsheetSummary;
 }
 
+/** Slice 6 (D1): "pdf" | "docx" | "xlsx" for POST /api/documents. */
+export type SourceFormat = "pdf" | "docx" | "xlsx" | "json" | "csv";
+
 export interface Rejection {
   filename: string;
+  /** Slice 6 adds Word/Excel refusals: legacy_format, macros, external_links, format_mismatch, encrypted,
+   * unpacked_too_large, too_many_entries, unsafe_xml, unreadable, cell_too_long, too_many_columns, too_many_rows,
+   * too_many_cells, too_many_sheets (see API.md). */
   code: "not_pdf" | "empty" | "too_large" | "too_many_pages" | "too_many_documents" | string;
   message: string;
   limit?: number;
@@ -53,6 +62,8 @@ export interface RunDocument {
   /** Input slot key (slice 3): "quotes", or a Policy Check role. Older payloads may omit it. */
   slot?: string;
   filename: string;
+  /** Slice 6: the document's uploaded format (column label). Older payloads may omit it (= "pdf"). */
+  source_format?: SourceFormat;
   status: DocStatus;
   progress: string | null;
   error: string | null;
