@@ -318,6 +318,9 @@ Accepted scope: Activity shows the newest 100 with a visible note when the cap i
 - M7 (R1): extracted name precedence: Policy Check renewal -> expiring -> quote (verified facts only); Compare majority with ties broken by RunDocument.position. Test conflicts.
 - M8: schema check (D10 of slice 3b, db.py:83) requires all four new columns and the queue_state constraint; index on run(line, queue_state). One test per missing element.
 
+### Owner amendment after build
+- D3 amended (owner, 2026-11-04 17:23): a comparison whose latest proposal failed or was cancelled goes to **Needs attention** (not Ready), reason "Proposal didn't finish", primary action "Retry proposal" (menu keeps "Open failed proposal" and "Start new proposal"). A done comparison with no proposal, or whose `proposal_run_id` names a deleted run, stays Ready. Reason: a failure must never read as ready work (seen live on Copperfield Marine). Overrides D3's "back in Ready" text above.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
