@@ -18,7 +18,7 @@ def _limits(ctx: AppContext) -> dict[str, Any]:
     lim = ctx.settings.limits
     return {"max_pages": lim.max_pages, "max_bytes": lim.max_bytes,
             "max_megabytes": round(lim.max_bytes / (1024 * 1024), 2),
-            "max_documents_per_run": lim.max_documents_per_run, "accepts": "application/pdf",
+            "max_documents_per_run": lim.max_documents_per_run, "accepts": db.QUOTE_TYPES,
             "run_token_budget": ctx.manager.budget_limit}
 
 

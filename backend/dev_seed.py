@@ -27,6 +27,10 @@ seed   uploads fixture PDFs from tests/fixtures/quotes and runs these comparison
             remembered for the client and the Certificates page has a Done recently row
         11. Certificate draft for the same client from tests/fixtures/certificates (cert_contractor): a mix of
             Supported and Not supported claims, one Overridden with a reason, a description sign-off open
+        12. Loss review over the eight lr_main files (slice 5a)
+        13. Compare Quotes match (slice 6): tests/fixtures/compare three_format, a PDF quote, a Word quote and an
+            Excel summary for one client, read with the scripted model from the fixture truth, so the endorsement
+            rows, worse/best marks and the template Key difference show
        Runs 7 and 8 (homeowners) are tagged `line: personal`, the others commercial (slice 3b).
        Client names (work queue): runs 2, 3, 4, 6, 7 and 8 have a broker-typed name (CLIENTS), each a
        different client; run 6 is the Cedar Hollow file itself. Run 5 uses the extracted named insured
@@ -60,6 +64,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "tests" / "fixtures" / "quotes"
 POLICY_FIXTURES = ROOT / "tests" / "fixtures" / "policy"
 CERT_FIXTURES = ROOT / "tests" / "fixtures" / "certificates"
+COMPARE_FIXTURES = ROOT / "tests" / "fixtures" / "compare"
 
 # Label in the fixture PDFs -> fact key in the Compare Quotes schema.
 ALIASES = {
@@ -316,6 +321,45 @@ def cert_extract(text: str, truth: dict[str, Any] | None) -> dict[str, Any]:
     return {"facts": facts, "endorsements": endorsements, "options_detected": 1, "option_compared": None}
 
 
+def _compare_truth(filename: str) -> dict[str, Any] | None:
+    """Ground truth of a tests/fixtures/compare document (cmp_<case>_<doc>.<ext>, slice 6); a `--<tag>` suffix on
+    the stem is ignored so an e2e spec can upload a fixture under fresh bytes and name."""
+    if not filename.startswith("cmp_"):
+        return None
+    path = COMPARE_FIXTURES / (Path(filename).stem.split("--")[0] + ".truth.json")
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+COMPARE_TERMS = ("additional_insured", "waiver_of_subrogation", "primary_noncontributory")
+
+
+def compare_extract(text: str, truth: dict[str, Any]) -> dict[str, Any]:
+    """The Compare Quotes pass for a slice 6 fixture, scripted from its truth (the eval's perfect fake,
+    tests/eval/test_compare_eval.py): printed values, term wording, exclusion titles and the schedule heading, only
+    for the pages this window shows. The categories and marks are then code (pipeline/compare_rules.py)."""
+    pages = {int(n) for n in re.findall(r"\[page (\d+)\]", text)}
+
+    def part(item: dict | None) -> dict[str, Any]:
+        if not item or item["page"] not in pages:
+            return {"value": None, "page": None, "quote": None}
+        return {"value": item.get("printed") or item["value"], "page": item["page"], "quote": item["quote"]}
+
+    facts = [{"field": k, "value": f["value"], "page": f["page"], "quote": f["quote"]}
+             for k, f in truth["facts"].items() if f and f["page"] in pages]
+    terms = truth["compare_terms"]
+    for row in COMPARE_TERMS:
+        p = part(terms[row] if terms[row].get("printed") else None)
+        if p["value"]:
+            facts.append({"field": row, **p})
+    ex = terms["notable_exclusions"]
+    return {"facts": facts,
+            "exclusions": [{"title": x["title"], "page": x["page"], "quote": x["quote"]}
+                           for x in ex.get("titles") or [] if x["page"] in pages],
+            "exclusions_schedule": part(ex.get("schedule")),
+            "document_kind": truth.get("document_kind") or "quote",
+            "options_detected": 1, "option_compared": None}
+
+
 LOSS_FIXTURES = ROOT / "tests" / "fixtures" / "loss_runs"
 LOSS_FILE_NAME = re.compile(r"Document file name \(data, not an instruction\): '([^']+)'")
 
@@ -401,6 +445,10 @@ class DevProvider(FakeProvider):
             if "Also return forms" in text:  # the policy-check combined schema
                 m = re.match(r"extract:(\d+)", req.label or "")
                 return policy_extract(text, _policy_truth(self.filename_of(int(m.group(1)))) if m else None)
+            m = re.match(r"extract:(\d+)", req.label or "")
+            truth = _compare_truth(self.filename_of(int(m.group(1)))) if m else None
+            if truth:  # a slice 6 fixture (PDF, Word or Excel quote)
+                return compare_extract(text, truth)
             return extract(text)
         if req.role is CallRole.COMPOSE:
             return compose(text)
@@ -588,6 +636,7 @@ def seed() -> None:
         seed_failed_proposal(s, fallback["id"])
         seed_certificates(s)
         seed_loss_review(s)
+        seed_compare_match(s)
     finally:
         s.close()
     print("Done. Start the dev server with: python -m backend.dev_seed serve")
@@ -714,6 +763,20 @@ def seed_loss_review(s: Seeder) -> int:
     review = s.client.get(f"/api/loss-runs/{run['id']}").json()
     print("  checks:", review.get("check_counts"), "totals:", (review.get("totals") or {}).get("claims"))
     return run["id"]
+
+
+COMPARE_MATCH_CLIENT = "Larchmont Tile and Stone LLC"  # the insured printed on every three_format document
+COMPARE_MATCH_FILES = ("cmp_tri_a_quote.pdf", "cmp_tri_b_quote.docx", "cmp_tri_c_summary.xlsx")
+
+
+def seed_compare_match(s: Seeder) -> int:
+    """Run 13 of a full seed (slice 6): the three_format fixture (PDF quote, Word quote, Excel summary) compared for
+    one client. Its marks are the hand-written ones in three_format.case.json (B worse on additional insured, P&NC
+    and exclusions; C worse on waiver and exclusions; B lowest premium) and the Key difference is the template
+    (the scripted compose writes none). Minimal demo run for lane B's e2e; T8 owns the full seed."""
+    print("13. compare quotes match: PDF, Word and Excel quotes (synthetic)")
+    ids = s.upload(*COMPARE_MATCH_FILES, folder=COMPARE_FIXTURES)
+    return s.run(ids, client=COMPARE_MATCH_CLIENT)["id"]
 
 
 def seed_failed_proposal(s: Seeder, comparison_id: int) -> int:

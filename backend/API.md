@@ -87,13 +87,17 @@ document).
 {
   "id": 1, "name": "Local workspace", "app_name": "BrokerDocs", "model_configured": true,
   "limits": {"max_pages": 80, "max_bytes": 15728640, "max_megabytes": 15.0,
-             "max_documents_per_run": 8, "accepts": "application/pdf", "run_token_budget": 600000},
+             "max_documents_per_run": 8,
+             "accepts": "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             "run_token_budget": 600000},
   "workflows": [{"id": 1, "slug": "compare-quotes", "name": "Compare Quotes", "category": "Quoting"}],
   "default_workflow": "compare-quotes"
 }
 ```
 
 Use `limits` for the drop zone text (DG6) and `app_name` for the wordmark (DG7).
+`limits.accepts` lists what `POST /api/documents` takes (PDF, and from slice 6 Word and Excel quotes); a
+workflow slot's own `accepts` narrows it (Policy Check and certificate slots take PDF only, R5).
 
 ### `GET /api/workflows`
 

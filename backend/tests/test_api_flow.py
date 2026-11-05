@@ -65,7 +65,10 @@ def test_workspace_and_workflows(api):
     ws = api.client.get("/api/workspace").json()
     assert ws["app_name"] == "BrokerDocs" and ws["default_workflow"] == "compare-quotes"
     assert ws["limits"] == {"max_pages": 300, "max_bytes": 50 * 1024 * 1024, "max_megabytes": 50.0,
-                            "max_documents_per_run": 8, "accepts": "application/pdf", "run_token_budget": 1_500_000}
+                            "max_documents_per_run": 8, "accepts": db.QUOTE_TYPES, "run_token_budget": 1_500_000}
+    # POST /api/documents takes PDF, Word and Excel quotes (slice 6); each slot narrows it (R5).
+    assert ws["limits"]["accepts"].split(",") == ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
     wf = api.client.get("/api/workflows/compare-quotes").json()
     assert wf["name"] == "Compare Quotes" and len(wf["fact_schema"]) == 24 and wf["section_plan"][0]["number"] == "1"
     assert api.client.get(f"/api/workflows/{wf['id']}").json()["slug"] == "compare-quotes"

@@ -236,3 +236,46 @@ def test_cert_truth_ignores_a_tag_suffix_so_e2e_can_upload_fresh_copies():
     assert dev_seed._cert_truth("cert_written_contract_gl--e2e1793760357.pdf") == plain
     assert dev_seed._cert_truth("cert_no_such_fixture--e2e1.pdf") is None
     assert dev_seed._cert_truth("quote--e2e1.pdf") is None
+
+
+def test_compare_truth_ignores_a_tag_suffix_so_e2e_can_upload_fresh_copies():
+    assert dev_seed._compare_truth("cmp_tri_b_quote--e2e1.docx")["fixture_id"] == "cmp_tri_b_quote"
+    assert dev_seed._compare_truth("carrier_a_clean.pdf") is None
+
+
+def test_seeded_compare_match_shows_marks_terms_formats_and_the_key_difference(tmp_path, monkeypatch):
+    """Slice 6 (lane B demo run, run 13 of a full seed): the three_format fixture (PDF quote, Word quote, Excel
+    summary) read with the scripted model from the fixture truth. The artifact carries the hand-written marks of
+    three_format.case.json, the four term rows, each column's format and kind, and a template Key difference."""
+    import json
+
+    from backend.pipeline import cache
+
+    monkeypatch.setenv("BROKERDOCS_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv(cache.ENV_SWITCH, raising=False)
+    dev_seed.scenario_environment()
+    s = dev_seed.Seeder()
+    try:
+        run_id = dev_seed.seed_compare_match(s)
+        run = s.client.get(f"/api/runs/{run_id}").json()
+        assert run["status"] == "done" and run["client_name"] == dev_seed.COMPARE_MATCH_CLIENT
+        assert [d["source_format"] for d in run["documents"]] == ["pdf", "docx", "xlsx"]
+        art = s.client.get(f"/api/runs/{run_id}/artifact").json()
+        tables = [b for sec in art["content"]["sections"] for b in sec["blocks"] if b["type"] == "table"]
+        cells = {(r["key"], c): cell for t in tables for r in t["rows"] for c, cell in r["cells"].items()}
+        letter = {d["filename"].split(".")[0]: d["letter"] for d in run["documents"]}
+        case = json.loads((dev_seed.COMPARE_FIXTURES / "three_format.case.json").read_text(encoding="utf-8"))
+        expected = {(m["row"], letter[m["document"]], m["kind"], m["reason"]) for m in case["expected_marks"]}
+        got = {(row, col, c["mark"], c["mark_reason"]) for (row, col), c in cells.items() if c.get("mark")}
+        assert got == expected
+        assert cells[("additional_insured", "B")]["value"] == "Scheduled only"
+        columns = {c["key"]: c for t in tables for c in t["columns"]}
+        assert {k: c["document_kind"] for k, c in columns.items()} == {"A": "quote", "B": "quote", "C": "summary"}
+        first = art["content"]["sections"][0]
+        assert first["id"] == "key_difference" and not first["stale"]
+        kd = first["blocks"][0]
+        assert kd["type"] == "key_difference" and kd["source"] == "template" and kd["segments"]
+        assert all(ref["column"] in columns for seg in kd["segments"] for ref in seg["cells"])
+    finally:
+        s.close()
