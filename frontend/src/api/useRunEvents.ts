@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { isDemo } from "../config";
 import { api } from "./client";
 import type { RunDocument, RunEvent, RunStatus } from "./types";
 
@@ -28,7 +29,7 @@ export function useRunEvents(runId: number | null, active: boolean, handlers: Ru
   if (last.current.runId !== runId) last.current = { runId, id: undefined };
 
   useEffect(() => {
-    if (runId == null || !active) return;
+    if (runId == null || !active || isDemo()) return; // demo: seeded runs are finished, nothing streams
     let source: EventSource | null = null;
     let ended = false;
     let retryTimer: number | undefined;

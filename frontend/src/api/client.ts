@@ -1,4 +1,5 @@
-import { API_BASE } from "../config";
+import { API_BASE, DEMO_MESSAGE, isDemo } from "../config";
+import { demoFile } from "./demoKey";
 import type {
   Artifact,
   CertificateIssue,
@@ -68,7 +69,34 @@ async function parse<T>(res: Response): Promise<T> {
   throw new ApiError(res.status, code, message, extra);
 }
 
+/** Where a recorded response lives (static demo). */
+export function demoUrl(path: string): string {
+  return `${import.meta.env.BASE_URL}demo/${demoFile("GET", path)}`;
+}
+
+/** Demo mode: the API address of a binary (PDF, kept original) becomes its recorded file. */
+const assetUrl = (path: string) => (isDemo() ? demoUrl(path) : `${API_BASE}${path}`);
+
+const demoReadOnly = () => new ApiError(403, "demo_read_only", DEMO_MESSAGE);
+
+/** Demo mode: GET reads the recorded response; anything that would write is refused with the read-only message. */
+async function demoRequest<T>(path: string, init: RequestInit): Promise<T> {
+  if ((init.method ?? "GET").toUpperCase() !== "GET") throw demoReadOnly();
+  let res: Response;
+  try {
+    res = await fetch(demoUrl(path));
+  } catch {
+    throw new ApiError(0, "network", NETWORK_MESSAGE);
+  }
+  // A static host may answer an unknown file with the app shell (200, HTML): that is a missing snapshot.
+  if (!res.ok || !(res.headers.get("Content-Type") ?? "").includes("json")) {
+    return parse<T>(new Response(JSON.stringify({ error: { code: "not_found", message: "Not found." } }), { status: 404 }));
+  }
+  return parse<T>(res);
+}
+
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (isDemo()) return demoRequest<T>(path, init);
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
@@ -197,7 +225,7 @@ export const api = {
       body: json({ version }),
     }),
   newCertificateVersion: (runId: number) => request<CertificateView>(`/api/certificates/${runId}/new-version`, { method: "POST" }),
-  certificatePdfUrl: (runId: number, version: number) => `${API_BASE}/api/certificates/${runId}/issues/${version}/pdf`,
+  certificatePdfUrl: (runId: number, version: number) => assetUrl(`/api/certificates/${runId}/issues/${version}/pdf`),
   /** D10/D15: a certificate claim decision; `resolved` needs a note (the override reason), every call sends the fingerprint. */
   patchClaim: (runId: number, itemId: string, body: { status: ClaimStatus; note?: string | null; expected_fingerprint: string }) =>
     request<unknown>(`/api/runs/${runId}/discrepancies/${encodeURIComponent(itemId)}`, { method: "PATCH", body: json(body) }),
@@ -237,15 +265,16 @@ export const api = {
   patchTask: (id: number, body: TaskInput) => request<Task>(`/api/tasks/${id}`, { method: "PATCH", body: json(body) }),
   /** Sent only when the undo toast closes or the page unmounts (D6). */
   deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: "DELETE" }),
-  fileUrl: (documentId: number) => `${API_BASE}/api/documents/${documentId}/file`,
+  fileUrl: (documentId: number) => assetUrl(`/api/documents/${documentId}/file`),
   /** Slice 6: the file as uploaded (a Word or Excel quote's kept original; a PDF returns itself), as an attachment. */
-  originalUrl: (documentId: number) => `${API_BASE}/api/documents/${documentId}/original`,
+  originalUrl: (documentId: number) => assetUrl(`/api/documents/${documentId}/original`),
   eventsUrl: (runId: number, lastEventId?: number) =>
     `${API_BASE}/api/runs/${runId}/events${lastEventId != null ? `?last_event_id=${lastEventId}` : ""}`,
 };
 
 /** Download an export. Returns the saved file name and the X-Export-Note header (XLSX holds tables only). */
 export async function downloadExport(artifactId: number, format: ExportFormat, version: number) {
+  if (isDemo()) throw demoReadOnly();
   let res: Response;
   try {
     res = await fetch(`${API_BASE}/api/artifacts/${artifactId}/export?format=${format}&version=${version}`);
@@ -274,6 +303,7 @@ export function uploadFile(
   onProgress: (fraction: number) => void,
   path: "/api/documents" | "/api/documents/ams" | "/api/documents/spreadsheets" = "/api/documents",
 ): Promise<{ documents: DocumentInfo[]; rejected: Rejection[] }> {
+  if (isDemo()) return Promise.reject(demoReadOnly());
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_BASE}${path}`);

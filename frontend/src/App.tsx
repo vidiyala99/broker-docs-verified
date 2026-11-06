@@ -7,9 +7,9 @@ import type { Line, Run, Workspace } from "./api/types";
 import { compareHref, LaunchView } from "./launch/LaunchView";
 import { CompareNew } from "./launch/CompareNew";
 import { RunView } from "./run/RunView";
-import { NarrowNotice, Rail, TopBar, type Crumb, type Section } from "./shell/Shell";
+import { DemoBanner, NarrowNotice, Rail, TopBar, type Crumb, type Section } from "./shell/Shell";
 import { IntegrationsPage } from "./integrations/IntegrationsPage";
-import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "./config";
+import { isDemo, POLICY_WORKFLOW, PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "./config";
 import { useViewport } from "./shell/layout";
 import { ToastProvider } from "./ui/Toast";
 import { ProposalWizard } from "./wizard/ProposalWizard";
@@ -332,6 +332,7 @@ export function App() {
       <div className={`app vp-${viewport}`}>
         <Rail section={section} />
         <div className="app__main">
+          {isDemo() && <DemoBanner />}
           <TopBar crumbs={crumbs} />
           {viewport === "narrow" && route.runId != null && !certPage && !lossPage && !route.wizard && !route.policy && !route.integrations && !route.personal && !route.tasks && !route.activity && !policyRun && <NarrowNotice />}
           {route.integrations ? (

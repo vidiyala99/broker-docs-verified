@@ -1,6 +1,6 @@
 import type { GlyphName } from "../voice/marks";
 import { RailGlyph } from "../voice/railMarks";
-import { APP_NAME } from "../config";
+import { APP_NAME, DEMO_BANNER } from "../config";
 import { Tip } from "../ui/Tip";
 
 export type Section = "workflows" | "proposals" | "personal-lines" | "policy-check" | "certificates" | "tasks" | "integrations" | "analytics";
@@ -128,6 +128,15 @@ export function NarrowNotice() {
   return (
     <p className="narrow-notice" role="note">
       Best viewed on a wider screen. The report stays readable here; tables scroll sideways.
+    </p>
+  );
+}
+
+/** Static demo only (VITE_DEMO=1): one quiet line above the top bar. */
+export function DemoBanner() {
+  return (
+    <p className="demo-banner" role="note">
+      {DEMO_BANNER}
     </p>
   );
 }
