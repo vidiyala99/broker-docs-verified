@@ -1,0 +1,2 @@
+# Recorded demo snapshot: byte-exact (PDFs, kept originals, JSON). Never convert line endings.
+frontend/public/demo/** -text
