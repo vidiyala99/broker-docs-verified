@@ -11,7 +11,7 @@
 // Env: DEMO_PYTHON (python with the backend's packages; default backend/.venv in this checkout or the main one),
 //      DEMO_REUSE=1 (use servers already running on 8060/5220 instead of seeding and starting them).
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -177,13 +177,21 @@ async function extras(runs) {
     for (const p of ["", "/artifact", "/messages", "/suggestions", "/discrepancies"]) add(`/api/runs/${r.id}${p}`);
     if (/loss/i.test(r.workflow_name ?? "")) {
       add(`/api/loss-runs/${r.id}`);
-      add(`/api/loss-runs/${r.id}/claims?dir=desc&limit=100&offset=0&sort=claim_incurred`);
+      // The claims table: every sort in both directions, and each quick filter on its own (the rest is a visitor's search).
+      const base = { limit: 100, offset: 0 };
+      const q = (o) => `/api/loss-runs/${r.id}/claims?${new URLSearchParams(Object.entries({ ...base, ...o }).map(([k, v]) => [k, String(v)]))}`;
+      for (const sort of ["claim_number", "claimant", "date_of_loss", "status", "paid", "reserve", "claim_incurred"])
+        for (const dir of ["asc", "desc"]) add(q({ sort, dir }));
+      for (const f of ["over_100k", "open_only", "last_3_months", "open_reserve"]) add(q({ sort: "claim_incurred", dir: "desc", [f]: true }));
     }
     if (/certificate/i.test(r.workflow_name ?? "")) {
       add(`/api/certificates/${r.id}`);
       for (const i of (await getJson(`/api/certificates/${r.id}`)).issues ?? []) add(`/api/certificates/${r.id}/issues/${i.version}/pdf`);
     }
   }
+  // Paths the click-through QA found missing (scripts/demo-qa.mjs appends them).
+  const extraFile = path.join(FRONTEND, "scripts", "demo-extra-paths.json");
+  if (existsSync(extraFile)) for (const p of JSON.parse(readFileSync(extraFile, "utf8"))) add(p);
   for (const c of new Set(runs.map((r) => r.client_name).filter(Boolean))) {
     add(`/api/certificates/holders?client=${encodeURIComponent(c)}`);
     add(`/api/certificates/documents?client=${encodeURIComponent(c)}`);

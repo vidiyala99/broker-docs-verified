@@ -1,0 +1,10 @@
+[
+ "/api/loss-runs/12/claims?sort=claim_incurred&dir=desc&document_id=36&scope_kind=all&offset=0&limit=100",
+ "/api/loss-runs/12/claims?sort=claim_incurred&dir=desc&document_id=38&state=unverified&offset=0&limit=100",
+ "/api/loss-runs/12/claims?sort=claim_number&dir=desc&offset=0&limit=100",
+ "/api/loss-runs/12/claims?sort=claimant&dir=desc&offset=0&limit=100",
+ "/api/loss-runs/12/claims?sort=date_of_loss&dir=desc&offset=0&limit=100",
+ "/api/loss-runs/12/claims?sort=paid&dir=desc&offset=0&limit=100",
+ "/api/loss-runs/12/claims?sort=reserve&dir=desc&offset=0&limit=100",
+ "/api/loss-runs/12/claims?sort=status&dir=desc&offset=0&limit=100"
+]

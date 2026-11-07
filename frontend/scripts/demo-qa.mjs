@@ -5,7 +5,7 @@
 // error, a /demo/ request that is missing (404 or the app shell instead of JSON/PDF), a "couldn't load" state, a
 // missing banner. Then checks that a write attempt shows the read-only message. Screenshots: qa-screenshots/demo-static/.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
@@ -41,13 +41,19 @@ const SCREENS = [
 ];
 const BAD_TEXT = /couldn't (load|open|read|reach)|can't reach|request failed|couldn't check the server/i;
 const failures = [];
+/** API paths the app asked the snapshot for and did not find. Written to demo-extra-paths.json, which the snapshot fetches. */
+const gaps = new Set();
 let pages = 0;
 
 async function newPage(browser, width) {
   const context = await browser.newContext({ viewport: { width, height: width > 600 ? 900 : 844 } });
   const page = await context.newPage();
   const state = { problems: [] };
-  page.on("console", (m) => m.type() === "error" && state.problems.push(`console error: ${m.text()}`));
+  page.on("console", (m) => {
+    if (m.type() === "error") state.problems.push(`console error: ${m.text()}`);
+    const gap = /^demo snapshot missing: (.+)$/.exec(m.text());
+    if (gap) gaps.add(gap[1]);
+  });
   page.on("pageerror", (e) => state.problems.push(`page error: ${e.message}`));
   page.on("requestfailed", (r) => state.problems.push(`request failed: ${r.url()}`));
   page.on("response", (r) => {
@@ -112,8 +118,10 @@ try {
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.getByRole("button", { name: "Good report" }).first().click();
   await expectMessage("feedback");
-  await page.getByRole("button", { name: "Chat", exact: true }).first().click().catch(() => {});
+  // Collapsed, the toggle's name includes its summary ("Chat Ask about these quotes"), so open it by state, not name.
+  await page.locator('.chat__toggle[aria-expanded="false"]').first().click({ timeout: 2000 }).catch(() => {});
   await page.getByRole("button", { name: "Which quote has the lowest total premium?" }).first().click().catch(() => {});
+  await page.getByRole("button", { name: "Send question" }).first().click().catch(() => {});
   await expectMessage("chat question");
   for (const f of ["Export PDF, full report", "Export DOCX, Word document", "Export XLSX, tables only"]) {
     if (!(await page.getByRole("button", { name: f }).isDisabled())) failures.push(`${f} is not disabled`);
@@ -135,6 +143,12 @@ try {
   stop();
 }
 
+if (gaps.size) {
+  const file = path.join(FRONTEND, "scripts", "demo-extra-paths.json");
+  const known = (() => { try { return JSON.parse(readFileSync(file, "utf8")); } catch { return []; } })();
+  writeFileSync(file, JSON.stringify([...new Set([...known, ...gaps])].sort(), null, 1) + "\n");
+  console.error(`demo qa: ${gaps.size} missing API path(s) added to scripts/demo-extra-paths.json; run npm run demo:snapshot, build, and QA again`);
+}
 console.log(`demo qa: ${pages} page views (${SCREENS.length} screens + ${runs.length} runs, at 1440 and 390 wide)`);
 if (failures.length) {
   console.error(`demo qa FAILED (${failures.length}):`);

@@ -421,9 +421,104 @@
    "bytes": 84116,
    "type": "application/json"
   },
+  "loss-runs__12__claims~896ee7d3.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_incurred&dir=asc",
+   "bytes": 103033,
+   "type": "application/json"
+  },
   "loss-runs__12__claims~93b41641.json": {
-   "path": "/api/loss-runs/12/claims?dir=desc&limit=100&offset=0&sort=claim_incurred",
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_incurred&dir=desc",
    "bytes": 103034,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~aab5d896.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_incurred&dir=desc&last_3_months=true",
+   "bytes": 1363,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~255aa51f.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_incurred&dir=desc&open_only=true",
+   "bytes": 67768,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~bb4bba55.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_incurred&dir=desc&open_reserve=true",
+   "bytes": 70170,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~ca4a3a23.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_incurred&dir=desc&over_100k=true",
+   "bytes": 114,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~6aa3f548.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_number&dir=asc",
+   "bytes": 103031,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~dd8cb8e2.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claim_number&dir=desc",
+   "bytes": 103032,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~d1143469.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claimant&dir=asc",
+   "bytes": 103027,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~e2139a67.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=claimant&dir=desc",
+   "bytes": 103028,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~c4f7326a.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=date_of_loss&dir=asc",
+   "bytes": 103031,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~27bce7e4.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=date_of_loss&dir=desc",
+   "bytes": 103032,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~ba0b03d2.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=paid&dir=asc",
+   "bytes": 103023,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~609d9790.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=paid&dir=desc",
+   "bytes": 103024,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~a7bdc0bc.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=reserve&dir=asc",
+   "bytes": 103026,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~443b113e.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=reserve&dir=desc",
+   "bytes": 103027,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~dcf105a6.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=status&dir=asc",
+   "bytes": 103025,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~4086eb2c.json": {
+   "path": "/api/loss-runs/12/claims?limit=100&offset=0&sort=status&dir=desc",
+   "bytes": 103026,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~8e672d8d.json": {
+   "path": "/api/loss-runs/12/claims?sort=claim_incurred&dir=desc&document_id=36&scope_kind=all&offset=0&limit=100",
+   "bytes": 27547,
+   "type": "application/json"
+  },
+  "loss-runs__12__claims~f2486f31.json": {
+   "path": "/api/loss-runs/12/claims?sort=claim_incurred&dir=desc&document_id=38&state=unverified&offset=0&limit=100",
+   "bytes": 9655,
    "type": "application/json"
   },
   "queue~4b8f3908.json": {
@@ -613,7 +708,7 @@
   },
   "runs__5.json": {
    "path": "/api/runs/5",
-   "bytes": 2214,
+   "bytes": 2213,
    "type": "application/json"
   },
   "runs__5__artifact.json": {

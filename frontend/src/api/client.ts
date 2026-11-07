@@ -90,6 +90,7 @@ async function demoRequest<T>(path: string, init: RequestInit): Promise<T> {
   }
   // A static host may answer an unknown file with the app shell (200, HTML): that is a missing snapshot.
   if (!res.ok || !(res.headers.get("Content-Type") ?? "").includes("json")) {
+    console.warn(`demo snapshot missing: ${path}`); // scripts/demo-qa.mjs collects these into scripts/demo-extra-paths.json
     return parse<T>(new Response(JSON.stringify({ error: { code: "not_found", message: "Not found." } }), { status: 404 }));
   }
   // A request the UI makes that the live API answers with an error (a run with no report yet is a 404) is recorded as
