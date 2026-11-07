@@ -8,6 +8,9 @@ of guessing.
 > **Unofficial portfolio project** inspired by commercial insurance broker document workflows.
 > Not affiliated with or endorsed by any broker software vendor or carrier. All documents in this repo are **synthetic sample data**.
 
+**Live demo:** https://broker-docs-verified.vercel.app (read-only: the seeded runs, recorded, with no backend.
+Click through reports, citations, sources and loss runs; uploads and edits are switched off.)
+
 **Demo video:** _(Loom link)_
 
 ## What it does
@@ -64,6 +67,10 @@ backend/.venv/Scripts/python -m backend.dev_seed serve    # http://127.0.0.1:800
 
 Then in `frontend/`: `npm install` and `npm run dev`, and open http://localhost:5173.
 To use the real model, run `python -m backend.main` with `OPENAI_API_KEY` set (see `backend/API.md`).
+
+The live demo is the same frontend built with `npm run build:demo` (`VITE_DEMO=1`): it reads GET responses
+recorded from the seeded dev server (`npm run demo:snapshot`, into `frontend/public/demo/`) and refuses writes.
+`node scripts/demo-qa.mjs` clicks through every screen and run of that build with no backend running.
 
 ## Where to look
 
