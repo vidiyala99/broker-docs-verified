@@ -1,6 +1,7 @@
 import type { ClaimRow, LossCheck, LossChip, LossQuickFilter, LossReview, Run } from "../api/types";
 import type { PdfTarget } from "../pdf/PdfViewer";
-import { API_BASE } from "../config";
+import { API_BASE, isDemo } from "../config";
+import { demoUrl } from "../api/client";
 
 /**
  * A loss-run chip in the source viewer. PDF chips open the document's page; sheet chips open the rendered sheet page
@@ -32,7 +33,7 @@ export function chipTarget(chip: LossChip, scan = false, name = "", text = chip.
     letter: chip.letter,
     page: box.page_no,
     chip: box,
-    url: sheet ? `${chip.url!.startsWith("http") ? "" : API_BASE}${chip.url}` : undefined,
+    url: sheet ? (isDemo() ? demoUrl(chip.url!) : `${chip.url!.startsWith("http") ? "" : API_BASE}${chip.url}`) : undefined,
     zoom: sheet ? SHEET_ZOOM : undefined,
     caption: sheet ? `Source: ${who}, ${text}` : `Source: ${who}, page ${box.page_no}`,
   };

@@ -11,3 +11,10 @@ export const PROPOSAL_WORKFLOW = "Proposal Builder";
 
 /** `workflow_name` of slice 3 Policy Check runs (backend seed). */
 export const POLICY_WORKFLOW = "Policy Check";
+
+/** Static read-only demo (build with VITE_DEMO=1): responses come from `public/demo/`, nothing is written. */
+export const isDemo = (): boolean => import.meta.env.VITE_DEMO === "1";
+
+export const DEMO_MESSAGE = "This is a read-only demo. Live uploads are coming soon.";
+
+export const DEMO_BANNER = "Read-only portfolio demo with synthetic sample data.";

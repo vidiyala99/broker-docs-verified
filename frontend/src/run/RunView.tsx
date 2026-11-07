@@ -16,6 +16,7 @@ import {
   FileText,
 } from "@phosphor-icons/react";
 import { api, ApiError, downloadExport, type ExportFormat } from "../api/client";
+import { DEMO_MESSAGE, isDemo } from "../config";
 import { POLICY_WORKFLOW, PROPOSAL_WORKFLOW, WORKFLOW_NAME } from "../config";
 import { useRunEvents } from "../api/useRunEvents";
 import type { Artifact, Chip, EditResult, Line, Run, RunDocument, SourceFormat, Workspace } from "../api/types";
@@ -402,6 +403,8 @@ export function RunView({
     }
   };
 
+  const demo = isDemo();
+
   const exportAs = async (format: ExportFormat) => {
     if (!artifact) return;
     setExporting(format);
@@ -675,18 +678,18 @@ export function RunView({
                 <Copy size={18} aria-hidden />
               </button>
             </Tip>
-            <Tip text="Export PDF: full report">
-              <button type="button" className="icon-btn" aria-label="Export PDF, full report" disabled={!artifact || exporting != null} onClick={() => void exportAs("pdf")}>
+            <Tip text={demo ? DEMO_MESSAGE : "Export PDF: full report"}>
+              <button type="button" className="icon-btn" aria-label="Export PDF, full report" disabled={!artifact || exporting != null || demo} onClick={() => void exportAs("pdf")}>
                 {exporting === "pdf" ? <span className="spinner spinner--sm" aria-hidden /> : <FilePdf size={18} aria-hidden />}
               </button>
             </Tip>
-            <Tip text="Export DOCX: Word document">
-              <button type="button" className="icon-btn" aria-label="Export DOCX, Word document" disabled={!artifact || exporting != null} onClick={() => void exportAs("docx")}>
+            <Tip text={demo ? DEMO_MESSAGE : "Export DOCX: Word document"}>
+              <button type="button" className="icon-btn" aria-label="Export DOCX, Word document" disabled={!artifact || exporting != null || demo} onClick={() => void exportAs("docx")}>
                 {exporting === "docx" ? <span className="spinner spinner--sm" aria-hidden /> : <FileDoc size={18} aria-hidden />}
               </button>
             </Tip>
-            <Tip text="Export XLSX: tables only">
-              <button type="button" className="icon-btn" aria-label="Export XLSX, tables only" disabled={!artifact || exporting != null} onClick={() => void exportAs("xlsx")}>
+            <Tip text={demo ? DEMO_MESSAGE : "Export XLSX: tables only"}>
+              <button type="button" className="icon-btn" aria-label="Export XLSX, tables only" disabled={!artifact || exporting != null || demo} onClick={() => void exportAs("xlsx")}>
                 {exporting === "xlsx" ? <span className="spinner spinner--sm" aria-hidden /> : <FileXls size={18} aria-hidden />}
               </button>
             </Tip>

@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Trash, WarningCircle } from "@phosphor-icons/react";
 import { api, ApiError } from "../api/client";
+import { APP_NAME } from "../config";
 import type { Line, Workspace } from "../api/types";
 import { LineChoice } from "../personal/LineChoice";
 import { ClientField } from "../queue/ClientField";
@@ -158,7 +159,7 @@ export function CompareNew({
                   maxLength={CONTEXT_MAX}
                   value={context}
                   aria-describedby={countId}
-                  placeholder="Leave blank. BrokerDocs already knows what a quote comparison needs."
+                  placeholder={`Leave blank. ${APP_NAME} already knows what a quote comparison needs.`}
                   onChange={(e) => setContext(e.target.value)}
                 />
                 <p id={countId} className="context-field__count">

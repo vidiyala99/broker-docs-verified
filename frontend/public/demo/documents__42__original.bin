@@ -1,0 +1,8 @@
+Bellwether Casualty Company;Claims extract;"Synthetic sample data: loss run for software testing. Every carrier, insured, claimant and claim number is invented."
+Claim No;Policy;Line of Business;Claimant;Date of Loss;Status;Paid;Reserve;Incurred
+BW-23-118;BCC 23 77310;General Liability;"Lindqvist, Rory";15 Aug 2023;Open;6000.00;19000.00;25000.00
+BW-21-008;BCC 21 77310;General Liability;"Ashby, Fenella";2 Mar 2021;Pending Review;1800.00;3200.00;5000.00
+BW-21-015;BCC 21 77310;General Liability;"Trevelyan, Moss";17 Jun 2021;RO;7500.00;2500.00;10000.00
+BW-21-019;BCC 21 77310;General Liability;Désirée Okafor;8 Sep 2021;Reopen;12250.00;4750.00;17000.00
+BW-21-022;BCC 21 77310;Property;Hollis Feed & Grain;30 Nov 2021;C;39900.00;0.00;39900.00
+TOTAL;;;;;;67450.00;29450.00;96900.00

@@ -7,7 +7,11 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "preview": "vite preview --port 5173",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "test": "vitest run",
+    "build:demo": "node scripts/build-demo.mjs",
+    "demo:snapshot": "node scripts/demo-snapshot.mjs",
+    "demo:check": "node scripts/demo-name-check.mjs"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +32,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
     "typescript": "^7.0.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
   }
 }
