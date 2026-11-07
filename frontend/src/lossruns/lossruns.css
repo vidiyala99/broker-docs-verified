@@ -116,7 +116,8 @@
 .lr-cols__menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: var(--z-popover); margin: 0; padding: var(--space-2) var(--space-3); min-width: 200px; background: var(--color-surface); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); box-shadow: 0 8px 24px rgb(53 56 59 / 0.12); }
 
 /* ---------- the claims table ---------- */
-.lr-tablewrap { flex: 1; min-height: 240px; min-width: 0; overflow: auto; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-surface); }
+/* position: relative keeps sr-only text in the table clipped by this scroller (it otherwise stretched the page). */
+.lr-tablewrap { position: relative; flex: 1; min-height: 240px; min-width: 0; overflow: auto; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-surface); }
 .lr-tablewrap:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .lr-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); line-height: var(--leading-sm); font-variant-numeric: tabular-nums; }
 .lr-table th, .lr-table td { padding: var(--space-2); text-align: left; vertical-align: top; border-bottom: 1px solid var(--color-hairline); white-space: nowrap; box-sizing: border-box; }

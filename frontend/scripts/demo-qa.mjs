@@ -73,6 +73,8 @@ async function check(page, state, label, width) {
   const banner = await page.locator(".demo-banner").first();
   if (!(await banner.isVisible())) state.problems.push("banner not visible");
   else if (!/Read-only portfolio demo with synthetic sample data\./.test(await banner.innerText())) state.problems.push("banner text wrong");
+  const extra = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  if (extra > 1) state.problems.push(`page scrolls by ${extra}px (something escapes its scroll panel)`);
   const text = await page.locator("body").innerText();
   const bad = BAD_TEXT.exec(text);
   if (bad) state.problems.push(`error state on screen: "${bad[0]}"`);

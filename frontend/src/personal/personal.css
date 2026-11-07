@@ -224,6 +224,9 @@
 /* ------------------------------------------------------------------ page */
 
 .personal__body {
+  /* Positioned so absolutely positioned children (sr-only text) are clipped here instead of escaping to .workspace
+     and stretching the page past the viewport. */
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
