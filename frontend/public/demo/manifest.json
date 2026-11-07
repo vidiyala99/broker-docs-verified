@@ -113,43 +113,8 @@
   },
   "documents.json": {
    "path": "/api/documents",
-   "bytes": 12383,
+   "bytes": 8732,
    "type": "application/json"
-  },
-  "documents__1__file.pdf": {
-   "path": "/api/documents/1/file",
-   "bytes": 502,
-   "type": "application/pdf"
-  },
-  "documents__10__file.pdf": {
-   "path": "/api/documents/10/file",
-   "bytes": 9665,
-   "type": "application/pdf"
-  },
-  "documents__11__file.pdf": {
-   "path": "/api/documents/11/file",
-   "bytes": 10097,
-   "type": "application/pdf"
-  },
-  "documents__12__file.pdf": {
-   "path": "/api/documents/12/file",
-   "bytes": 11388,
-   "type": "application/pdf"
-  },
-  "documents__13__file.pdf": {
-   "path": "/api/documents/13/file",
-   "bytes": 10757,
-   "type": "application/pdf"
-  },
-  "documents__14__file.pdf": {
-   "path": "/api/documents/14/file",
-   "bytes": 502,
-   "type": "application/pdf"
-  },
-  "documents__15__file.pdf": {
-   "path": "/api/documents/15/file",
-   "bytes": 222380,
-   "type": "application/pdf"
   },
   "documents__16__file.pdf": {
    "path": "/api/documents/16/file",
@@ -169,11 +134,6 @@
   "documents__19__file.pdf": {
    "path": "/api/documents/19/file",
    "bytes": 9665,
-   "type": "application/pdf"
-  },
-  "documents__2__file.pdf": {
-   "path": "/api/documents/2/file",
-   "bytes": 6009,
    "type": "application/pdf"
   },
   "documents__20__file.pdf": {
@@ -216,11 +176,6 @@
    "bytes": 502,
    "type": "application/pdf"
   },
-  "documents__27__file.pdf": {
-   "path": "/api/documents/27/file",
-   "bytes": 502,
-   "type": "application/pdf"
-  },
   "documents__28__file.pdf": {
    "path": "/api/documents/28/file",
    "bytes": 6898,
@@ -229,11 +184,6 @@
   "documents__29__file.pdf": {
    "path": "/api/documents/29/file",
    "bytes": 6898,
-   "type": "application/pdf"
-  },
-  "documents__3__file.pdf": {
-   "path": "/api/documents/3/file",
-   "bytes": 9829,
    "type": "application/pdf"
   },
   "documents__30__file.pdf": {
@@ -295,11 +245,6 @@
    "path": "/api/documents/39/sheets",
    "bytes": 1541,
    "type": "application/json"
-  },
-  "documents__4__file.pdf": {
-   "path": "/api/documents/4/file",
-   "bytes": 9665,
-   "type": "application/pdf"
   },
   "documents__40__original.bin": {
    "path": "/api/documents/40/original",
@@ -386,11 +331,6 @@
    "bytes": 5718,
    "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   },
-  "documents__5__file.pdf": {
-   "path": "/api/documents/5/file",
-   "bytes": 222380,
-   "type": "application/pdf"
-  },
   "documents__6__file.pdf": {
    "path": "/api/documents/6/file",
    "bytes": 10097,
@@ -404,11 +344,6 @@
   "documents__8__file.pdf": {
    "path": "/api/documents/8/file",
    "bytes": 9829,
-   "type": "application/pdf"
-  },
-  "documents__9__file.pdf": {
-   "path": "/api/documents/9/file",
-   "bytes": 10097,
    "type": "application/pdf"
   },
   "loss-runs.json": {
@@ -523,27 +458,12 @@
   },
   "queue~4b8f3908.json": {
    "path": "/api/queue?line=commercial",
-   "bytes": 5004,
+   "bytes": 2652,
    "type": "application/json"
   },
   "queue~1db159ce.json": {
    "path": "/api/queue?line=personal",
    "bytes": 1238,
-   "type": "application/json"
-  },
-  "runs__1.json": {
-   "path": "/api/runs/1",
-   "bytes": 1252,
-   "type": "application/json"
-  },
-  "runs__1__messages.json": {
-   "path": "/api/runs/1/messages",
-   "bytes": 15,
-   "type": "application/json"
-  },
-  "runs__1__suggestions.json": {
-   "path": "/api/runs/1/suggestions",
-   "bytes": 18,
    "type": "application/json"
   },
   "runs__10.json": {
@@ -641,21 +561,6 @@
    "bytes": 144,
    "type": "application/json"
   },
-  "runs__2.json": {
-   "path": "/api/runs/2",
-   "bytes": 1510,
-   "type": "application/json"
-  },
-  "runs__2__messages.json": {
-   "path": "/api/runs/2/messages",
-   "bytes": 15,
-   "type": "application/json"
-  },
-  "runs__2__suggestions.json": {
-   "path": "/api/runs/2/suggestions",
-   "bytes": 18,
-   "type": "application/json"
-  },
   "runs__3.json": {
    "path": "/api/runs/3",
    "bytes": 1676,
@@ -678,56 +583,6 @@
   },
   "runs__3__suggestions.json": {
    "path": "/api/runs/3/suggestions",
-   "bytes": 144,
-   "type": "application/json"
-  },
-  "runs__4.json": {
-   "path": "/api/runs/4",
-   "bytes": 1238,
-   "type": "application/json"
-  },
-  "runs__4__artifact.json": {
-   "path": "/api/runs/4/artifact",
-   "bytes": 19582,
-   "type": "application/json"
-  },
-  "runs__4__discrepancies.json": {
-   "path": "/api/runs/4/discrepancies",
-   "bytes": 183,
-   "type": "application/json"
-  },
-  "runs__4__messages.json": {
-   "path": "/api/runs/4/messages",
-   "bytes": 15,
-   "type": "application/json"
-  },
-  "runs__4__suggestions.json": {
-   "path": "/api/runs/4/suggestions",
-   "bytes": 144,
-   "type": "application/json"
-  },
-  "runs__5.json": {
-   "path": "/api/runs/5",
-   "bytes": 2213,
-   "type": "application/json"
-  },
-  "runs__5__artifact.json": {
-   "path": "/api/runs/5/artifact",
-   "bytes": 42284,
-   "type": "application/json"
-  },
-  "runs__5__discrepancies.json": {
-   "path": "/api/runs/5/discrepancies",
-   "bytes": 183,
-   "type": "application/json"
-  },
-  "runs__5__messages.json": {
-   "path": "/api/runs/5/messages",
-   "bytes": 15,
-   "type": "application/json"
-  },
-  "runs__5__suggestions.json": {
-   "path": "/api/runs/5/suggestions",
    "bytes": 144,
    "type": "application/json"
   },
@@ -806,29 +661,14 @@
    "bytes": 144,
    "type": "application/json"
   },
-  "runs__9.json": {
-   "path": "/api/runs/9",
-   "bytes": 5331,
-   "type": "application/json"
-  },
-  "runs__9__messages.json": {
-   "path": "/api/runs/9/messages",
-   "bytes": 15,
-   "type": "application/json"
-  },
-  "runs__9__suggestions.json": {
-   "path": "/api/runs/9/suggestions",
-   "bytes": 18,
-   "type": "application/json"
-  },
   "runs~9c03c67e.json": {
    "path": "/api/runs?limit=100",
-   "bytes": 26723,
+   "bytes": 15439,
    "type": "application/json"
   },
   "runs~e2ff118b.json": {
    "path": "/api/runs?limit=100&line=commercial",
-   "bytes": 23394,
+   "bytes": 12110,
    "type": "application/json"
   },
   "runs~124d1335.json": {
@@ -838,12 +678,12 @@
   },
   "runs~7bc85e71.json": {
    "path": "/api/runs?limit=20",
-   "bytes": 26723,
+   "bytes": 15439,
    "type": "application/json"
   },
   "runs~a49b75d8.json": {
    "path": "/api/runs?limit=20&line=commercial",
-   "bytes": 23394,
+   "bytes": 12110,
    "type": "application/json"
   },
   "runs~89ea03de.json": {
@@ -895,32 +735,15 @@
    "status": 404
   },
   {
-   "path": "/api/runs/1/artifact",
-   "status": 404
-  },
-  {
-   "path": "/api/runs/1/discrepancies",
-   "status": 404
-  },
-  {
    "path": "/api/runs/12/suggestions",
    "status": 500
-  },
-  {
-   "path": "/api/runs/2/artifact",
-   "status": 404
-  },
-  {
-   "path": "/api/runs/2/discrepancies",
-   "status": 404
-  },
-  {
-   "path": "/api/runs/9/artifact",
-   "status": 404
-  },
-  {
-   "path": "/api/runs/9/discrepancies",
-   "status": 404
   }
+ ],
+ "hidden_runs": [
+  1,
+  2,
+  4,
+  5,
+  9
  ]
 }

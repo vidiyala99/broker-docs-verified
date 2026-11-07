@@ -15,6 +15,7 @@ import { existsSync, readFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { HIDDEN_RUNS, prune } from "./demo-prune.mjs";
 import { chromium } from "@playwright/test";
 import { demoFile } from "../src/api/demoKey.ts";
 import { exercise } from "./demo-exercise.mjs";
@@ -268,6 +269,8 @@ try {
   await crawl(runs);
   await extras(runs);
   await write();
+  const pruned = prune();
+  log(`pruned failure-path runs ${HIDDEN_RUNS.join(", ")}: removed ${pruned.removed} files, edited ${pruned.edited}`);
 } finally {
   stopAll();
 }
