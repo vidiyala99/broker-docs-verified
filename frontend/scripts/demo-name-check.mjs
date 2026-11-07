@@ -25,8 +25,11 @@ const ALLOWED = [
   /<title>BrokerDocs<\/title>/g, // index.html
   /(["'`])brokerdocs[.:][A-Za-z0-9.-]+\1/g, // brokerdocs.policyCheckDraft.v1, brokerdocs.proposal-draft.v1, brokerdocs:proposal-draft-restored
 ];
-const NAME = /brokerdocs/i;
-const NAME16 = Buffer.from("brokerdocs", "utf16le").toString("latin1");
+// Built from parts so publish_scrub.py leaves it alone: in the public copy this still hunts for the original name
+// (a literal would be rewritten to "brokerdocs", which the scrubbed PDF metadata legitimately carries).
+const WORD = ["out", "market"].join("");
+const NAME = new RegExp(WORD, "i");
+const NAME16 = Buffer.from(WORD, "utf16le").toString("latin1");
 
 const problems = [];
 const unreadable = [];
@@ -47,7 +50,7 @@ function bytesHit(buf) {
   if (NAME.test(latin)) return "ascii";
   const lower = latin.toLowerCase();
   if (lower.includes(NAME16)) return "utf-16le";
-  const be = Buffer.from("brokerdocs", "utf16le").swap16().toString("latin1");
+  const be = Buffer.from(WORD, "utf16le").swap16().toString("latin1");
   if (lower.includes(be)) return "utf-16be";
   // PDF hex strings <4f75746d61726b6574>
   const hex = latin.replace(/\s+/g, "").toLowerCase();
