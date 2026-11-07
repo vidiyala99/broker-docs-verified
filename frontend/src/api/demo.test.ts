@@ -76,6 +76,11 @@ describe("request() in demo mode", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("nope", { status: 404 })));
     await expect(request("/api/runs/99")).rejects.toBeInstanceOf(ApiError);
   });
+  it("replays a recorded error with its status", async () => {
+    vi.stubEnv("VITE_DEMO", "1");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ __demo_status: 404, error: { code: "no_artifact", message: "No report yet." } })));
+    await expect(request("/api/runs/1/artifact")).rejects.toMatchObject({ status: 404, code: "no_artifact", message: "No report yet." });
+  });
   it.each(["POST", "PATCH", "PUT", "DELETE"])("rejects %s with the read-only message and never fetches", async (method) => {
     vi.stubEnv("VITE_DEMO", "1");
     const fetchMock = vi.fn();

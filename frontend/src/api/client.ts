@@ -92,7 +92,16 @@ async function demoRequest<T>(path: string, init: RequestInit): Promise<T> {
   if (!res.ok || !(res.headers.get("Content-Type") ?? "").includes("json")) {
     return parse<T>(new Response(JSON.stringify({ error: { code: "not_found", message: "Not found." } }), { status: 404 }));
   }
-  return parse<T>(res);
+  // A request the UI makes that the live API answers with an error (a run with no report yet is a 404) is recorded as
+  // {"__demo_status": 404, "error": {...}}: replayed with its status, so the UI takes the same path and no request fails.
+  const text = await res.text();
+  try {
+    const body = JSON.parse(text) as { __demo_status?: number };
+    if (body && typeof body.__demo_status === "number") return parse<T>(new Response(text, { status: body.__demo_status }));
+  } catch {
+    /* not JSON: parse() below reports it */
+  }
+  return parse<T>(new Response(text, { status: 200 }));
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
