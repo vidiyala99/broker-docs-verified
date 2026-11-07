@@ -418,3 +418,11 @@ Upload folds when Done ("N documents, all read"), compact document rows with "+N
 - Found while recording: seeded backend 500 on `GET /api/runs/12/suggestions` (loss review chat suggestions). Demo shows no suggestions there; live bug not investigated.
 - Main still has uncommitted `CLAUDE.md` (routing section) and deploy-spec edits plus untracked `skills-lock.json` from earlier sessions: owner's call. `frontend/qa-screenshots/demo-static/` lives only in the worktree `.claude/worktrees/demo-static` (not committed); remove the worktree after unlinking node_modules.
 - **Next (fresh session, each needs owner OK):** `publish_scrub.py` + push to public broker-docs-verified; Vercel deploy of `frontend` with `npm run build:demo` (output `dist`); then link it from the README. Oracle VM backend still waits on the owner's card signup. Also open from 11-05: T8 docs, dev_seed fake-chat crash, runs/12 suggestions 500.
+
+## 2026-11-07 00:10: public push + live static demo
+- Public broker-docs-verified pushed by owner: main 0d3569a..cfadbf9 (fast-forward, 8 commits incl. 8042926). Scrubbed clone checked first: 0 "brokerdocs" in files/binaries/paths/messages, one identity, no Claude trailers, build:demo + demo QA pass.
+- 8042926: demo name check builds the word from parts; the scrub had rewritten its literal to "brokerdocs" (which scrubbed PDF metadata carries), failing build:demo in the public copy.
+- **Live demo: https://broker-docs-verified.vercel.app** (Vercel project vidiyala99s-projects/broker-docs-verified, deployed with the CLI from the scrubbed clone, vercel.json: npm ci, build:demo, dist). Demo QA against the live URL: 54 views pass, title BrokerDocs, 0 name hits, /demo/*.json served as JSON.
+- Redeploy: fresh scrub clone (per publish memory), then in its `frontend/`: `vercel link --yes --project broker-docs-verified && vercel deploy --prod`. Not wired to git yet (no deploy-on-push).
+- Stray Vercel project `vidiyala99s-projects/frontend` (created by a link without --project, empty): owner can delete it in the dashboard.
+- **Next:** link the live demo from the root README (then scrub + owner push); optionally connect the Vercel project to the GitHub repo for deploy-on-push; plus the 11-06 list (runs/12 suggestions 500, dev_seed fake-chat crash, T8 docs, Oracle backend).
